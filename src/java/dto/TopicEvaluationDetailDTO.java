@@ -32,6 +32,18 @@ public class TopicEvaluationDetailDTO implements Serializable {
     private BigDecimal totalEstimateAmount = BigDecimal.ZERO;
     private List<CriteriaConfig> criteriaList = new ArrayList<>();
 
+    // Evaluation Session Audit Fields (SCR-2.3 Review & Read-only State)
+    private Integer evaluationId;
+    private Integer evaluatorUserId;
+    private String evaluatorName;
+    private String evaluationStage;
+    private String evaluationDecision;
+    private String evaluationComments;
+    private Double compositeScore;
+    private Double legalRiskScore;
+    private java.util.Map<Integer, Double> evaluatedScores = new java.util.HashMap<>();
+    private java.util.Map<Integer, String> evaluatedComments = new java.util.HashMap<>();
+
     public TopicEvaluationDetailDTO() {
     }
 
@@ -192,5 +204,85 @@ public class TopicEvaluationDetailDTO implements Serializable {
 
     public void setCriteriaList(List<CriteriaConfig> criteriaList) {
         this.criteriaList = criteriaList;
+    }
+
+    public Integer getEvaluationId() {
+        return evaluationId;
+    }
+
+    public void setEvaluationId(Integer evaluationId) {
+        this.evaluationId = evaluationId;
+    }
+
+    public Integer getEvaluatorUserId() {
+        return evaluatorUserId;
+    }
+
+    public void setEvaluatorUserId(Integer evaluatorUserId) {
+        this.evaluatorUserId = evaluatorUserId;
+    }
+
+    public String getEvaluatorName() {
+        return evaluatorName;
+    }
+
+    public void setEvaluatorName(String evaluatorName) {
+        this.evaluatorName = evaluatorName;
+    }
+
+    public String getEvaluationStage() {
+        return evaluationStage;
+    }
+
+    public void setEvaluationStage(String evaluationStage) {
+        this.evaluationStage = evaluationStage;
+    }
+
+    public String getEvaluationDecision() {
+        return evaluationDecision;
+    }
+
+    public void setEvaluationDecision(String evaluationDecision) {
+        this.evaluationDecision = evaluationDecision;
+    }
+
+    public String getEvaluationComments() {
+        return evaluationComments;
+    }
+
+    public void setEvaluationComments(String evaluationComments) {
+        this.evaluationComments = evaluationComments;
+    }
+
+    public Double getCompositeScore() {
+        return compositeScore;
+    }
+
+    public void setCompositeScore(Double compositeScore) {
+        this.compositeScore = compositeScore;
+    }
+
+    public Double getLegalRiskScore() {
+        return legalRiskScore;
+    }
+
+    public void setLegalRiskScore(Double legalRiskScore) {
+        this.legalRiskScore = legalRiskScore;
+    }
+
+    public java.util.Map<Integer, Double> getEvaluatedScores() {
+        return evaluatedScores;
+    }
+
+    public void setEvaluatedScores(java.util.Map<Integer, Double> evaluatedScores) {
+        this.evaluatedScores = evaluatedScores;
+    }
+
+    public java.util.Map<Integer, String> getEvaluatedComments() {
+        return evaluatedComments;
+    }
+
+    public void setEvaluatedComments(java.util.Map<Integer, String> evaluatedComments) {
+        this.evaluatedComments = evaluatedComments;
     }
 }

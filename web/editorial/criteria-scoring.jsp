@@ -349,6 +349,57 @@
 
                 <!-- RIGHT COLUMN: Rubric Scoring Desk & Decision Panel -->
                 <div>
+                    <c:set var="isReadOnly" value="${topic.status != 'SUBMITTED'}" />
+
+                    <!-- Lock Notice Banner if topic is escalated to Executive -->
+                    <c:if test="${isReadOnly}">
+                        <div style="margin-bottom: 16px; padding: 14px 18px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 14px; background: #fff8e6; color: #b26a00; border: 1px solid #ffe082;">
+                            <span style="font-size: 28px;">🔒</span>
+                            <div>
+                                <div style="font-size: 15px; font-weight: 800; text-transform: uppercase;">
+                                    ĐỀ TÀI ĐANG CHỜ TỔNG BIÊN TẬP PHÊ DUYỆT ĐIỀU HÀNH
+                                </div>
+                                <div style="margin-top: 3px; font-size: 13px; font-weight: normal; color: #7c4a00; line-height: 1.4;">
+                                    Đề tài đã hoàn tất thẩm định đợt 1 và chuyển vượt cấp lên Tổng Biên Tập. Trưởng ban không được phép chỉnh sửa điểm số hoặc phê duyệt tại trạng thái này.
+                                </div>
+                            </div>
+                        </div>
+                    </c:if>
+
+                    <!-- Audit Trail Card of Previous Evaluation Session -->
+                    <c:if test="${not empty topic.evaluationDecision or not empty topic.evaluatorName}">
+                        <div class="card" style="margin-bottom: 16px; background: #f8fafc; border-left: 4px solid #b26a00; padding: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px;">
+                                    📋 NHẬT KÝ THẨM ĐỊNH CẤP 1 (AUDIT LOG)
+                                </span>
+                                <span class="badge b-escalated" style="font-size: 12px; padding: 4px 10px;">
+                                    Trạng thái: ${topic.evaluationDecision}
+                                </span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+                                <div>
+                                    <span class="muted" style="display:block; font-size: 11px;">NGƯỜI THẨM ĐỊNH</span>
+                                    <strong>${not empty topic.evaluatorName ? topic.evaluatorName : 'Trường (Desk Editor)'}</strong>
+                                </div>
+                                <div>
+                                    <span class="muted" style="display:block; font-size: 11px;">ĐIỂM TỔNG HỢP RUBRIC</span>
+                                    <strong style="color: var(--primary); font-size: 15px;">
+                                        <fmt:formatNumber value="${topic.compositeScore != null ? topic.compositeScore : 8.5}" pattern="0.0"/> / 10
+                                    </strong>
+                                </div>
+                            </div>
+                            <c:if test="${not empty topic.evaluationComments}">
+                                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px;">
+                                    <span class="muted" style="display:block; font-size: 11px; margin-bottom: 2px;">CĂN CỨ / Ý KIẾN TRƯỞNG BAN GỬI TBT</span>
+                                    <p style="margin: 0; font-style: italic; color: var(--text);">
+                                        "${topic.evaluationComments}"
+                                    </p>
+                                </div>
+                            </c:if>
+                        </div>
+                    </c:if>
+
                     <form id="evalForm" method="post" action="${pageContext.request.contextPath}/editorial/criteria-scoring">
                         <input type="hidden" name="topicId" value="${topic.topicId}">
                         <input type="hidden" name="decision" id="decisionInput" value="APPROVED">
@@ -357,7 +408,14 @@
                         <div class="card">
                             <div class="card-title">
                                 <h2>⚖️ Bàn Chấm Điểm Rubric Tiêu Chí (1 - 10)</h2>
-                                <span class="tag" style="background:#eef2ff; color:var(--primary); font-weight:700;">4 Tiêu chí chuẩn</span>
+                                <c:choose>
+                                    <c:when test="${isReadOnly}">
+                                        <span class="tag" style="background:#fff3e0; color:#b26a00; font-weight:700;">🔒 Chế độ Chỉ xem</span>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <span class="tag" style="background:#eef2ff; color:var(--primary); font-weight:700;">4 Tiêu chí chuẩn</span>
+                                    </c:otherwise>
+                                </c:choose>
                             </div>
 
                             <!-- Realtime Total Score Display -->
@@ -367,7 +425,9 @@
                                         ĐIỂM TỔNG HỢP CÓ TRỌNG SỐ (WEIGHTED SCORE)
                                     </span>
                                     <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
-                                        <span class="total-score-val" id="totalWeightedScore">8.5</span>
+                                        <span class="total-score-val" id="totalWeightedScore">
+                                            <fmt:formatNumber value="${topic.compositeScore != null ? topic.compositeScore : 8.5}" pattern="0.0"/>
+                                        </span>
                                         <span style="font-size: 18px; opacity: 0.7;">/ 10</span>
                                     </div>
                                     <small id="verdictLabel" style="color: #5de0a5; font-weight: 700; margin-top: 4px; display: block;">
@@ -384,6 +444,8 @@
 
                             <!-- List of Rubric Criteria -->
                             <c:forEach items="${criteriaList}" var="c">
+                                <c:set var="curScore" value="${not empty topic.evaluatedScores[c.criteriaId] ? topic.evaluatedScores[c.criteriaId] : 8.5}" />
+                                <c:set var="curComment" value="${topic.evaluatedComments[c.criteriaId]}" />
                                 <div class="criteria-card">
                                     <div class="criteria-header">
                                         <b>${c.criteriaName}</b>
@@ -393,28 +455,35 @@
                                     </div>
                                     <div class="criteria-inputs">
                                         <input type="range"
-                                               min="1.0" max="10.0" step="0.5" value="8.5"
+                                               min="1.0" max="10.0" step="0.5"
+                                               value="${curScore}"
                                                data-weight="${c.weightPercent}"
                                                data-criteria-id="${c.criteriaId}"
                                                class="criterion-slider"
+                                               ${isReadOnly ? 'disabled' : ''}
                                                oninput="syncScore(this)">
                                         <input type="number"
-                                               min="1.0" max="10.0" step="0.5" value="8.5"
+                                               min="1.0" max="10.0" step="0.5"
+                                               value="${curScore}"
                                                name="score_${c.criteriaId}"
                                                id="score_input_${c.criteriaId}"
                                                class="score-box criterion-number"
+                                               ${isReadOnly ? 'readonly' : ''}
                                                oninput="syncSlider(this, ${c.criteriaId})">
                                     </div>
                                     <div style="margin-top: 8px;">
                                         <input type="text"
                                                name="comment_${c.criteriaId}"
-                                               placeholder="Ghi chú đánh giá cho tiêu chí này (tùy chọn)..."
-                                               style="width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; background: #fff;">
+                                               value="${curComment}"
+                                               ${isReadOnly ? 'readonly' : ''}
+                                               placeholder="${isReadOnly ? 'Không có ghi chú thêm.' : 'Ghi chú đánh giá cho tiêu chí này (tùy chọn)...'}"
+                                               style="width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; background: ${isReadOnly ? '#f8fafc' : '#fff'};">
                                     </div>
                                 </div>
                             </c:forEach>
 
                             <!-- Legal Risk Exposure Slider (Guard Clause) -->
+                            <c:set var="curLegalRisk" value="${topic.legalRiskScore != null && topic.legalRiskScore > 0 ? topic.legalRiskScore : 3.0}" />
                             <div class="legal-risk-box" id="legalRiskContainer">
                                 <div class="criteria-header">
                                     <div>
@@ -423,16 +492,18 @@
                                             Thang 1-10: Đánh giá nguy cơ vi phạm bảo mật nguồn tin, vu khống, bản quyền hoặc tranh chấp pháp lý.
                                         </small>
                                     </div>
-                                    <span class="badge b-escalated" id="legalBadge">Rủi ro: 3.0 / 10</span>
+                                    <span class="badge b-escalated" id="legalBadge">Rủi ro: ${curLegalRisk} / 10</span>
                                 </div>
 
                                 <div class="criteria-inputs" style="margin-top: 8px;">
                                     <input type="range"
-                                           min="1.0" max="10.0" step="0.5" value="3.0"
+                                           min="1.0" max="10.0" step="0.5"
+                                           value="${curLegalRisk}"
                                            name="legalRiskScore"
                                            id="legalRiskSlider"
+                                           ${isReadOnly ? 'disabled' : ''}
                                            oninput="handleLegalRiskChange(this.value)">
-                                    <span id="legalScoreDisplay" class="score-box" style="color: #b26a00;">3.0</span>
+                                    <span id="legalScoreDisplay" class="score-box" style="color: #b26a00;">${curLegalRisk}</span>
                                 </div>
 
                                 <div class="guard-alert" id="guardAlertBox">
@@ -446,8 +517,9 @@
                                     💬 Ý Kiến & Nhận Xét Của BTV (Gửi Phóng Viên & Ban Biên Tập):
                                 </label>
                                 <textarea name="comments" id="editorialComments" rows="3"
-                                          placeholder="Nhập lý do phê duyệt, nội dung cần phóng viên hoàn thiện hoặc căn cứ chuyển TBT..."
-                                          style="width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: vertical;"></textarea>
+                                          ${isReadOnly ? 'readonly' : ''}
+                                          placeholder="${isReadOnly ? 'Không có ý kiến thêm.' : 'Nhập lý do phê duyệt, nội dung cần phóng viên hoàn thiện hoặc căn cứ chuyển TBT...'}"
+                                          style="width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: vertical; background: ${isReadOnly ? '#f8fafc' : '#fff'};">${topic.evaluationComments}</textarea>
                             </div>
 
                             <!-- Score Threshold Warning Box -->
@@ -455,25 +527,39 @@
                                 🚫 <strong>ĐIỂM CHƯA ĐẠT CHUẨN (Tổng: <span id="scoreAlertVal">0.0</span> / 10 &lt; 5.0):</strong> Đề tài không đáp ứng ngưỡng chất lượng tối thiểu để Phê duyệt Cấp 1 trực tiếp. BTV chỉ được phép chọn <strong>"Yêu cầu chỉnh sửa đề cương"</strong> hoặc <strong>"Bác bỏ đề tài"</strong>.
                             </div>
 
-                            <!-- Action Buttons Group -->
-                            <div class="btn-decision-group">
-                                <button type="button" id="btnApprove" class="btn-decision btn-approve"
-                                        onclick="submitDecision('APPROVED')">
-                                    ✔ Phê duyệt Cấp 1 (APPROVED)
-                                </button>
-                                <button type="button" id="btnEscalate" class="btn-decision btn-escalate"
-                                        onclick="submitDecision('ESCALATED')">
-                                    🚀 Chuyển lên Tổng Biên Tập
-                                </button>
-                                <button type="button" class="btn-decision btn-revise"
-                                        onclick="submitDecision('REVISION_REQUESTED')">
-                                    🔄 Yêu cầu chỉnh sửa đề cương
-                                </button>
-                                <button type="button" class="btn-decision btn-reject"
-                                        onclick="submitDecision('REJECTED')">
-                                    ✖ Bác bỏ đề tài
-                                </button>
-                            </div>
+                            <!-- Action Buttons Group / Read-only Return Navigation -->
+                            <c:choose>
+                                <c:when test="${isReadOnly}">
+                                    <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);">
+                                        <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="btn" style="border: 1px solid var(--line); padding: 10px 18px;">
+                                            &larr; Quay lại Hàng đợi Thẩm định
+                                        </a>
+                                        <span class="badge b-escalated" style="padding: 10px 16px; font-size: 13px; font-weight: 700;">
+                                            🔒 Hồ sơ đã chuyển TBT — Khóa chỉnh sửa
+                                        </span>
+                                    </div>
+                                </c:when>
+                                <c:otherwise>
+                                    <div class="btn-decision-group">
+                                        <button type="button" id="btnApprove" class="btn-decision btn-approve"
+                                                onclick="submitDecision('APPROVED')">
+                                            ✔ Phê duyệt Cấp 1 (APPROVED)
+                                        </button>
+                                        <button type="button" id="btnEscalate" class="btn-decision btn-escalate"
+                                                onclick="submitDecision('ESCALATED')">
+                                            🚀 Chuyển lên Tổng Biên Tập
+                                        </button>
+                                        <button type="button" class="btn-decision btn-revise"
+                                                onclick="submitDecision('REVISION_REQUESTED')">
+                                            🔄 Yêu cầu chỉnh sửa đề cương
+                                        </button>
+                                        <button type="button" class="btn-decision btn-reject"
+                                                onclick="submitDecision('REJECTED')">
+                                            ✖ Bác bỏ đề tài
+                                        </button>
+                                    </div>
+                                </c:otherwise>
+                            </c:choose>
                         </div>
                     </form>
                 </div>
@@ -570,26 +656,28 @@
         if (isHighLegalRisk) {
             container.classList.add('high-risk');
             legalAlertBox.style.display = 'block';
-            btnEscalate.style.boxShadow = '0 0 0 3px rgba(178, 106, 0, 0.4)';
+            if (btnEscalate) btnEscalate.style.boxShadow = '0 0 0 3px rgba(178, 106, 0, 0.4)';
         } else {
             container.classList.remove('high-risk');
             legalAlertBox.style.display = 'none';
-            btnEscalate.style.boxShadow = 'none';
+            if (btnEscalate) btnEscalate.style.boxShadow = 'none';
         }
 
         // Approval button state
-        if (isScoreFailed || isHighLegalRisk) {
-            btnApprove.disabled = true;
-            if (isScoreFailed && isHighLegalRisk) {
-                btnApprove.title = 'Điểm < 5.0 và Rủi ro >= 8.0: Không đủ điều kiện phê duyệt Cấp 1.';
-            } else if (isScoreFailed) {
-                btnApprove.title = 'Điểm tổng hợp (' + finalScore.toFixed(1) + '/10) < 5.0: Chưa đạt ngưỡng tối thiểu phê duyệt.';
+        if (btnApprove) {
+            if (isScoreFailed || isHighLegalRisk) {
+                btnApprove.disabled = true;
+                if (isScoreFailed && isHighLegalRisk) {
+                    btnApprove.title = 'Điểm < 5.0 và Rủi ro >= 8.0: Không đủ điều kiện phê duyệt Cấp 1.';
+                } else if (isScoreFailed) {
+                    btnApprove.title = 'Điểm tổng hợp (' + finalScore.toFixed(1) + '/10) < 5.0: Chưa đạt ngưỡng tối thiểu phê duyệt.';
+                } else {
+                    btnApprove.title = 'Rủi ro pháp lý >= 8.0: Bắt buộc chuyển lên TBT duyệt vượt cấp.';
+                }
             } else {
-                btnApprove.title = 'Rủi ro pháp lý >= 8.0: Bắt buộc chuyển lên TBT duyệt vượt cấp.';
+                btnApprove.disabled = false;
+                btnApprove.title = 'Đủ điều kiện phê duyệt Cấp 1 trực tiếp.';
             }
-        } else {
-            btnApprove.disabled = false;
-            btnApprove.title = 'Đủ điều kiện phê duyệt Cấp 1 trực tiếp.';
         }
     }
 

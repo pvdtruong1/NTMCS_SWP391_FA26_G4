@@ -103,15 +103,27 @@ public class CriteriaScoringTest {
             scores.put(3, 7.5);
             scores.put(4, 7.0);
 
-            boolean ok = dao.evaluateTopic(2, 1, "ESCALATED", "Chuyển TBT do rủi ro pháp lý cao.", scores, null, 8.5);
+            Map<Integer, String> comments = new HashMap<>();
+            comments.put(1, "Tin độc quyền chất lượng cao.");
+
+            boolean ok = dao.evaluateTopic(2, 1, "ESCALATED", "Chuyển TBT do rủi ro pháp lý cao.", scores, comments, 8.5);
 
             TopicEvaluationDetailDTO updated = dao.getTopicDetailForEvaluation(2);
+            boolean scoresRetained = updated != null && updated.getEvaluatedScores() != null &&
+                                     updated.getEvaluatedScores().get(1) != null &&
+                                     updated.getEvaluatedScores().get(1) == 8.0 &&
+                                     updated.getEvaluatorName() != null &&
+                                     updated.getLegalRiskScore() != null &&
+                                     updated.getLegalRiskScore() == 8.5 &&
+                                     updated.getCompositeScore() != null &&
+                                     updated.getCompositeScore() > 0.0;
+
             if (ok && updated != null && "PENDING_EXECUTIVE_APPROVAL".equals(updated.getStatus()) &&
-                updated.getTopicCode() == null) {
-                System.out.println("[PASS] Test 4: Escalation successful. Status = PENDING_EXECUTIVE_APPROVAL, topic_code = null.");
+                updated.getTopicCode() == null && scoresRetained) {
+                System.out.println("[PASS] Test 4: Escalation successful. Status = PENDING_EXECUTIVE_APPROVAL, topic_code = null, Desk Editor scores & legal risk verified.");
                 passed++;
             } else {
-                System.err.println("[FAIL] Test 4: Escalation failed. Status=" + (updated != null ? updated.getStatus() : "null"));
+                System.err.println("[FAIL] Test 4: Escalation failed. Status=" + (updated != null ? updated.getStatus() : "null") + ", scoresRetained=" + scoresRetained);
                 failed++;
             }
         } catch (Exception e) {
@@ -121,6 +133,10 @@ public class CriteriaScoringTest {
 
         // Test 5: Revision Request Flow (REVISION_REQUESTED -> No-Bypass loopback)
         try {
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'SUBMITTED', topic_code = NULL WHERE topic_id = 1;")) {
+                ps.executeUpdate();
+            }
+
             Map<Integer, Double> scores = new HashMap<>();
             scores.put(1, 6.0);
             scores.put(2, 5.5);
@@ -144,6 +160,10 @@ public class CriteriaScoringTest {
 
         // Test 6: Rejection Flow (REJECTED -> Routes to Idea Archive)
         try {
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'SUBMITTED', topic_code = NULL WHERE topic_id = 1;")) {
+                ps.executeUpdate();
+            }
+
             Map<Integer, Double> scores = new HashMap<>();
             scores.put(1, 4.0);
             scores.put(2, 3.5);
@@ -153,7 +173,7 @@ public class CriteriaScoringTest {
             boolean ok = dao.evaluateTopic(1, 1, "REJECTED", "Không đạt chuẩn thời sự.", scores, null, 1.0);
 
             TopicEvaluationDetailDTO updated = dao.getTopicDetailForEvaluation(1);
-            if (ok && updated != null && "REVISION_REQUESTED".equals(updated.getStatus()) || "REJECTED".equals(updated.getStatus())) {
+            if (ok && updated != null && "REJECTED".equals(updated.getStatus())) {
                 System.out.println("[PASS] Test 6: Rejection flow verified. Status = REJECTED.");
                 passed++;
             } else {
@@ -197,6 +217,10 @@ public class CriteriaScoringTest {
 
         // Test 8: Passing Score Threshold Guard (Direct approval with score < 5.0 must throw IllegalStateException)
         try {
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'SUBMITTED', topic_code = NULL WHERE topic_id = 1;")) {
+                ps.executeUpdate();
+            }
+
             Map<Integer, Double> failingScores = new HashMap<>();
             failingScores.put(1, 2.0);
             failingScores.put(2, 2.5);
@@ -219,6 +243,36 @@ public class CriteriaScoringTest {
             }
         } catch (Exception e) {
             System.err.println("[FAIL] Test 8: Exception - " + e.getMessage());
+            failed++;
+        }
+
+        // Test 9: Defense-in-Depth Status Locking Guard (Evaluating non-SUBMITTED topic must throw IllegalStateException)
+        try {
+            // Topic 2 was escalated to PENDING_EXECUTIVE_APPROVAL in Test 4
+            Map<Integer, Double> dummyScores = new HashMap<>();
+            dummyScores.put(1, 9.0);
+            dummyScores.put(2, 9.0);
+            dummyScores.put(3, 9.0);
+            dummyScores.put(4, 9.0);
+
+            boolean threwLockException = false;
+            try {
+                dao.evaluateTopic(2, 1, "APPROVED", "Cố tình phê duyệt đề tài đã chuyển TBT", dummyScores, null, 1.0);
+            } catch (IllegalStateException ex) {
+                if (ex.getMessage() != null && ex.getMessage().contains("PENDING_EXECUTIVE_APPROVAL")) {
+                    threwLockException = true;
+                }
+            }
+
+            if (threwLockException) {
+                System.out.println("[PASS] Test 9: Defense-in-depth status guard verified (Evaluation strictly blocked for PENDING_EXECUTIVE_APPROVAL topic).");
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 9: Expected IllegalStateException for non-SUBMITTED topic was not thrown.");
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 9: Exception - " + e.getMessage());
             failed++;
         }
 

@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hàng Đợi Chờ Thẩm Định (SCR-2.2) | NTMCS — Tòa Soạn Hội Tụ</title>
+    <title>Danh Sách Chờ Thẩm Định (SCR-2.2) | NTMCS — Tòa Soạn Hội Tụ</title>
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/style.css">
     <style>
         a, a:hover, a:focus, a:visited, a:active {
@@ -210,6 +210,9 @@
                             <c:when test="${param.error == 'invalid_submission'}">
                                 <b>Thao tác không hợp lệ:</b> Dữ liệu gửi lên không đúng quy cách.
                             </c:when>
+                            <c:when test="${param.error == 'topic_locked_by_exec'}">
+                                <b>Thao tác bị chặn:</b> Đề tài đang chờ Tổng Biên Tập phê duyệt điều hành hoặc đã hoàn tất, Trưởng ban không được phép chỉnh sửa.
+                            </c:when>
                             <c:when test="${param.error == 'server_error'}">
                                 <b>Lỗi máy chủ:</b> Không thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.
                             </c:when>
@@ -341,10 +344,20 @@
                                             </c:choose>
                                         </td>
                                         <td style="text-align: right;">
-                                            <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
-                                               class="btn primary sm">
-                                                Thẩm định &rarr;
-                                            </a>
+                                            <c:choose>
+                                                <c:when test="${t.status == 'PENDING_EXECUTIVE_APPROVAL'}">
+                                                    <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
+                                                       class="btn sm" style="border: 1px solid var(--line); background: #fff; color: var(--text);">
+                                                        Xem thẩm định 👁️
+                                                    </a>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
+                                                       class="btn primary sm">
+                                                        Thẩm định &rarr;
+                                                    </a>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </td>
                                     </tr>
                                 </c:forEach>

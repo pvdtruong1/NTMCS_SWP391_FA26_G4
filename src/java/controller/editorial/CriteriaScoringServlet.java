@@ -142,6 +142,19 @@ public class CriteriaScoringServlet extends HttpServlet {
         Map<Integer, String> criteriaComments = new HashMap<>();
 
         try (TopicDAO topicDAO = new TopicDAO()) {
+            // Defense-in-Depth Guard: Topic MUST be in 'SUBMITTED' state for Desk Review
+            TopicEvaluationDetailDTO existingTopic = topicDAO.getTopicDetailForEvaluation(topicId);
+            if (existingTopic == null) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
+                return;
+            }
+            if (!"SUBMITTED".equalsIgnoreCase(existingTopic.getStatus())) {
+                LOGGER.log(Level.WARNING, "Blocked illegal evaluation attempt on topic {0} with status {1}",
+                        new Object[]{topicId, existingTopic.getStatus()});
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
+                return;
+            }
+
             List<CriteriaConfig> criteriaList = topicDAO.getCriteriaConfigs();
             double totalWeighted = 0.0;
             double totalWeight = 0.0;
@@ -198,7 +211,11 @@ public class CriteriaScoringServlet extends HttpServlet {
             }
         } catch (IllegalStateException ex) {
             LOGGER.log(Level.WARNING, "Domain guard clause violation for topic " + topicId + ": " + ex.getMessage());
-            response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=score_below_threshold");
+            if (ex.getMessage() != null && ex.getMessage().contains("SUBMITTED")) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
+            } else {
+                response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=score_below_threshold");
+            }
         } catch (Exception ex) {
             LOGGER.log(Level.SEVERE, "Error during evaluation of topic " + topicId, ex);
             response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=server_error");

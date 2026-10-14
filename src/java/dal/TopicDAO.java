@@ -372,6 +372,79 @@ public class TopicDAO extends DBContext {
 
                 // Fetch Criteria Configs
                 dto.setCriteriaList(getCriteriaConfigs());
+
+                // Fetch latest Evaluation Session if exists (SCR-2.3 Review & Read-only State)
+                String latestEvalSql = "SELECT TOP 1 te.evaluation_id, te.evaluator_user_id, u.full_name AS evaluator_name, " +
+                                       "             te.evaluation_stage, te.decision, te.comments " +
+                                       "FROM Topic_Evaluation te " +
+                                       "INNER JOIN [User] u ON te.evaluator_user_id = u.user_id " +
+                                       "WHERE te.topic_id = ? " +
+                                       "ORDER BY te.evaluation_id DESC;";
+
+                try (PreparedStatement psEval = conn.prepareStatement(latestEvalSql)) {
+                    psEval.setInt(1, topicId);
+                    try (ResultSet rsEval = psEval.executeQuery()) {
+                        if (rsEval.next()) {
+                            dto.setEvaluationId(rsEval.getInt("evaluation_id"));
+                            dto.setEvaluatorUserId(rsEval.getInt("evaluator_user_id"));
+                            dto.setEvaluatorName(rsEval.getString("evaluator_name"));
+                            dto.setEvaluationStage(rsEval.getString("evaluation_stage"));
+                            dto.setEvaluationDecision(rsEval.getString("decision"));
+
+                            String rawComments = rsEval.getString("comments");
+                            if (rawComments != null) {
+                                // Parse optional Legal Risk prefix if present: "[Rủi ro pháp lý: X.X/10] ..."
+                                if (rawComments.startsWith("[Rủi ro pháp lý: ")) {
+                                    int endIdx = rawComments.indexOf("/10]");
+                                    if (endIdx != -1) {
+                                        try {
+                                            String scoreSub = rawComments.substring("[Rủi ro pháp lý: ".length(), endIdx).trim();
+                                            dto.setLegalRiskScore(Double.parseDouble(scoreSub));
+                                            rawComments = rawComments.substring(endIdx + 4).trim();
+                                        } catch (Exception ignored) {
+                                        }
+                                    }
+                                }
+                            }
+                            dto.setEvaluationComments(rawComments != null ? rawComments : "");
+
+                            // Fetch Evaluation_Detail rows
+                            String detailSql = "SELECT criteria_id, score, item_comment " +
+                                               "FROM Evaluation_Detail " +
+                                               "WHERE evaluation_id = ?;";
+                            Map<Integer, Double> scoreMap = new HashMap<>();
+                            Map<Integer, String> commentMap = new HashMap<>();
+                            try (PreparedStatement psDet = conn.prepareStatement(detailSql)) {
+                                psDet.setInt(1, dto.getEvaluationId());
+                                try (ResultSet rsDet = psDet.executeQuery()) {
+                                    while (rsDet.next()) {
+                                        scoreMap.put(rsDet.getInt("criteria_id"), rsDet.getBigDecimal("score").doubleValue());
+                                        String cmt = rsDet.getString("item_comment");
+                                        if (cmt != null) {
+                                            commentMap.put(rsDet.getInt("criteria_id"), cmt);
+                                        }
+                                    }
+                                }
+                            }
+                            dto.setEvaluatedScores(scoreMap);
+                            dto.setEvaluatedComments(commentMap);
+
+                            // Compute composite weighted score from evaluated scores
+                            if (!scoreMap.isEmpty() && dto.getCriteriaList() != null) {
+                                double totalWeighted = 0.0;
+                                double totalWeight = 0.0;
+                                for (CriteriaConfig cfg : dto.getCriteriaList()) {
+                                    Double s = scoreMap.get(cfg.getCriteriaId());
+                                    if (s != null) {
+                                        totalWeighted += (s * cfg.getWeightPercent());
+                                        totalWeight += cfg.getWeightPercent();
+                                    }
+                                }
+                                dto.setCompositeScore(totalWeight > 0 ? (totalWeighted / totalWeight) : 0.0);
+                            }
+                        }
+                    }
+                }
             }
 
             return dto;
@@ -396,6 +469,30 @@ public class TopicDAO extends DBContext {
         conn.setAutoCommit(false);
 
         try {
+            // 0. Defense-in-Depth Guard: Verify topic status before evaluating
+            String checkTopicStatusSql = "SELECT status FROM Topic WHERE topic_id = ?;";
+            try (PreparedStatement psCheck = conn.prepareStatement(checkTopicStatusSql)) {
+                psCheck.setInt(1, topicId);
+                try (ResultSet rsCheck = psCheck.executeQuery()) {
+                    if (!rsCheck.next()) {
+                        conn.rollback();
+                        throw new IllegalArgumentException("Đề tài #" + topicId + " không tồn tại.");
+                    }
+                    String currentStatus = rsCheck.getString("status");
+                    if (!"SUBMITTED".equalsIgnoreCase(currentStatus)) {
+                        conn.rollback();
+                        throw new IllegalStateException("Đề tài #" + topicId + " đang ở trạng thái '" + currentStatus
+                                + "'. Chỉ đề tài ở trạng thái 'SUBMITTED' mới được phép thẩm định Cấp 1.");
+                    }
+                }
+            }
+
+            // Format full comments with Legal Risk Tag if legalRiskScore > 0
+            String fullComments = comments != null ? comments.trim() : "";
+            if (legalRiskScore > 0) {
+                fullComments = String.format(java.util.Locale.US, "[Rủi ro pháp lý: %.1f/10] ", legalRiskScore) + fullComments;
+            }
+
             // 1. Insert into Topic_Evaluation
             int evalId = 0;
             String insertEvalSql = "INSERT INTO Topic_Evaluation (topic_id, evaluator_user_id, evaluation_stage, decision, comments) " +
@@ -404,7 +501,7 @@ public class TopicDAO extends DBContext {
                 ps.setInt(1, topicId);
                 ps.setInt(2, evaluatorUserId);
                 ps.setString(3, decision);
-                ps.setString(4, comments);
+                ps.setString(4, fullComments);
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (rs.next()) {

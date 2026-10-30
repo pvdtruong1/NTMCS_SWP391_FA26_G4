@@ -1,5 +1,6 @@
 package dao;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -8,10 +9,18 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Topic;
+import model.TopicEstimate;
+import model.TopicMember;
+import model.User;
 
 /**
  * Truy vấn và quản lý đề tài của phóng viên trong NTMCS Workflow 1.
@@ -150,9 +159,16 @@ public class TopicRepository {
     }
 
     /**
-     * Tạo mới hoặc cập nhật đề tài.
+     * Tạo mới hoặc cập nhật đề tài (không kèm dự toán và nhân sự).
      */
     public Topic save(Topic topic) {
+        return save(topic, null, null);
+    }
+
+    /**
+     * Tạo mới hoặc cập nhật đề tài kèm dự toán kinh phí và thành viên tổ tác nghiệp.
+     */
+    public Topic save(Topic topic, List<TopicEstimate> estimates, List<TopicMember> members) {
         if (topic == null) {
             throw new IllegalArgumentException(
                     "Topic không được null.");
@@ -286,6 +302,58 @@ public class TopicRepository {
                     }
                 }
 
+                // Cập nhật Topic_Estimate nếu danh sách được truyền vào
+                if (estimates != null) {
+                    String delEst = "DELETE FROM Topic_Estimate WHERE topic_id = ?";
+                    try (PreparedStatement psDel = conn.prepareStatement(delEst)) {
+                        psDel.setInt(1, topic.getTopicId());
+                        psDel.executeUpdate();
+                    }
+
+                    String insEst = "INSERT INTO Topic_Estimate (topic_id, cost_item, amount) VALUES (?, ?, ?)";
+                    try (PreparedStatement psIns = conn.prepareStatement(insEst)) {
+                        for (TopicEstimate est : estimates) {
+                            if (est == null || est.getCostItem() == null || est.getCostItem().trim().isEmpty()) {
+                                continue;
+                            }
+                            psIns.setInt(1, topic.getTopicId());
+                            psIns.setString(2, est.getCostItem().trim());
+                            psIns.setBigDecimal(3, est.getAmount() != null ? est.getAmount() : BigDecimal.ZERO);
+                            psIns.executeUpdate();
+                        }
+                    }
+                }
+
+                // Cập nhật Topic_Member nếu danh sách được truyền vào
+                if (members != null) {
+                    String delMem = "DELETE FROM Topic_Member WHERE topic_id = ?";
+                    try (PreparedStatement psDel = conn.prepareStatement(delMem)) {
+                        psDel.setInt(1, topic.getTopicId());
+                        psDel.executeUpdate();
+                    }
+
+                    String insMem = "INSERT INTO Topic_Member (topic_id, user_id, role_in_team) VALUES (?, ?, ?)";
+                    try (PreparedStatement psIns = conn.prepareStatement(insMem)) {
+                        Set<Integer> addedUsers = new HashSet<>();
+                        for (TopicMember mem : members) {
+                            if (mem == null || mem.getUserId() <= 0 || addedUsers.contains(mem.getUserId())) {
+                                continue;
+                            }
+                            String role = mem.getRoleInTeam();
+                            if (role == null || role.trim().isEmpty()) {
+                                role = "ASSISTANT";
+                            } else {
+                                role = role.trim();
+                            }
+                            psIns.setInt(1, topic.getTopicId());
+                            psIns.setInt(2, mem.getUserId());
+                            psIns.setString(3, role);
+                            psIns.executeUpdate();
+                            addedUsers.add(mem.getUserId());
+                        }
+                    }
+                }
+
                 conn.commit();
                 return topic;
 
@@ -305,6 +373,7 @@ public class TopicRepository {
                     "Không thể lưu đề tài: " + e.getMessage(), e);
         }
     }
+
 
     /**
      * Lấy ID bắt buộc từ database.
@@ -511,4 +580,172 @@ public class TopicRepository {
                     "Không thể lấy mức độ ưu tiên từ database.", e);
         }
     }
+
+    /**
+     * Lấy danh sách dự toán kinh phí tác nghiệp của đề tài.
+     */
+    public List<TopicEstimate> findEstimatesByTopicId(int topicId) {
+        List<TopicEstimate> list = new ArrayList<>();
+        if (topicId <= 0) {
+            return list;
+        }
+
+        String sql = "SELECT estimate_id, topic_id, cost_item, amount "
+                   + "FROM Topic_Estimate "
+                   + "WHERE topic_id = ? "
+                   + "ORDER BY estimate_id ASC";
+
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, topicId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    TopicEstimate est = new TopicEstimate();
+                    est.setEstimateId(rs.getInt("estimate_id"));
+                    est.setTopicId(rs.getInt("topic_id"));
+                    est.setCostItem(rs.getString("cost_item"));
+                    est.setAmount(rs.getBigDecimal("amount"));
+                    list.add(est);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy dự toán chi phí cho topic " + topicId, e);
+        }
+        return list;
+    }
+
+    /**
+     * Lấy danh sách thành viên tổ tác nghiệp của đề tài.
+     */
+    public List<TopicMember> findMembersByTopicId(int topicId) {
+        List<TopicMember> list = new ArrayList<>();
+        if (topicId <= 0) {
+            return list;
+        }
+
+        String sql = "SELECT tm.member_id, tm.topic_id, tm.user_id, tm.role_in_team, "
+                   + "u.full_name, u.email, r.role_name "
+                   + "FROM Topic_Member tm "
+                   + "JOIN [User] u ON tm.user_id = u.user_id "
+                   + "JOIN Role r ON u.role_id = r.role_id "
+                   + "WHERE tm.topic_id = ? "
+                   + "ORDER BY tm.member_id ASC";
+
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, topicId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    TopicMember tm = new TopicMember();
+                    tm.setMemberId(rs.getInt("member_id"));
+                    tm.setTopicId(rs.getInt("topic_id"));
+                    tm.setUserId(rs.getInt("user_id"));
+                    tm.setRoleInTeam(rs.getString("role_in_team"));
+                    tm.setUserName(rs.getString("full_name"));
+                    tm.setUserEmail(rs.getString("email"));
+                    tm.setUserRole(rs.getString("role_name"));
+                    list.add(tm);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy danh sách thành viên cho topic " + topicId, e);
+        }
+        return list;
+    }
+
+    /**
+     * Lấy tất cả người dùng đang hoạt động trong hệ thống để thêm vào tổ tác nghiệp.
+     */
+    public List<User> findAllActiveUsers() {
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT u.user_id, u.full_name, u.email, u.role_id, r.role_name, u.active_status, u.desk_id, d.desk_name "
+                   + "FROM [User] u "
+                   + "JOIN Role r ON u.role_id = r.role_id "
+                   + "LEFT JOIN Desk d ON u.desk_id = d.desk_id "
+                   + "WHERE u.active_status = 1 "
+                   + "ORDER BY u.user_id ASC";
+
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                User u = new User();
+                u.setUserId(rs.getInt("user_id"));
+                u.setFullName(rs.getString("full_name"));
+                u.setEmail(rs.getString("email"));
+                u.setRoleId(rs.getInt("role_id"));
+                u.setRoleName(rs.getString("role_name"));
+                u.setActiveStatus(rs.getBoolean("active_status"));
+                int deskId = rs.getInt("desk_id");
+                if (!rs.wasNull()) {
+                    u.setDeskId(deskId);
+                }
+                u.setDeskName(rs.getString("desk_name"));
+                list.add(u);
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy danh sách nhân sự.", e);
+        }
+        return list;
+    }
+
+    /**
+     * Lấy danh sách lịch bận của tất cả nhân sự (các đề tài đang chạy, nộp thẩm định hoặc giao việc).
+     * @param excludeTopicId đề tài đang được chỉnh sửa (để không tự tính là bận với chính nó)
+     * @return Map mapping userId -> List các đề tài đang bận
+     */
+    public Map<Integer, List<String>> getUsersBusySchedule(int excludeTopicId) {
+        Map<Integer, List<String>> map = new HashMap<>();
+
+        String sql = "SELECT DISTINCT tm_all.user_id, t.topic_id, t.topic_code, t.title, t.status "
+                   + "FROM ( "
+                   + "    SELECT author_user_id AS user_id, topic_id FROM Topic "
+                   + "    UNION "
+                   + "    SELECT user_id, topic_id FROM Topic_Member "
+                   + "    UNION "
+                   + "    SELECT assignee_user_id AS user_id, topic_id FROM Fieldwork_Task WHERE task_status IN ('TODO', 'IN_PROGRESS') "
+                   + ") tm_all "
+                   + "JOIN Topic t ON tm_all.topic_id = t.topic_id "
+                   + "WHERE t.status NOT IN ('DRAFT', 'REJECTED', 'ABORTED', 'ACCEPTED_READY_FOR_CMS') "
+                   + "  AND (? <= 0 OR t.topic_id <> ?) "
+                   + "ORDER BY tm_all.user_id, t.topic_id ASC";
+
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, excludeTopicId);
+            ps.setInt(2, excludeTopicId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int uid = rs.getInt("user_id");
+                    int tid = rs.getInt("topic_id");
+                    String code = rs.getString("topic_code");
+                    String title = rs.getString("title");
+                    String label = (code != null && !code.trim().isEmpty())
+                            ? (code.trim() + " (" + title + ")")
+                            : ("#" + tid + " (" + title + ")");
+                    map.computeIfAbsent(uid, k -> new ArrayList<>()).add(label);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy danh sách lịch bận của nhân sự.", e);
+        }
+        return map;
+    }
+
+    /**
+     * Lấy lịch bận của 1 nhân sự cụ thể.
+     */
+    public List<String> getUserBusyTopics(int userId, int excludeTopicId) {
+        if (userId <= 0) {
+            return Collections.emptyList();
+        }
+        Map<Integer, List<String>> map = getUsersBusySchedule(excludeTopicId);
+        return map.getOrDefault(userId, Collections.emptyList());
+    }
 }
+

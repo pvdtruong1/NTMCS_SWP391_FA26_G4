@@ -116,26 +116,56 @@
           </div>
         </section>
 
-        <!-- Preview placeholders for Iteration 2 modules -->
         <div class="grid2">
           <section class="card">
             <div class="card-title">
-              <h2>Ekip đề tài (Topic_Member)</h2>
-              <span class="demo">Iter 2</span>
+              <h2>Ekip tác nghiệp (Topic_Member)</h2>
+              <span class="badge b-approved">${not empty members ? members.size() : 0} nhân sự</span>
             </div>
-            <p style="color:var(--muted);font-size:13px;margin:0">
-              Phân công nhân sự (quay phim, ảnh, trợ lý) sẽ được kích hoạt sau khi đề tài được phê duyệt tại Iteration 2.
-            </p>
+            <c:choose>
+              <c:when test="${not empty members}">
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                  <c:forEach var="m" items="${members}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:8px">
+                      <div>
+                        <strong><c:out value="${m.userName}"/></strong>
+                        <small style="display:block;color:var(--muted)"><c:out value="${m.userRole}"/></small>
+                      </div>
+                      <span class="badge"><c:out value="${m.roleInTeamDisplay}"/></span>
+                    </div>
+                  </c:forEach>
+                </div>
+              </c:when>
+              <c:otherwise>
+                <p style="color:var(--muted);font-size:13px;margin:0">
+                  Chưa có nhân sự nào được phân công trong tổ tác nghiệp này.
+                </p>
+              </c:otherwise>
+            </c:choose>
           </section>
 
           <section class="card">
             <div class="card-title">
-              <h2>Dự toán kinh phí (Estimate)</h2>
-              <span class="demo">Iter 2</span>
+              <h2>Dự toán kinh phí (Topic_Estimate)</h2>
+              <span class="badge b-approved">${not empty estimates ? estimates.size() : 0} khoản chi</span>
             </div>
-            <p style="color:var(--muted);font-size:13px;margin:0">
-              Bảng lập dự toán chi phí tác nghiệp thực địa sẽ hoàn thiện ở Iteration 2.
-            </p>
+            <c:choose>
+              <c:when test="${not empty estimates}">
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                  <c:forEach var="e" items="${estimates}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:8px">
+                      <span><c:out value="${e.costItem}"/></span>
+                      <strong style="color:var(--primary)"><c:out value="${e.formattedAmount}"/></strong>
+                    </div>
+                  </c:forEach>
+                </div>
+              </c:when>
+              <c:otherwise>
+                <p style="color:var(--muted);font-size:13px;margin:0">
+                  Chưa có khoản dự toán kinh phí nào được lập cho đề tài này.
+                </p>
+              </c:otherwise>
+            </c:choose>
           </section>
         </div>
       </div>

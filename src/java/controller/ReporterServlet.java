@@ -8,12 +8,20 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import model.Category;
 import model.Topic;
+import model.TopicEstimate;
+import model.TopicMember;
+import model.User;
 
 @WebServlet(name = "ReporterServlet", urlPatterns = {"/reporter/*"})
 public class ReporterServlet extends HttpServlet {
@@ -41,6 +49,8 @@ public class ReporterServlet extends HttpServlet {
             searchDuplicates(request, response);
         } else if ("/compose".equals(path)) {
             showCompose(request, response);
+        } else if ("/check-schedule".equals(path)) {
+            handleCheckSchedule(request, response);
         } else if ("/detail".equals(path)) {
             showDetail(request, response);
         } else if ("/delete".equals(path)) {
@@ -95,6 +105,9 @@ public class ReporterServlet extends HttpServlet {
         String priority = trim(request.getParameter("priority"));
         String deadlineText = trim(request.getParameter("deadline"));
 
+        List<TopicEstimate> estimates = parseEstimatesFromRequest(request);
+        List<TopicMember> members = parseMembersFromRequest(request);
+
         Topic topic;
         try {
             // Resolve the requested topic before validating or saving. An invalid ID must not create a new topic.
@@ -103,7 +116,7 @@ public class ReporterServlet extends HttpServlet {
             Topic formTopic = createFormTopic();
             fillTopicFromForm(formTopic, title, summary, angle, category,
                     genre, priority, deadlineText);
-            forwardComposeWithError(request, response, e.getMessage(), formTopic);
+            forwardComposeWithError(request, response, e.getMessage(), formTopic, estimates, members);
             return;
         }
 
@@ -112,7 +125,7 @@ public class ReporterServlet extends HttpServlet {
         if (error != null) {
             fillTopicFromForm(topic, title, summary, angle, category,
                     genre, priority, deadlineText);
-            forwardComposeWithError(request, response, error, topic);
+            forwardComposeWithError(request, response, error, topic, estimates, members);
             return;
         }
 
@@ -127,10 +140,10 @@ public class ReporterServlet extends HttpServlet {
         }
 
         try {
-            repository.save(topic);
+            repository.save(topic, estimates, members);
         } catch (IllegalArgumentException | IllegalStateException e) {
             forwardComposeWithError(request, response,
-                    safeMessage(e, "Không thể lưu đề tài. Vui lòng thử lại."), topic);
+                    safeMessage(e, "Không thể lưu đề tài. Vui lòng thử lại."), topic, estimates, members);
             return;
         }
 
@@ -159,6 +172,22 @@ public class ReporterServlet extends HttpServlet {
         request.setAttribute("genres", TopicRepository.GENRES);
         request.setAttribute("priorities",
                 repository.findExistingPriorities());
+        request.setAttribute("activeUsers", repository.findAllActiveUsers());
+
+        int topicId = 0;
+        try {
+            String idText = request.getParameter("id");
+            if (idText == null || idText.trim().isEmpty()) {
+                idText = request.getParameter("topicId");
+            }
+            if (idText != null && !idText.trim().isEmpty()) {
+                topicId = Integer.parseInt(idText.trim());
+            }
+        } catch (Exception ignored) {}
+
+        Map<Integer, List<String>> schedules = repository.getUsersBusySchedule(topicId);
+        request.setAttribute("userBusySchedules", schedules);
+        request.setAttribute("userBusySchedulesJson", toScheduleJson(schedules));
     }
 
     /**
@@ -233,9 +262,22 @@ public class ReporterServlet extends HttpServlet {
     private void forwardComposeWithError(HttpServletRequest request,
             HttpServletResponse response, String error, Topic topic)
             throws ServletException, IOException {
+        forwardComposeWithError(request, response, error, topic, null, null);
+    }
+
+    private void forwardComposeWithError(HttpServletRequest request,
+            HttpServletResponse response, String error, Topic topic,
+            List<TopicEstimate> estimates, List<TopicMember> members)
+            throws ServletException, IOException {
         request.setAttribute("error", error);
         populateFormOptions(request);
         request.setAttribute("formTopic", topic == null ? createFormTopic() : topic);
+        if (estimates != null) {
+            request.setAttribute("formEstimates", estimates);
+        }
+        if (members != null) {
+            request.setAttribute("formMembers", members);
+        }
         request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp")
                 .forward(request, response);
     }
@@ -386,6 +428,8 @@ public class ReporterServlet extends HttpServlet {
                     request.setAttribute("formTopic", createFormTopic());
                 } else {
                     request.setAttribute("formTopic", topic);
+                    request.setAttribute("formEstimates", repository.findEstimatesByTopicId(id));
+                    request.setAttribute("formMembers", repository.findMembersByTopicId(id));
                 }
             } catch (NumberFormatException e) {
                 request.setAttribute("error", "ID đề tài không hợp lệ.");
@@ -414,6 +458,8 @@ public class ReporterServlet extends HttpServlet {
         request.setAttribute("topic", topic);
         if (topic != null) {
             request.setAttribute("stepRank", calculateWorkflowRank(topic.getStatus()));
+            request.setAttribute("estimates", repository.findEstimatesByTopicId(topic.getTopicId()));
+            request.setAttribute("members", repository.findMembersByTopicId(topic.getTopicId()));
         }
         request.getRequestDispatcher("/WEB-INF/views/reporter/detail.jsp")
                 .forward(request, response);
@@ -520,4 +566,119 @@ public class ReporterServlet extends HttpServlet {
     private String trim(String value) {
         return value == null ? "" : value.trim();
     }
+
+    private void handleCheckSchedule(HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        String uidStr = trim(request.getParameter("userId"));
+        String tidStr = trim(request.getParameter("topicId"));
+        int userId = 0;
+        int topicId = 0;
+        try {
+            if (!uidStr.isEmpty()) {
+                userId = Integer.parseInt(uidStr);
+            }
+            if (!tidStr.isEmpty()) {
+                topicId = Integer.parseInt(tidStr);
+            }
+        } catch (NumberFormatException ignored) {}
+
+        List<String> busyTopics = repository.getUserBusyTopics(userId, topicId);
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"userId\":").append(userId);
+        sb.append(",\"busy\":").append(!busyTopics.isEmpty());
+        sb.append(",\"count\":").append(busyTopics.size());
+        sb.append(",\"topics\":[");
+        for (int i = 0; i < busyTopics.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(escapeJson(busyTopics.get(i))).append("\"");
+        }
+        sb.append("]}");
+        response.getWriter().write(sb.toString());
+    }
+
+    private List<TopicEstimate> parseEstimatesFromRequest(HttpServletRequest request) {
+        List<TopicEstimate> list = new ArrayList<>();
+        String[] costItems = request.getParameterValues("costItem");
+        String[] amounts = request.getParameterValues("amount");
+
+        if (costItems != null && amounts != null) {
+            for (int i = 0; i < costItems.length && i < amounts.length; i++) {
+                String item = trim(costItems[i]);
+                String amtStr = trim(amounts[i]);
+                if (!item.isEmpty()) {
+                    BigDecimal amt = BigDecimal.ZERO;
+                    try {
+                        if (!amtStr.isEmpty()) {
+                            amtStr = amtStr.replaceAll("[^0-9.]", "");
+                            amt = new BigDecimal(amtStr);
+                        }
+                    } catch (Exception ignored) {}
+                    TopicEstimate est = new TopicEstimate();
+                    est.setCostItem(item);
+                    est.setAmount(amt);
+                    list.add(est);
+                }
+            }
+        }
+        return list;
+    }
+
+    private List<TopicMember> parseMembersFromRequest(HttpServletRequest request) {
+        List<TopicMember> list = new ArrayList<>();
+        String[] userIds = request.getParameterValues("memberUserId");
+        String[] roles = request.getParameterValues("memberRole");
+
+        Set<Integer> added = new HashSet<>();
+        if (userIds != null && roles != null) {
+            for (int i = 0; i < userIds.length && i < roles.length; i++) {
+                String uidStr = trim(userIds[i]);
+                String role = trim(roles[i]);
+                if (!uidStr.isEmpty()) {
+                    try {
+                        int uid = Integer.parseInt(uidStr);
+                        if (uid > 0 && !added.contains(uid)) {
+                            added.add(uid);
+                            TopicMember mem = new TopicMember();
+                            mem.setUserId(uid);
+                            mem.setRoleInTeam(role.isEmpty() ? "ASSISTANT" : role);
+                            list.add(mem);
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        return list;
+    }
+
+    private String toScheduleJson(Map<Integer, List<String>> map) {
+        if (map == null || map.isEmpty()) {
+            return "{}";
+        }
+        StringBuilder sb = new StringBuilder("{");
+        boolean firstUser = true;
+        for (Map.Entry<Integer, List<String>> entry : map.entrySet()) {
+            if (!firstUser) sb.append(",");
+            firstUser = false;
+            sb.append("\"").append(entry.getKey()).append("\":[");
+            boolean firstTopic = true;
+            for (String t : entry.getValue()) {
+                if (!firstTopic) sb.append(",");
+                firstTopic = false;
+                sb.append("\"").append(escapeJson(t)).append("\"");
+            }
+            sb.append("]");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
+    }
 }
+

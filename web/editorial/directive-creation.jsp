@@ -347,11 +347,6 @@
                             <li><strong>Cân bằng tải:</strong> Ở bước tiếp theo, hãy kiểm tra kỹ số đề tài đang chạy của phóng viên để tránh quá tải.</li>
                         </ul>
                     </div>
-
-                    <!-- Help / Assistance Card -->
-                    <div class="card" style="padding: 16px; background: var(--surface2); font-size: 12px; color: var(--muted);">
-                        <b>Cần hỗ trợ nghiệp vụ?</b> Liên hệ Ban Thư ký Tòa soạn qua số máy nội bộ <code>ext: 102</code> để được tư vấn phân bổ nguồn lực xe và thiết bị hiện trường.
-                    </div>
                 </div>
             </div>
         </main>

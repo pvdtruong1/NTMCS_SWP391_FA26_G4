@@ -21,7 +21,7 @@ public class DBContext implements AutoCloseable {
     private static final String PASS = "123";
     private static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=NTMCS;encrypt=false;trustServerCertificate=true;multipleActiveResultSets=true;loginTimeout=5;";
 
-    private static final int MAX_POOL_SIZE = 10;
+    private static final int MAX_POOL_SIZE = 15;
     private static final BlockingQueue<Connection> POOL = new LinkedBlockingQueue<>(MAX_POOL_SIZE);
 
     protected Connection connection;
@@ -32,7 +32,7 @@ public class DBContext implements AutoCloseable {
             Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
             Thread warmupThread = new Thread(() -> {
                 try {
-                    for (int i = 0; i < 2; i++) {
+                    for (int i = 0; i < 4; i++) {
                         Connection conn = DriverManager.getConnection(URL, USER, PASS);
                         if (!POOL.offer(conn)) {
                             conn.close();

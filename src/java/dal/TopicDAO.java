@@ -33,6 +33,7 @@ public class TopicDAO extends DBContext {
     private static final Logger LOGGER = Logger.getLogger(TopicDAO.class.getName());
     private static volatile List<CriteriaConfig> CACHED_CRITERIA = null;
     private static final Map<Integer, Desk> CACHED_DESKS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<Integer, List<Category>> CACHED_CATEGORIES = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Retrieve all pending and escalated topics for a specific desk in a single query.
@@ -794,6 +795,10 @@ public class TopicDAO extends DBContext {
      * Retrieve all active categories for a specific desk.
      */
     public List<Category> getCategoriesByDesk(int deskId) {
+        List<Category> cached = CACHED_CATEGORIES.get(deskId);
+        if (cached != null && !cached.isEmpty()) {
+            return cached;
+        }
         List<Category> list = new ArrayList<>();
         String sql = "SELECT category_id, category_name, parent_category_id, desk_id FROM Category WHERE desk_id = ? ORDER BY category_name ASC;";
         try {
@@ -811,6 +816,9 @@ public class TopicDAO extends DBContext {
                         ));
                     }
                 }
+            }
+            if (!list.isEmpty()) {
+                CACHED_CATEGORIES.put(deskId, list);
             }
         } catch (SQLException ex) {
             LOGGER.log(Level.SEVERE, "Error in getCategoriesByDesk", ex);

@@ -124,6 +124,33 @@
     });
   }
 
+  // --- Helper to escape HTML ---
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // --- Badge notification updater ---
+  function updateNotifBadge(count) {
+    const notifBtn = document.querySelector('[data-notif-trigger]');
+    if (!notifBtn) return;
+    let badge = notifBtn.querySelector('em');
+    if (!count || count <= 0) {
+      if (badge) badge.remove();
+    } else {
+      if (!badge) {
+        badge = document.createElement('em');
+        notifBtn.appendChild(badge);
+      }
+      badge.textContent = count > 9 ? '9+' : String(count);
+    }
+  }
+
   // --- Notifications Modal ---
   function openNotificationsModal(contextPath) {
     document.getElementById('notif-modal-backdrop')?.remove();
@@ -132,46 +159,26 @@
     backdrop.id = 'notif-modal-backdrop';
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
-      <div class="modal">
-        <div class="modal-head">
-          <div>
-            <div class="eyebrow">THÔNG BÁO PHÓNG VIÊN</div>
-            <h2>Thông báo mới nhất</h2>
+      <div class="modal notif-modal">
+        <div class="notif-modal-header">
+          <div class="notif-tabs">
+            <button type="button" class="notif-tab-btn active" id="notif-tab-all">Tất cả (...)</button>
+            <button type="button" class="notif-tab-btn" id="notif-tab-unread">Chưa đọc (...)</button>
           </div>
-          <button class="icon-btn" data-modal-close>×</button>
+          <button type="button" class="notif-mark-all-btn" id="notif-mark-all-btn" title="Đánh dấu tất cả thông báo là đã đọc">
+            <span>✔</span> <span>Đánh dấu đã đọc tất cả</span>
+          </button>
         </div>
-        <div class="modal-body">
-          <div class="notifications">
-            <div class="notification">
-              <span class="notif-icon">!</span>
-              <div>
-                <b>Đề tài #1002 cần chỉnh sửa</b>
-                <p style="margin:4px 0 0;font-size:13px;color:var(--text)">Ban biên tập yêu cầu bổ sung số liệu thực tế trước khi thẩm định lại.</p>
-                <small>Hôm nay · Ban Thời sự</small>
-              </div>
-              <a class="btn sm" href="${contextPath}/reporter/compose?id=1002">Sửa ngay</a>
-            </div>
-            <div class="notification read">
-              <span class="notif-icon">✓</span>
-              <div>
-                <b>Đề tài #1005 đã được Trưởng ban phê duyệt</b>
-                <p style="margin:4px 0 0;font-size:13px;color:var(--text)">Mã đề tài chính thức: TS-2026-003.</p>
-                <small>2 ngày trước</small>
-              </div>
-              <a class="btn sm" href="${contextPath}/reporter/detail?id=1005">Xem</a>
-            </div>
-            <div class="notification read">
-              <span class="notif-icon">✓</span>
-              <div>
-                <b>Đề xuất #1001 đã nộp thành công</b>
-                <small>3 ngày trước</small>
-              </div>
-              <a class="btn sm" href="${contextPath}/reporter/detail?id=1001">Xem</a>
-            </div>
+
+        <div class="notif-modal-body" id="notif-list-container" style="max-height: 440px; overflow-y: auto; padding-right: 4px;">
+          <div style="text-align: center; padding: 36px 16px; color: var(--muted, #64748b);">
+            <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+            <div>Đang tải thông báo từ hệ thống...</div>
           </div>
         </div>
-        <div class="modal-foot">
-          <button class="btn" data-modal-close>Đóng</button>
+
+        <div class="modal-foot" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line, #e2e8f0); display: flex; justify-content: flex-end;">
+          <button class="btn" data-modal-close style="background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 22px; font-weight: 500;">Đóng</button>
         </div>
       </div>
     `;
@@ -182,6 +189,131 @@
         backdrop.remove();
       }
     });
+
+    let currentTab = 'all';
+    let notifData = { unreadCount: 0, totalCount: 0, notifications: [] };
+
+    function renderList() {
+      const container = document.getElementById('notif-list-container');
+      const tabAll = document.getElementById('notif-tab-all');
+      const tabUnread = document.getElementById('notif-tab-unread');
+      if (!container || !tabAll || !tabUnread) return;
+
+      tabAll.textContent = `Tất cả (${notifData.totalCount})`;
+      tabUnread.textContent = `Chưa đọc (${notifData.unreadCount})`;
+
+      if (currentTab === 'all') {
+        tabAll.classList.add('active');
+        tabUnread.classList.remove('active');
+      } else {
+        tabAll.classList.remove('active');
+        tabUnread.classList.add('active');
+      }
+
+      const items = currentTab === 'all'
+        ? notifData.notifications
+        : notifData.notifications.filter(n => !n.isRead);
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 42px 16px; color: var(--muted, #64748b);">
+            <div style="font-size: 32px; margin-bottom: 8px;">${currentTab === 'unread' ? '✓' : '🔔'}</div>
+            <div style="font-weight: 600; font-size: 14px;">
+              ${currentTab === 'unread' ? 'Tuyệt vời! Bạn không còn thông báo chưa đọc nào.' : 'Chưa có thông báo nào.'}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.map(n => `
+        <div class="notif-card-item ${n.isRead ? 'read' : 'unread'}">
+          <div class="notif-card-title">
+            ${escapeHtml(n.message)}
+          </div>
+          <div class="notif-card-meta">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <span>🕒</span>
+              <span>${n.createdAt || ''}</span>
+            </span>
+            ${n.topicId ? `
+              <a href="${contextPath}/reporter/detail?id=${n.topicId}" class="notif-detail-link" data-notif-id="${n.id}">
+                Xem hồ sơ đề tài #${n.topicId} ↗
+              </a>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Đánh dấu đã đọc khi phóng viên bấm xem hồ sơ đề tài
+      container.querySelectorAll('.notif-detail-link').forEach(link => {
+        link.addEventListener('click', () => {
+          const id = link.getAttribute('data-notif-id');
+          if (id) {
+            fetch(`${contextPath}/reporter/notifications`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `action=markRead&id=${encodeURIComponent(id)}`
+            }).then(() => {
+              const matched = notifData.notifications.find(item => String(item.id) === String(id));
+              if (matched && !matched.isRead) {
+                matched.isRead = true;
+                notifData.unreadCount = Math.max(0, notifData.unreadCount - 1);
+                updateNotifBadge(notifData.unreadCount);
+              }
+            }).catch(() => {});
+          }
+        });
+      });
+    }
+
+    // Sự kiện chuyển tab Tất cả / Chưa đọc
+    document.getElementById('notif-tab-all')?.addEventListener('click', () => {
+      currentTab = 'all';
+      renderList();
+    });
+
+    document.getElementById('notif-tab-unread')?.addEventListener('click', () => {
+      currentTab = 'unread';
+      renderList();
+    });
+
+    // Sự kiện nút "Đánh dấu đã đọc tất cả"
+    document.getElementById('notif-mark-all-btn')?.addEventListener('click', async () => {
+      try {
+        const res = await fetch(`${contextPath}/reporter/notifications`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'action=markAllRead'
+        });
+        const data = await res.json();
+        if (data.success) {
+          notifData.notifications.forEach(n => { n.isRead = true; });
+          notifData.unreadCount = 0;
+          updateNotifBadge(0);
+          renderList();
+          showToast('Đã đánh dấu tất cả thông báo là đã đọc', 'success');
+        }
+      } catch (err) {
+        console.error('Không thể đánh dấu đọc tất cả:', err);
+      }
+    });
+
+    // Tải dữ liệu thông báo từ Database
+    fetch(`${contextPath}/reporter/notifications`)
+      .then(r => r.json())
+      .then(data => {
+        notifData = data;
+        updateNotifBadge(data.unreadCount);
+        renderList();
+      })
+      .catch(err => {
+        console.error('Lỗi tải thông báo:', err);
+        const container = document.getElementById('notif-list-container');
+        if (container) {
+          container.innerHTML = '<div style="color:var(--danger); padding:24px; text-align:center;">Không thể kết nối đến máy chủ lấy thông báo.</div>';
+        }
+      });
   }
 
   // --- Account Info Modal ---

@@ -1187,6 +1187,134 @@ body.dark .step.done span {
   color: var(--success);
 }
 
+/* Notification Modal Modern Styles */
+.notif-modal {
+  max-width: 620px;
+  width: 95%;
+  background: var(--surface, #fff);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+.notif-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  margin-bottom: 16px;
+}
+
+.notif-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.notif-tab-btn {
+  background: transparent;
+  color: var(--muted, #64748b);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notif-tab-btn:hover {
+  background: var(--surface2, #f1f5f9);
+  color: var(--text, #0f172a);
+}
+
+.notif-tab-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+body.dark .notif-tab-btn.active {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.notif-mark-all-btn {
+  background: none;
+  border: none;
+  color: #059669;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.notif-mark-all-btn:hover {
+  background: rgba(16, 185, 129, 0.08);
+  color: #047857;
+}
+
+.notif-card-item {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.notif-card-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.notif-card-item.unread {
+  border-left: 3.5px solid var(--danger, #dc2626);
+  background: #fff;
+}
+
+body.dark .notif-card-item.unread {
+  background: #1e293b;
+  border-left-color: #ef4444;
+}
+
+.notif-card-item.read {
+  opacity: 0.85;
+}
+
+.notif-card-title {
+  font-size: 14.5px;
+  color: var(--text, #1e293b);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.notif-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+
+.notif-detail-link {
+  color: #dc2626;
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notif-detail-link:hover {
+  text-decoration: underline;
+  color: #b91c1c;
+}
+
 /* ==================== SEARCH RESULTS ==================== */
 .search-results {
   display: grid;

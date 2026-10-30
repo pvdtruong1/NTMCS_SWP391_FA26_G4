@@ -19,7 +19,9 @@
 
   <button type="button" class="icon-btn notif" data-notif-trigger title="Xem thông báo mới">
     <span>🔔</span>
-    <em>1</em>
+    <c:if test="${unreadNotifCount != null && unreadNotifCount > 0}">
+      <em>${unreadNotifCount > 9 ? '9+' : unreadNotifCount}</em>
+    </c:if>
   </button>
 
   <button type="button" class="account-chip" data-account-trigger>

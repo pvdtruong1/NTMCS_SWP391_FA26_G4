@@ -33,27 +33,6 @@ public class TopicRepository {
     private static final TopicRepository INSTANCE
             = new TopicRepository();
 
-    public static final String[] CATEGORIES = {
-        "Chính trị - Ngoại giao",
-        "Đô thị & Dân sinh",
-        "Tài chính - Ngân hàng",
-        "Doanh nghiệp & Thị trường",
-        "Điều tra tiêu cực",
-        "Pháp đình & Trật tự an ninh"
-    };
-
-    public static final String[] GENRES = {
-        "Tin nhanh",
-        "Phỏng vấn",
-        "Phóng sự / Feature",
-        "Điều tra",
-        "Infographic / Ảnh"
-    };
-
-    public static final String[] PRIORITIES = {
-        "NORMAL", "HOT", "URGENT"
-    };
-
     private TopicRepository() {
     }
 
@@ -556,29 +535,101 @@ public class TopicRepository {
         return topic;
     }
 
+    /**
+     * Lấy danh sách tên chuyên mục trực tiếp từ bảng Category trong Database.
+     */
+    public List<String> findAllCategories() {
+        String sql = "SELECT category_name FROM Category ORDER BY category_id ASC";
+        List<String> categories = new ArrayList<>();
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String catName = rs.getString("category_name");
+                if (catName != null && !catName.trim().isEmpty()) {
+                    categories.add(catName.trim());
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy danh sách chuyên mục từ Database.", e);
+        }
+        return categories;
+    }
+
+    /**
+     * Lấy danh sách thể loại báo chí từ database (bảng Topic).
+     */
+    public List<String> findExistingGenres() {
+        String sql = "SELECT DISTINCT genre "
+                + "FROM Topic "
+                + "WHERE genre IS NOT NULL AND LTRIM(RTRIM(genre)) <> '' "
+                + "ORDER BY genre ASC";
+
+        List<String> genres = new ArrayList<>();
+
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                String g = rs.getString("genre");
+                if (g != null && !g.trim().isEmpty()) {
+                    genres.add(g.trim());
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Không thể lấy danh sách thể loại từ database.", e);
+        }
+
+        // Đảm bảo các thể loại tiêu chuẩn luôn sẵn sàng nếu DB mới khởi tạo hoặc chưa có đủ dữ liệu
+        String[] defaults = {"Tin nhanh", "Phỏng vấn", "Phóng sự / Feature", "Điều tra", "Infographic / Ảnh"};
+        for (String def : defaults) {
+            if (!genres.contains(def)) {
+                genres.add(def);
+            }
+        }
+
+        return genres;
+    }
+
+    /**
+     * Lấy danh sách mức độ ưu tiên từ database (bảng Topic).
+     */
     public List<String> findExistingPriorities() {
         String sql = "SELECT DISTINCT priority "
                 + "FROM Topic "
-                + "WHERE priority IS NOT NULL "
-                + "ORDER BY priority";
+                + "WHERE priority IS NOT NULL AND LTRIM(RTRIM(priority)) <> '' "
+                + "ORDER BY priority ASC";
 
         List<String> priorities = new ArrayList<>();
 
-        try (Connection conn = DBContext.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
-                priorities.add(rs.getString("priority"));
+                String p = rs.getString("priority");
+                if (p != null && !p.trim().isEmpty()) {
+                    priorities.add(p.trim());
+                }
             }
-
-            return priorities;
-
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE,
-                    "Không thể lấy danh sách mức độ ưu tiên.", e);
-
-            throw new IllegalStateException(
-                    "Không thể lấy mức độ ưu tiên từ database.", e);
+                    "Không thể lấy danh sách mức độ ưu tiên từ database.", e);
         }
+
+        // Đảm bảo các mức độ ưu tiên tiêu chuẩn luôn có
+        if (!priorities.contains("NORMAL")) {
+            priorities.add(0, "NORMAL");
+        }
+        if (!priorities.contains("HOT")) {
+            priorities.add("HOT");
+        }
+        if (!priorities.contains("URGENT")) {
+            priorities.add("URGENT");
+        }
+
+        return priorities;
     }
 
     /**

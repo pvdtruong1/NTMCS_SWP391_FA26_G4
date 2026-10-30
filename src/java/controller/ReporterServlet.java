@@ -1,6 +1,7 @@
 package controller;
 
 import dao.CategoryDAO;
+import dao.NotificationDAO;
 import dao.TopicRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import model.Category;
+import model.Notification;
 import model.Topic;
 import model.TopicEstimate;
 import model.TopicMember;
@@ -57,6 +59,8 @@ public class ReporterServlet extends HttpServlet {
             handleDelete(request, response);
         } else if ("/quick-submit".equals(path)) {
             handleQuickSubmit(request, response);
+        } else if ("/notifications".equals(path)) {
+            handleGetNotifications(request, response);
         } else if ("/reset".equals(path)) {
             response.sendRedirect(request.getContextPath()
                     + "/reporter/dashboard?message=resetDisabled");
@@ -79,6 +83,10 @@ public class ReporterServlet extends HttpServlet {
         }
         if ("/quick-submit".equals(path)) {
             handleQuickSubmit(request, response);
+            return;
+        }
+        if ("/notifications".equals(path)) {
+            handlePostNotifications(request, response);
             return;
         }
         if ("/reset".equals(path)) {
@@ -158,20 +166,18 @@ public class ReporterServlet extends HttpServlet {
         request.setAttribute("currentUserRole", DEMO_REPORTER_ROLE);
         request.setAttribute("currentUserDesk", DEMO_REPORTER_DESK);
         request.setAttribute("userAvatar", "PV");
+
+        NotificationDAO notifDAO = new NotificationDAO();
+        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
+        request.setAttribute("currentUserId", userId);
+        request.setAttribute("unreadNotifCount", notifDAO.countUnreadByUserId(userId));
     }
 
     private void populateFormOptions(HttpServletRequest request) {
         request.setAttribute("today", LocalDate.now());
-        List<String> categoryNames = new ArrayList<>();
-        for (Category category : new CategoryDAO().getAll()) {
-            if (category != null && category.getCategoryName() != null) {
-                categoryNames.add(category.getCategoryName());
-            }
-        }
-        request.setAttribute("categories", categoryNames);
-        request.setAttribute("genres", TopicRepository.GENRES);
-        request.setAttribute("priorities",
-                repository.findExistingPriorities());
+        request.setAttribute("categories", repository.findAllCategories());
+        request.setAttribute("genres", repository.findExistingGenres());
+        request.setAttribute("priorities", repository.findExistingPriorities());
         request.setAttribute("activeUsers", repository.findAllActiveUsers());
 
         int topicId = 0;
@@ -308,14 +314,12 @@ public class ReporterServlet extends HttpServlet {
         }
 
         if (!genre.isEmpty()
-                && !java.util.Arrays.asList(TopicRepository.GENRES)
-                        .contains(genre)) {
+                && !repository.findExistingGenres().contains(genre)) {
             return "Thể loại đề tài không hợp lệ.";
         }
 
         if (!priority.isEmpty()
-                && !java.util.Arrays.asList(TopicRepository.PRIORITIES)
-                        .contains(priority)) {
+                && !repository.findExistingPriorities().contains(priority)) {
             return "Mức độ ưu tiên không hợp lệ.";
         }
 
@@ -671,6 +675,58 @@ public class ReporterServlet extends HttpServlet {
         }
         sb.append("}");
         return sb.toString();
+    }
+
+    private void handleGetNotifications(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        NotificationDAO notifDAO = new NotificationDAO();
+        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
+        List<Notification> list = notifDAO.findByUserId(userId);
+        int unread = notifDAO.countUnreadByUserId(userId);
+
+        StringBuilder json = new StringBuilder();
+        json.append("{\"unreadCount\":").append(unread)
+            .append(",\"totalCount\":").append(list.size())
+            .append(",\"notifications\":[");
+
+        for (int i = 0; i < list.size(); i++) {
+            Notification n = list.get(i);
+            if (i > 0) {
+                json.append(",");
+            }
+            json.append("{")
+                .append("\"id\":").append(n.getNotificationId()).append(",")
+                .append("\"userId\":").append(n.getUserId()).append(",")
+                .append("\"topicId\":").append(n.getTopicId() == null ? "null" : n.getTopicId()).append(",")
+                .append("\"message\":\"").append(escapeJson(n.getMessage())).append("\",")
+                .append("\"isRead\":").append(n.isIsRead()).append(",")
+                .append("\"createdAt\":\"").append(escapeJson(n.getCreatedAt())).append("\"")
+                .append("}");
+        }
+        json.append("]}");
+
+        response.getWriter().write(json.toString());
+    }
+
+    private void handlePostNotifications(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        NotificationDAO notifDAO = new NotificationDAO();
+        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
+
+        String action = trim(request.getParameter("action"));
+        if ("markAllRead".equals(action)) {
+            notifDAO.markAllAsRead(userId);
+        } else if ("markRead".equals(action)) {
+            try {
+                int id = Integer.parseInt(trim(request.getParameter("id")));
+                notifDAO.markAsRead(id, userId);
+            } catch (Exception ignored) {}
+        }
+
+        int unread = notifDAO.countUnreadByUserId(userId);
+        response.getWriter().write("{\"success\":true,\"unreadCount\":" + unread + "}");
     }
 
     private String escapeJson(String s) {

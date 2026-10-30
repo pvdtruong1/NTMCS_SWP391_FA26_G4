@@ -273,9 +273,16 @@ body.dark .schedule-status.status-busy {
                 <div class="field">
                     <label for="priority">Mức độ ưu tiên</label>
                     <select id="priority" name="priority">
-                        <option value="NORMAL" ${formTopic.priority eq 'NORMAL' ? 'selected' : ''}>Thường (NORMAL)</option>
-                        <option value="HOT" ${formTopic.priority eq 'HOT' ? 'selected' : ''}>Tin nóng (HOT)</option>
-                        <option value="URGENT" ${formTopic.priority eq 'URGENT' ? 'selected' : ''}>Khẩn cấp (URGENT)</option>
+                        <c:forEach var="p" items="${priorities}">
+                            <option value="${p}" ${formTopic.priority eq p ? 'selected' : ''}>
+                                <c:choose>
+                                    <c:when test="${p eq 'NORMAL'}">Thường (NORMAL)</c:when>
+                                    <c:when test="${p eq 'HOT'}">Tin nóng (HOT)</c:when>
+                                    <c:when test="${p eq 'URGENT'}">Khẩn cấp (URGENT)</c:when>
+                                    <c:otherwise><c:out value="${p}"/></c:otherwise>
+                                </c:choose>
+                            </option>
+                        </c:forEach>
                     </select>
                 </div>
             </div>

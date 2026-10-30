@@ -150,6 +150,9 @@
                 <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="nav-item">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
+                <a href="${pageContext.request.contextPath}/editorial/directive-topic" class="nav-item">
+                    <i>⚡</i> Đặt hàng đề tài chỉ đạo
+                </a>
                 <a href="${pageContext.request.contextPath}/editorial/idea-archive" class="nav-item active">
                     <i>🗄️</i> Kho lưu trữ ý tưởng
                 </a>

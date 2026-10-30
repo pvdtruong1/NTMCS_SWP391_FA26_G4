@@ -113,6 +113,9 @@
                 <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="nav-item active">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
+                <a href="${pageContext.request.contextPath}/editorial/directive-topic" class="nav-item">
+                    <i>⚡</i> Đặt hàng đề tài chỉ đạo
+                </a>
                 <a href="${pageContext.request.contextPath}/editorial/idea-archive" class="nav-item">
                     <i>🗄️</i> Kho lưu trữ ý tưởng
                 </a>
@@ -160,15 +163,18 @@
             <!-- Feedback Notification Banner -->
             <c:if test="${not empty param.msg}">
                 <div style="margin-bottom: 18px; padding: 14px 18px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 12px;
-                     ${param.msg == 'approved' ? 'background: #e8f7ef; color: #15734f; border: 1px solid #ccebdd;' : ''}
+                     ${param.msg == 'approved' or param.msg == 'tbt_approved' or param.msg == 'directive_commissioned' ? 'background: #e8f7ef; color: #15734f; border: 1px solid #ccebdd;' : ''}
                      ${param.msg == 'escalated' ? 'background: #fff4dd; color: #9a6200; border: 1px solid #f4ddb2;' : ''}
-                     ${param.msg == 'revision_requested' ? 'background: #f1ebff; color: #6e4cb1; border: 1px solid #d8c7ff;' : ''}
-                     ${param.msg == 'rejected' ? 'background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce;' : ''}">
+                     ${param.msg == 'revision_requested' or param.msg == 'tbt_revision_requested' ? 'background: #f1ebff; color: #6e4cb1; border: 1px solid #d8c7ff;' : ''}
+                     ${param.msg == 'rejected' or param.msg == 'tbt_rejected' ? 'background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce;' : ''}">
                     <span style="font-size: 20px;">
-                        ${param.msg == 'approved' ? '🎉' : (param.msg == 'escalated' ? '🚀' : (param.msg == 'revision_requested' ? '🔄' : '✖'))}
+                        ${param.msg == 'approved' ? '🎉' : (param.msg == 'directive_commissioned' ? '⚡' : (param.msg == 'escalated' ? '🚀' : (param.msg == 'revision_requested' or param.msg == 'tbt_revision_requested' ? '🔄' : '✖')))}
                     </span>
                     <div>
                         <c:choose>
+                            <c:when test="${param.msg == 'directive_commissioned'}">
+                                <b>Phát lệnh đặt hàng thành công!</b> Đề tài chỉ đạo đã được cấp mã định danh <b><c:out value="${param.code}"/></b>, chuyển sang trạng thái <b>ĐÃ DUYỆT (APPROVED)</b> và thông báo giao việc đã được gửi tới Trưởng nhóm phóng viên.
+                            </c:when>
                             <c:when test="${param.msg == 'approved'}">
                                 <b>Phê duyệt đề tài thành công!</b> Đề tài đã được cấp mã định danh chính thức và thông báo tự động đã được gửi tới phóng viên tác giả.
                             </c:when>
@@ -180,6 +186,15 @@
                             </c:when>
                             <c:when test="${param.msg == 'rejected'}">
                                 <b>Đã bác bỏ đề tài!</b> Đề tài đã được phân loại từ chối và lưu trữ vào Kho ý tưởng tòa soạn.
+                            </c:when>
+                            <c:when test="${param.msg == 'tbt_approved'}">
+                                <b>Tổng Biên Tập đã phê duyệt cấp cao thành công!</b> Đề tài đã được cấp mã định danh chính thức và chuyển sang giai đoạn tác nghiệp.
+                            </c:when>
+                            <c:when test="${param.msg == 'tbt_revision_requested'}">
+                                <b>Tổng Biên Tập đã yêu cầu hoàn thiện lại!</b> Ý kiến chỉ đạo của TBT đã được gửi về phóng viên (No-Bypass Rule kích hoạt).
+                            </c:when>
+                            <c:when test="${param.msg == 'tbt_rejected'}">
+                                <b>Tổng Biên Tập đã bác bỏ đề tài!</b> Đề tài đã được phân loại từ chối và lưu trữ vào Kho lưu trữ ý tưởng.
                             </c:when>
                             <c:otherwise>
                                 <b>Thao tác thành công!</b> Dữ liệu hàng đợi đã được cập nhật.
@@ -212,6 +227,12 @@
                             </c:when>
                             <c:when test="${param.error == 'topic_locked_by_exec'}">
                                 <b>Thao tác bị chặn:</b> Đề tài đang chờ Tổng Biên Tập phê duyệt điều hành hoặc đã hoàn tất, Trưởng ban không được phép chỉnh sửa.
+                            </c:when>
+                            <c:when test="${param.error == 'forbidden_not_tbt'}">
+                                <b>Từ chối quyền hạn:</b> Bạn không có vai trò Tổng Biên Tập (TBT) để ban hành quyết định thẩm định cấp cao cho đề tài này.
+                            </c:when>
+                            <c:when test="${param.error == 'invalid_status_for_tbt'}">
+                                <b>Trạng thái không hợp lệ:</b> Quyết định của TBT chỉ áp dụng cho đề tài đang chờ duyệt vượt cấp (PENDING_EXECUTIVE_APPROVAL).
                             </c:when>
                             <c:when test="${param.error == 'server_error'}">
                                 <b>Lỗi máy chủ:</b> Không thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.
@@ -346,10 +367,20 @@
                                         <td style="text-align: right;">
                                             <c:choose>
                                                 <c:when test="${t.status == 'PENDING_EXECUTIVE_APPROVAL'}">
-                                                    <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
-                                                       class="btn sm" style="border: 1px solid var(--line); background: #fff; color: var(--text);">
-                                                        Xem thẩm định 👁️
-                                                    </a>
+                                                    <c:choose>
+                                                        <c:when test="${sessionScope.user != null and sessionScope.user.roleId == 3}">
+                                                            <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
+                                                               class="btn sm" style="background: linear-gradient(135deg, #1b263b, #2b4570); color: #fff; font-weight: 700; border: none; padding: 6px 14px;">
+                                                                ⭐ Thẩm định TBT
+                                                            </a>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"
+                                                               class="btn sm" style="border: 1px solid var(--line); background: #fff; color: var(--text);">
+                                                                Xem thẩm định 👁️
+                                                            </a>
+                                                        </c:otherwise>
+                                                    </c:choose>
                                                 </c:when>
                                                 <c:otherwise>
                                                     <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"

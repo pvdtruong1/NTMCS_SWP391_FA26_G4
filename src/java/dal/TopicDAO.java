@@ -1,11 +1,13 @@
 package dal;
 
+import dto.ReporterWorkloadDTO;
 import dto.TopicArchiveDTO;
 import dto.TopicEvaluationDetailDTO;
 import dto.TopicPendingDTO;
 import model.Category;
 import model.CriteriaConfig;
 import model.Desk;
+import model.Topic;
 import model.TopicEstimate;
 
 import java.math.BigDecimal;
@@ -633,6 +635,141 @@ public class TopicDAO extends DBContext {
         }
     }
 
+    /**
+     * Executes atomic transaction for Executive Editor (TBT) reviewing an escalated topic (SCR-2.3B / UC: Review Escalated Pitch).
+     * Enforces guard clause: Topic must currently be in 'PENDING_EXECUTIVE_APPROVAL'.
+     *
+     * @param topicId         Topic identifier
+     * @param evaluatorUserId Executive Editor user identifier (e.g. TBT)
+     * @param decision        Binary review decision ('APPROVED', 'REVISION_REQUESTED', or 'REJECTED')
+     * @param comments        Executive direction comments (mandatory for REVISION_REQUESTED and REJECTED)
+     * @return true if evaluation transaction committed successfully
+     * @throws SQLException on database transaction error
+     */
+    public boolean evaluateEscalatedTopic(int topicId, int evaluatorUserId, String decision, String comments) throws SQLException {
+        Connection conn = getConnection();
+        boolean oldAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            // 1. Guard check: Topic must exist and currently be in PENDING_EXECUTIVE_APPROVAL status
+            String checkTopicSql = "SELECT status, author_user_id FROM Topic WHERE topic_id = ?;";
+            int authorId = 0;
+            try (PreparedStatement psCheck = conn.prepareStatement(checkTopicSql)) {
+                psCheck.setInt(1, topicId);
+                try (ResultSet rsCheck = psCheck.executeQuery()) {
+                    if (!rsCheck.next()) {
+                        conn.rollback();
+                        throw new IllegalArgumentException("Đề tài #" + topicId + " không tồn tại.");
+                    }
+                    String currentStatus = rsCheck.getString("status");
+                    if (!"PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(currentStatus)) {
+                        conn.rollback();
+                        throw new IllegalStateException("Đề tài #" + topicId + " đang ở trạng thái '" + currentStatus
+                                + "', không thể thực hiện phê duyệt cấp cao của Tổng Biên Tập (chỉ áp dụng cho 'PENDING_EXECUTIVE_APPROVAL').");
+                    }
+                    authorId = rsCheck.getInt("author_user_id");
+                }
+            }
+
+            // 2. Validate decision: must be APPROVED, REVISION_REQUESTED, or REJECTED
+            String normDecision = decision != null ? decision.toUpperCase().trim() : "";
+            if (!"APPROVED".equals(normDecision) && !"REVISION_REQUESTED".equals(normDecision) && !"REJECTED".equals(normDecision)) {
+                conn.rollback();
+                throw new IllegalArgumentException("Quyết định thẩm định của TBT không hợp lệ: " + decision);
+            }
+
+            if (("REVISION_REQUESTED".equals(normDecision) || "REJECTED".equals(normDecision))
+                    && (comments == null || comments.trim().isEmpty())) {
+                conn.rollback();
+                throw new IllegalArgumentException("Tổng Biên Tập bắt buộc phải nhập ý kiến chỉ đạo khi yêu cầu sửa đổi hoặc bác bỏ đề tài.");
+            }
+
+            // 3. Insert into Topic_Evaluation with evaluation_stage = 'EXECUTIVE_APPROVAL'
+            String insertEvalSql = "INSERT INTO Topic_Evaluation (topic_id, evaluator_user_id, evaluation_stage, decision, comments) "
+                    + "VALUES (?, ?, 'EXECUTIVE_APPROVAL', ?, ?);";
+            try (PreparedStatement psEval = conn.prepareStatement(insertEvalSql)) {
+                psEval.setInt(1, topicId);
+                psEval.setInt(2, evaluatorUserId);
+                psEval.setString(3, normDecision);
+                psEval.setString(4, comments != null ? comments.trim() : "");
+                psEval.executeUpdate();
+            }
+
+            // 4. Update Topic status and topic_code (if APPROVED)
+            String topicCode = null;
+            if ("APPROVED".equals(normDecision)) {
+                topicCode = generateUniqueTopicCode(conn, topicId);
+                String updateApprovedSql = "UPDATE Topic SET status = 'APPROVED', topic_code = ? WHERE topic_id = ?;";
+                try (PreparedStatement ps = conn.prepareStatement(updateApprovedSql)) {
+                    ps.setString(1, topicCode);
+                    ps.setInt(2, topicId);
+                    ps.executeUpdate();
+                }
+            } else {
+                String updateStatusSql = "UPDATE Topic SET status = ? WHERE topic_id = ?;";
+                try (PreparedStatement ps = conn.prepareStatement(updateStatusSql)) {
+                    ps.setString(1, normDecision);
+                    ps.setInt(2, topicId);
+                    ps.executeUpdate();
+                }
+            }
+
+            // 5. Send Notification to Author
+            if (authorId > 0) {
+                String notifMsg;
+                if ("APPROVED".equals(normDecision)) {
+                    notifMsg = "Tổng Biên Tập đã phê duyệt cấp cao đề tài #" + topicId + " (Mã: " + topicCode + ").";
+                } else if ("REVISION_REQUESTED".equals(normDecision)) {
+                    notifMsg = "Tổng Biên Tập yêu cầu hoàn thiện đề tài #" + topicId + ": " + (comments != null ? comments : "");
+                } else {
+                    notifMsg = "Tổng Biên Tập đã bác bỏ đề tài #" + topicId + ": " + (comments != null ? comments : "");
+                }
+
+                String insertNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+                try (PreparedStatement psNotif = conn.prepareStatement(insertNotifSql)) {
+                    psNotif.setInt(1, authorId);
+                    psNotif.setInt(2, topicId);
+                    psNotif.setString(3, notifMsg);
+                    psNotif.executeUpdate();
+                }
+            }
+
+            // 6. Notify Desk Editor who escalated this topic
+            String findEscalatorSql = "SELECT TOP 1 evaluator_user_id FROM Topic_Evaluation "
+                    + "WHERE topic_id = ? AND evaluation_stage = 'DESK_REVIEW' AND decision = 'ESCALATED' "
+                    + "ORDER BY evaluation_id DESC;";
+            int deskEditorId = 0;
+            try (PreparedStatement psEsc = conn.prepareStatement(findEscalatorSql)) {
+                psEsc.setInt(1, topicId);
+                try (ResultSet rsEsc = psEsc.executeQuery()) {
+                    if (rsEsc.next()) {
+                        deskEditorId = rsEsc.getInt(1);
+                    }
+                }
+            }
+            if (deskEditorId > 0 && deskEditorId != authorId) {
+                String deskMsg = "Tổng Biên Tập đã ban hành kết luận '" + normDecision + "' cho đề tài #" + topicId + " do Ban chuyên môn chuyển lên.";
+                String insertNotifDeskSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+                try (PreparedStatement psNotifDesk = conn.prepareStatement(insertNotifDeskSql)) {
+                    psNotifDesk.setInt(1, deskEditorId);
+                    psNotifDesk.setInt(2, topicId);
+                    psNotifDesk.setString(3, deskMsg);
+                    psNotifDesk.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException ex) {
+            conn.rollback();
+            LOGGER.log(Level.SEVERE, "Transaction rollback during evaluateEscalatedTopic for topicId " + topicId, ex);
+            throw ex;
+        } finally {
+            conn.setAutoCommit(oldAutoCommit);
+        }
+    }
+
     private String generateUniqueTopicCode(Connection conn, int topicId) throws SQLException {
         int year = Year.now().getValue();
         String prefix = "TOPIC-" + year + "-";
@@ -679,6 +816,139 @@ public class TopicDAO extends DBContext {
             LOGGER.log(Level.SEVERE, "Error in getCategoriesByDesk", ex);
         }
         return list;
+    }
+
+    /**
+     * Retrieves Topic entity by primary key topic_id.
+     */
+    public Topic getTopicById(int topicId) {
+        String sql = "SELECT topic_id, topic_code, title, angle, status, deadline, category_id, author_user_id "
+                   + "FROM Topic WHERE topic_id = ?;";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return new Topic(
+                                rs.getInt("topic_id"),
+                                rs.getString("topic_code"),
+                                rs.getString("title"),
+                                rs.getString("angle"),
+                                rs.getString("status"),
+                                rs.getDate("deadline"),
+                                rs.getInt("category_id"),
+                                rs.getInt("author_user_id")
+                        );
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error in getTopicById for topicId " + topicId, ex);
+        }
+        return null;
+    }
+
+    /**
+     * Creates a new Directive Topic in 'DRAFT' status (SCR-2.4: Directive Topic Creation Form).
+     * Returns the newly generated topic_id.
+     */
+    public int createDirectiveTopicDraft(Topic topic) throws SQLException {
+        String sql = "INSERT INTO Topic (title, angle, status, deadline, category_id, author_user_id) "
+                   + "VALUES (?, ?, 'DRAFT', ?, ?, ?);";
+        Connection conn = getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, topic.getTitle().trim());
+            ps.setString(2, topic.getAngle() != null ? topic.getAngle().trim() : "");
+            if (topic.getDeadline() != null) {
+                ps.setDate(3, topic.getDeadline());
+            } else {
+                ps.setNull(3, java.sql.Types.DATE);
+            }
+            ps.setInt(4, topic.getCategoryId());
+            ps.setInt(5, topic.getAuthorUserId());
+
+            int affected = ps.executeUpdate();
+            if (affected == 0) {
+                throw new SQLException("Lưu bản thảo đề tài chỉ đạo thất bại, không có bản ghi nào được ghi nhận.");
+            }
+
+            try (ResultSet gk = ps.getGeneratedKeys()) {
+                if (gk.next()) {
+                    int generatedId = gk.getInt(1);
+                    topic.setTopicId(generatedId);
+                    return generatedId;
+                } else {
+                    throw new SQLException("Lưu bản thảo đề tài chỉ đạo thất bại, không lấy được mã định danh tự tăng.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates an existing Directive Topic draft (SCR-2.4).
+     */
+    public boolean updateDirectiveTopicDraft(Topic topic) throws SQLException {
+        String sql = "UPDATE Topic SET title = ?, angle = ?, deadline = ?, category_id = ? "
+                   + "WHERE topic_id = ? AND status = 'DRAFT';";
+        Connection conn = getConnection();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, topic.getTitle().trim());
+            ps.setString(2, topic.getAngle() != null ? topic.getAngle().trim() : "");
+            if (topic.getDeadline() != null) {
+                ps.setDate(3, topic.getDeadline());
+            } else {
+                ps.setNull(3, java.sql.Types.DATE);
+            }
+            ps.setInt(4, topic.getCategoryId());
+            ps.setInt(5, topic.getTopicId());
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * Retrieves the production quota count for a desk in a given period (e.g. '2026-10').
+     */
+    public int getDeskQuota(int deskId, String period) {
+        String sql = "SELECT quota_count FROM Desk_Quota WHERE desk_id = ? AND period = ?;";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, deskId);
+                ps.setString(2, period);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.WARNING, "Error querying Desk Quota for desk " + deskId, ex);
+        }
+        return 15; // default fallback
+    }
+
+    /**
+     * Retrieves count of active/approved topics for a desk to compute Quota fulfillment progress.
+     */
+    public int getDeskProductionCount(int deskId) {
+        String sql = "SELECT COUNT(*) FROM Topic t "
+                   + "INNER JOIN Category c ON t.category_id = c.category_id "
+                   + "WHERE c.desk_id = ? AND t.status IN ('APPROVED', 'IN_PROGRESS', 'DELIVERED', 'ACCEPTED_READY_FOR_CMS');";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, deskId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.WARNING, "Error querying Desk Production Count for desk " + deskId, ex);
+        }
+        return 0;
     }
 
     /**
@@ -945,6 +1215,224 @@ public class TopicDAO extends DBContext {
         } catch (SQLException | RuntimeException ex) {
             conn.rollback();
             LOGGER.log(Level.SEVERE, "Transaction rollback in reactivateArchivedTopic for topicId " + topicId, ex);
+            throw ex;
+        } finally {
+            conn.setAutoCommit(oldAutoCommit);
+        }
+    }
+
+    /**
+     * Retrieves reporter workload matrix for a specific desk (SCR-2.5: Reporter Dispatch & Workload Desk).
+     * Calculates active topics, overdue topics, and completed topics for each reporter.
+     * Orders reporters prioritizing current desk members, then lowest active workload first.
+     */
+    public List<ReporterWorkloadDTO> getReportersWorkloadByDesk(int deskId) {
+        List<ReporterWorkloadDTO> list = new ArrayList<>();
+        String sql = "SELECT "
+                   + "    u.user_id, "
+                   + "    u.full_name, "
+                   + "    u.email, "
+                   + "    u.desk_id, "
+                   + "    COALESCE(d.desk_name, N'Ban Chuyên đề') AS desk_name, "
+                   + "    ( "
+                   + "        SELECT COUNT(DISTINCT t.topic_id) "
+                   + "        FROM Topic t "
+                   + "        LEFT JOIN Topic_Member tm ON t.topic_id = tm.topic_id "
+                   + "        WHERE (tm.user_id = u.user_id OR (tm.user_id IS NULL AND t.author_user_id = u.user_id)) "
+                   + "          AND t.status IN ('APPROVED', 'IN_PROGRESS') "
+                   + "    ) AS active_count, "
+                   + "    ( "
+                   + "        SELECT COUNT(DISTINCT t.topic_id) "
+                   + "        FROM Topic t "
+                   + "        LEFT JOIN Topic_Member tm ON t.topic_id = tm.topic_id "
+                   + "        WHERE (tm.user_id = u.user_id OR (tm.user_id IS NULL AND t.author_user_id = u.user_id)) "
+                   + "          AND t.status IN ('APPROVED', 'IN_PROGRESS') "
+                   + "          AND t.deadline < CAST(GETDATE() AS DATE) "
+                   + "    ) AS overdue_count, "
+                   + "    ( "
+                   + "        SELECT COUNT(DISTINCT t.topic_id) "
+                   + "        FROM Topic t "
+                   + "        LEFT JOIN Topic_Member tm ON t.topic_id = tm.topic_id "
+                   + "        WHERE (tm.user_id = u.user_id OR (tm.user_id IS NULL AND t.author_user_id = u.user_id)) "
+                   + "          AND t.status IN ('ACCEPTED_READY_FOR_CMS', 'PUBLISHED') "
+                   + "    ) AS completed_count "
+                   + "FROM [User] u "
+                   + "JOIN [Role] r ON u.role_id = r.role_id "
+                   + "LEFT JOIN Desk d ON u.desk_id = d.desk_id "
+                   + "WHERE r.role_name = 'REPORTER' AND u.active_status = 1 "
+                   + "ORDER BY "
+                   + "    CASE WHEN u.desk_id = ? THEN 0 ELSE 1 END, "
+                   + "    active_count ASC, "
+                   + "    u.full_name ASC;";
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, deskId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        int userId = rs.getInt("user_id");
+                        int activeCount = rs.getInt("active_count");
+                        ReporterWorkloadDTO dto = new ReporterWorkloadDTO(
+                                userId,
+                                rs.getString("full_name"),
+                                rs.getString("email"),
+                                rs.getInt("desk_id"),
+                                rs.getString("desk_name"),
+                                activeCount,
+                                rs.getInt("overdue_count"),
+                                rs.getInt("completed_count")
+                        );
+
+                        // If reporter has active topics, fetch up to 3 topic titles for quick context tooltip
+                        if (activeCount > 0) {
+                            String activeTitlesSql = "SELECT DISTINCT TOP 3 t.title "
+                                                   + "FROM Topic t "
+                                                   + "LEFT JOIN Topic_Member tm ON t.topic_id = tm.topic_id "
+                                                   + "WHERE (tm.user_id = ? OR (tm.user_id IS NULL AND t.author_user_id = ?)) "
+                                                   + "  AND t.status IN ('APPROVED', 'IN_PROGRESS') "
+                                                   + "ORDER BY t.title ASC;";
+                            try (PreparedStatement psTitles = conn.prepareStatement(activeTitlesSql)) {
+                                psTitles.setInt(1, userId);
+                                psTitles.setInt(2, userId);
+                                try (ResultSet rsTitles = psTitles.executeQuery()) {
+                                    while (rsTitles.next()) {
+                                        dto.addActiveTopicTitle(rsTitles.getString("title"));
+                                    }
+                                }
+                            }
+                        }
+
+                        list.add(dto);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error in getReportersWorkloadByDesk for desk " + deskId, ex);
+        }
+        return list;
+    }
+
+    /**
+     * Executes atomic ACID transaction for commissioning a directive topic (SCR-2.5: Lead Reporter Assignment Desk):
+     * 1. Status Guard: Verifies topic is strictly in 'DRAFT' status.
+     * 2. Lead Reporter Guard: Verifies reporter exists, has role REPORTER (1), and is active.
+     * 3. Mints unique topic_code via generateUniqueTopicCode.
+     * 4. Updates Topic status to 'APPROVED' and assigns minted topic_code.
+     * 5. Inserts lead reporter into Topic_Member with role_in_team = 'LEAD_REPORTER'.
+     * 6. Dispatches in-app notifications to assigned Lead Reporter and Commissioning Editor.
+     * 
+     * Returns the minted topic_code upon success.
+     */
+    public String commissionDirectiveTopic(int topicId, int leadReporterId, int commissioningEditorId, String commissionNotes) throws SQLException {
+        Connection conn = getConnection();
+        boolean oldAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            // 1. Guard check: Topic must exist and be in DRAFT status
+            String topicCheckSql = "SELECT title, status, deadline FROM Topic WHERE topic_id = ?;";
+            String title = null;
+            String currentStatus = null;
+            java.sql.Date deadline = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(topicCheckSql)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        title = rs.getString("title");
+                        currentStatus = rs.getString("status");
+                        deadline = rs.getDate("deadline");
+                    }
+                }
+            }
+
+            if (currentStatus == null) {
+                conn.rollback();
+                throw new IllegalArgumentException("Không tìm thấy đề tài có mã #" + topicId);
+            }
+
+            if (!"DRAFT".equalsIgnoreCase(currentStatus)) {
+                conn.rollback();
+                throw new IllegalStateException("Chỉ đề tài ở trạng thái DRAFT mới có thể phát lệnh đặt hàng. Trạng thái hiện tại: " + currentStatus);
+            }
+
+            // 2. Guard check: Reporter must exist, be active and have role REPORTER
+            String reporterCheckSql = "SELECT u.full_name FROM [User] u JOIN [Role] r ON u.role_id = r.role_id WHERE u.user_id = ? AND r.role_name = 'REPORTER' AND u.active_status = 1;";
+            String reporterName = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(reporterCheckSql)) {
+                ps.setInt(1, leadReporterId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        reporterName = rs.getString("full_name");
+                    }
+                }
+            }
+
+            if (reporterName == null) {
+                conn.rollback();
+                throw new IllegalArgumentException("Phóng viên chỉ định không hợp lệ hoặc đang ở trạng thái không hoạt động.");
+            }
+
+            // 3. Mint unique topic_code
+            String topicCode = generateUniqueTopicCode(conn, topicId);
+
+            // 4. Mutate Topic status to APPROVED and set topic_code
+            String updateTopicSql = "UPDATE Topic SET status = 'APPROVED', topic_code = ? WHERE topic_id = ?;";
+            try (PreparedStatement ps = conn.prepareStatement(updateTopicSql)) {
+                ps.setString(1, topicCode);
+                ps.setInt(2, topicId);
+                ps.executeUpdate();
+            }
+
+            // 5. Clean prior members for this draft topic and assign Lead Reporter
+            String deleteMembersSql = "DELETE FROM Topic_Member WHERE topic_id = ?;";
+            try (PreparedStatement ps = conn.prepareStatement(deleteMembersSql)) {
+                ps.setInt(1, topicId);
+                ps.executeUpdate();
+            }
+
+            String insertMemberSql = "INSERT INTO Topic_Member (topic_id, user_id, role_in_team) VALUES (?, ?, 'LEAD_REPORTER');";
+            try (PreparedStatement ps = conn.prepareStatement(insertMemberSql)) {
+                ps.setInt(1, topicId);
+                ps.setInt(2, leadReporterId);
+                ps.executeUpdate();
+            }
+
+            // 6. Dispatch Notification to Lead Reporter
+            String deadlineNote = deadline != null ? ". Hạn hoàn thành: " + deadline : "";
+            String extraNote = (commissionNotes != null && !commissionNotes.trim().isEmpty())
+                    ? ". Chỉ đạo nghiệp vụ: " + commissionNotes.trim()
+                    : "";
+            String reporterMessage = "Bạn được Trưởng ban giao quyền Trưởng nhóm tác nghiệp đề tài chỉ đạo: [" + topicCode + "] "
+                    + title + deadlineNote + extraNote;
+
+            String notifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+            try (PreparedStatement ps = conn.prepareStatement(notifSql)) {
+                ps.setInt(1, leadReporterId);
+                ps.setInt(2, topicId);
+                ps.setString(3, reporterMessage);
+                ps.executeUpdate();
+            }
+
+            // 7. Dispatch Notification to Commissioning Editor (audit confirmation)
+            if (commissioningEditorId > 0) {
+                String editorMessage = "Đã phát lệnh đặt hàng thành công đề tài chỉ đạo [" + topicCode + "] - " + title
+                        + ". Trưởng nhóm tác nghiệp: " + reporterName;
+                try (PreparedStatement ps = conn.prepareStatement(notifSql)) {
+                    ps.setInt(1, commissioningEditorId);
+                    ps.setInt(2, topicId);
+                    ps.setString(3, editorMessage);
+                    ps.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            return topicCode;
+        } catch (SQLException | RuntimeException ex) {
+            conn.rollback();
+            LOGGER.log(Level.SEVERE, "Transaction rollback in commissionDirectiveTopic for topicId " + topicId, ex);
             throw ex;
         } finally {
             conn.setAutoCommit(oldAutoCommit);

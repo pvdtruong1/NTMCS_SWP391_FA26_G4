@@ -34,6 +34,16 @@ public class PendingQueueServlet extends HttpServlet {
             throws ServletException, IOException {
         HttpSession session = request.getSession();
 
+        // Support quick role switch in dev mode: ?as=tbt or ?as=editor
+        String asParam = request.getParameter("as");
+        if ("tbt".equalsIgnoreCase(asParam)) {
+            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
+            session.setAttribute("user", tbtUser);
+        } else if ("editor".equalsIgnoreCase(asParam)) {
+            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
+            session.setAttribute("user", editorUser);
+        }
+
         // 1. Session Context & Fallback Dev Mode
         User currentUser = (User) session.getAttribute("user");
         if (currentUser == null) {

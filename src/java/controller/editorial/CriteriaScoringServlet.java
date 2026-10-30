@@ -32,7 +32,16 @@ public class CriteriaScoringServlet extends HttpServlet {
             throws ServletException, IOException {
         HttpSession session = request.getSession();
 
-        // 1. Session Context & Fallback Dev Mode
+        // 1. Session Context & Fallback Dev Mode (with quick role switch support: ?as=tbt or ?as=editor)
+        String asParam = request.getParameter("as");
+        if ("tbt".equalsIgnoreCase(asParam)) {
+            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
+            session.setAttribute("user", tbtUser);
+        } else if ("editor".equalsIgnoreCase(asParam)) {
+            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
+            session.setAttribute("user", editorUser);
+        }
+
         User currentUser = (User) session.getAttribute("user");
         if (currentUser == null) {
             currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
@@ -73,6 +82,10 @@ public class CriteriaScoringServlet extends HttpServlet {
         request.setAttribute("criteriaList", topicDetail.getCriteriaList());
         request.setAttribute("estimates", topicDetail.getEstimates());
         request.setAttribute("totalEstimate", topicDetail.getTotalEstimateAmount());
+
+        boolean isExecReviewer = (currentUser.getRoleId() == 3) && "PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(topicDetail.getStatus());
+        request.setAttribute("isExecReviewer", isExecReviewer);
+
         request.getRequestDispatcher("/editorial/criteria-scoring.jsp").forward(request, response);
     }
 
@@ -81,6 +94,16 @@ public class CriteriaScoringServlet extends HttpServlet {
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         HttpSession session = request.getSession();
+
+        // Support quick role switch in dev mode: ?as=tbt or ?as=editor
+        String asParam = request.getParameter("as");
+        if ("tbt".equalsIgnoreCase(asParam)) {
+            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
+            session.setAttribute("user", tbtUser);
+        } else if ("editor".equalsIgnoreCase(asParam)) {
+            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
+            session.setAttribute("user", editorUser);
+        }
 
         // 1. Session Context & Fallback Dev Mode
         User currentUser = (User) session.getAttribute("user");
@@ -108,52 +131,89 @@ public class CriteriaScoringServlet extends HttpServlet {
         }
 
         decision = decision.trim().toUpperCase();
-        if (!decision.equals("APPROVED") && !decision.equals("ESCALATED") &&
-            !decision.equals("REVISION_REQUESTED") && !decision.equals("REJECTED")) {
-            response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=invalid_decision");
-            return;
-        }
-
-        // 3. Parse Legal Risk Score
-        double legalRiskScore = 0.0;
-        String legalRiskStr = request.getParameter("legalRiskScore");
-        if (legalRiskStr != null && !legalRiskStr.trim().isEmpty()) {
-            try {
-                legalRiskScore = Double.parseDouble(legalRiskStr.trim());
-            } catch (NumberFormatException ignored) {
-                legalRiskScore = 0.0;
-            }
-        }
-
-        // Executive Escalation Guard Clause: if legal_risk >= 8.0, decision MUST be ESCALATED
-        if (legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
-            decision = "ESCALATED";
-        }
-
-        // Mandatory feedback requirement for Revision Request or Rejection
-        if (("REVISION_REQUESTED".equals(decision) || "REJECTED".equals(decision))
-                && (comments == null || comments.trim().isEmpty())) {
-            response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=comment_required");
-            return;
-        }
-
-        // 4. Parse Criteria Scores and Comments
-        Map<Integer, Double> criteriaScores = new HashMap<>();
-        Map<Integer, String> criteriaComments = new HashMap<>();
 
         try (TopicDAO topicDAO = new TopicDAO()) {
-            // Defense-in-Depth Guard: Topic MUST be in 'SUBMITTED' state for Desk Review
             TopicEvaluationDetailDTO existingTopic = topicDAO.getTopicDetailForEvaluation(topicId);
             if (existingTopic == null) {
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
                 return;
             }
+
+            // =========================================================================
+            // BRANCH 1: Executive Review by Executive Editor (TBT - SCR-2.3B)
+            // =========================================================================
+            if ("PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(existingTopic.getStatus())) {
+                // Security Guard: Only Executive Editor (role_id = 3) can decide on escalated pitches
+                if (currentUser.getRoleId() != 3) {
+                    LOGGER.log(Level.WARNING, "Blocked non-TBT user {0} (role {1}) from deciding on escalated topic {2}",
+                            new Object[]{currentUser.getUserId(), currentUser.getRoleId(), topicId});
+                    response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=forbidden_not_tbt");
+                    return;
+                }
+
+                if (!"APPROVED".equals(decision) && !"REVISION_REQUESTED".equals(decision) && !"REJECTED".equals(decision)) {
+                    response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=invalid_decision");
+                    return;
+                }
+
+                // Mandatory feedback requirement for Revision Request or Dismissal by TBT
+                if (("REVISION_REQUESTED".equals(decision) || "REJECTED".equals(decision))
+                        && (comments == null || comments.trim().isEmpty())) {
+                    response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=comment_required");
+                    return;
+                }
+
+                boolean success = topicDAO.evaluateEscalatedTopic(topicId, currentUser.getUserId(), decision, comments);
+                if (success) {
+                    response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?msg=tbt_" + decision.toLowerCase());
+                } else {
+                    response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=eval_failed");
+                }
+                return;
+            }
+
+            // =========================================================================
+            // BRANCH 2: Level-1 Rubric Review by Desk Editor (Trường - SCR-2.3)
+            // =========================================================================
             if (!"SUBMITTED".equalsIgnoreCase(existingTopic.getStatus())) {
                 LOGGER.log(Level.WARNING, "Blocked illegal evaluation attempt on topic {0} with status {1}",
                         new Object[]{topicId, existingTopic.getStatus()});
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
                 return;
             }
+
+            if (!decision.equals("APPROVED") && !decision.equals("ESCALATED") &&
+                !decision.equals("REVISION_REQUESTED") && !decision.equals("REJECTED")) {
+                response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=invalid_decision");
+                return;
+            }
+
+            // Parse Legal Risk Score
+            double legalRiskScore = 0.0;
+            String legalRiskStr = request.getParameter("legalRiskScore");
+            if (legalRiskStr != null && !legalRiskStr.trim().isEmpty()) {
+                try {
+                    legalRiskScore = Double.parseDouble(legalRiskStr.trim());
+                } catch (NumberFormatException ignored) {
+                    legalRiskScore = 0.0;
+                }
+            }
+
+            // Executive Escalation Guard Clause: if legal_risk >= 8.0, decision MUST be ESCALATED
+            if (legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
+                decision = "ESCALATED";
+            }
+
+            // Mandatory feedback requirement for Revision Request or Rejection
+            if (("REVISION_REQUESTED".equals(decision) || "REJECTED".equals(decision))
+                    && (comments == null || comments.trim().isEmpty())) {
+                response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=comment_required");
+                return;
+            }
+
+            // Parse Criteria Scores and Comments
+            Map<Integer, Double> criteriaScores = new HashMap<>();
+            Map<Integer, String> criteriaComments = new HashMap<>();
 
             List<CriteriaConfig> criteriaList = topicDAO.getCriteriaConfigs();
             double totalWeighted = 0.0;
@@ -213,6 +273,8 @@ public class CriteriaScoringServlet extends HttpServlet {
             LOGGER.log(Level.WARNING, "Domain guard clause violation for topic " + topicId + ": " + ex.getMessage());
             if (ex.getMessage() != null && ex.getMessage().contains("SUBMITTED")) {
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
+            } else if (ex.getMessage() != null && ex.getMessage().contains("PENDING_EXECUTIVE_APPROVAL")) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_status_for_tbt");
             } else {
                 response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=score_below_threshold");
             }

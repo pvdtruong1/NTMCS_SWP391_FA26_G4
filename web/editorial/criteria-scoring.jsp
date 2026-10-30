@@ -182,6 +182,9 @@
                 <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="nav-item">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
+                <a href="${pageContext.request.contextPath}/editorial/directive-topic" class="nav-item">
+                    <i>⚡</i> Đặt hàng đề tài chỉ đạo
+                </a>
                 <a href="${pageContext.request.contextPath}/editorial/idea-archive" class="nav-item">
                     <i>🗄️</i> Kho lưu trữ ý tưởng
                 </a>
@@ -352,19 +355,34 @@
                     <c:set var="isReadOnly" value="${topic.status != 'SUBMITTED'}" />
 
                     <!-- Lock Notice Banner if topic is escalated to Executive -->
-                    <c:if test="${isReadOnly}">
-                        <div style="margin-bottom: 16px; padding: 14px 18px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 14px; background: #fff8e6; color: #b26a00; border: 1px solid #ffe082;">
-                            <span style="font-size: 28px;">🔒</span>
-                            <div>
-                                <div style="font-size: 15px; font-weight: 800; text-transform: uppercase;">
-                                    ĐỀ TÀI ĐANG CHỜ TỔNG BIÊN TẬP PHÊ DUYỆT ĐIỀU HÀNH
-                                </div>
-                                <div style="margin-top: 3px; font-size: 13px; font-weight: normal; color: #7c4a00; line-height: 1.4;">
-                                    Đề tài đã hoàn tất thẩm định đợt 1 và chuyển vượt cấp lên Tổng Biên Tập. Trưởng ban không được phép chỉnh sửa điểm số hoặc phê duyệt tại trạng thái này.
+                    <c:choose>
+                        <c:when test="${isExecReviewer}">
+                            <div style="margin-bottom: 16px; padding: 16px 20px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, #1b263b, #2b4570); color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
+                                <span style="font-size: 32px;">⭐</span>
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        BÀN THẨM ĐỊNH TỐI CAO CỦA TỔNG BIÊN TẬP (SCR-2.3B)
+                                    </div>
+                                    <div style="margin-top: 4px; font-size: 13px; font-weight: normal; color: #e2e8f0; line-height: 1.4;">
+                                        Đề tài có rủi ro pháp lý cao (&ge; 8.0/10) hoặc đề tài trọng điểm đã được Trưởng ban chuyển lên xin phê duyệt cấp cao. Tổng Biên Tập thực hiện xem xét và ban hành quyết định nhị phân cuối cùng.
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </c:if>
+                        </c:when>
+                        <c:when test="${isReadOnly}">
+                            <div style="margin-bottom: 16px; padding: 14px 18px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 14px; background: #fff8e6; color: #b26a00; border: 1px solid #ffe082;">
+                                <span style="font-size: 28px;">🔒</span>
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 800; text-transform: uppercase;">
+                                        ĐỀ TÀI ĐANG CHỜ TỔNG BIÊN TẬP PHÊ DUYỆT ĐIỀU HÀNH
+                                    </div>
+                                    <div style="margin-top: 3px; font-size: 13px; font-weight: normal; color: #7c4a00; line-height: 1.4;">
+                                        Đề tài đã hoàn tất thẩm định đợt 1 và chuyển vượt cấp lên Tổng Biên Tập. Trưởng ban không được phép chỉnh sửa điểm số hoặc phê duyệt tại trạng thái này.
+                                    </div>
+                                </div>
+                            </div>
+                        </c:when>
+                    </c:choose>
 
                     <!-- Audit Trail Card of Previous Evaluation Session -->
                     <c:if test="${not empty topic.evaluationDecision or not empty topic.evaluatorName}">
@@ -527,8 +545,50 @@
                                 🚫 <strong>ĐIỂM CHƯA ĐẠT CHUẨN (Tổng: <span id="scoreAlertVal">0.0</span> / 10 &lt; 5.0):</strong> Đề tài không đáp ứng ngưỡng chất lượng tối thiểu để Phê duyệt Cấp 1 trực tiếp. BTV chỉ được phép chọn <strong>"Yêu cầu chỉnh sửa đề cương"</strong> hoặc <strong>"Bác bỏ đề tài"</strong>.
                             </div>
 
-                            <!-- Action Buttons Group / Read-only Return Navigation -->
+                            <!-- Action Buttons Group / TBT Decision Panel (SCR-2.3B) / Read-only Return Navigation -->
                             <c:choose>
+                                <c:when test="${isExecReviewer}">
+                                    <div style="margin-top: 20px; padding: 20px; border-radius: 12px; background: #f8fafc; border: 2px solid #2b4570; box-shadow: 0 4px 14px rgba(27,38,59,0.1);">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="font-size: 20px;">⭐</span>
+                                                <strong style="font-size: 14px; color: #1b263b; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    BÀN QUYẾT ĐỊNH CỦA TỔNG BIÊN TẬP (TAB SCR-2.3B)
+                                                </strong>
+                                            </div>
+                                            <span class="badge b-escalated" style="font-size: 12px; padding: 4px 10px;">
+                                                Thẩm quyền Tối cao
+                                            </span>
+                                        </div>
+
+                                        <div style="margin-bottom: 16px;">
+                                            <label style="display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px; color: var(--text);">
+                                                ✍️ Ý Kiến Chỉ Đạo & Kết Luận Của TBT (Bắt buộc khi yêu cầu sửa hoặc bác bỏ):
+                                            </label>
+                                            <textarea name="tbtComments" id="tbtComments" rows="3"
+                                                      placeholder="Nhập kết luận chỉ đạo của Tổng Biên Tập gửi Ban Thư ký, Trưởng ban và Phóng viên..."
+                                                      style="width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; resize: vertical; background: #fff;"></textarea>
+                                        </div>
+
+                                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                                            <button type="button" class="btn" style="background: #10b981; color: #fff; font-weight: 700; padding: 11px 18px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer;"
+                                                    onclick="submitTbtDecision('APPROVED')">
+                                                ✔ Phê Duyệt Cấp Cao (TBT Approve)
+                                            </button>
+                                            <button type="button" class="btn" style="background: #f59e0b; color: #fff; font-weight: 700; padding: 11px 18px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer;"
+                                                    onclick="submitTbtDecision('REVISION_REQUESTED')">
+                                                🔄 Yêu Cầu Hoàn Thiện Lại (Revise)
+                                            </button>
+                                            <button type="button" class="btn" style="background: #ef4444; color: #fff; font-weight: 700; padding: 11px 18px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer;"
+                                                    onclick="submitTbtDecision('REJECTED')">
+                                                ✖ Bác Bỏ & Lưu Kho (Dismiss)
+                                            </button>
+                                            <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="btn" style="margin-left: auto; border: 1px solid var(--line); padding: 10px 16px; border-radius: 8px;">
+                                                &larr; Quay lại Hàng đợi
+                                            </a>
+                                        </div>
+                                    </div>
+                                </c:when>
                                 <c:when test="${isReadOnly}">
                                     <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);">
                                         <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="btn" style="border: 1px solid var(--line); padding: 10px 18px;">
@@ -721,10 +781,44 @@
         }
     }
 
+    // 6. Submit TBT Decision (Tab SCR-2.3B)
+    function submitTbtDecision(decision) {
+        var tbtCommentsEl = document.getElementById('tbtComments');
+        var comments = tbtCommentsEl ? tbtCommentsEl.value.trim() : '';
+
+        if ((decision === 'REVISION_REQUESTED' || decision === 'REJECTED') && comments.length === 0) {
+            alert('Vui lòng nhập ý kiến chỉ đạo của Tổng Biên Tập trước khi Yêu cầu hoàn thiện lại hoặc Bác bỏ đề tài.');
+            if (tbtCommentsEl) tbtCommentsEl.focus();
+            return;
+        }
+
+        var commentsInput = document.getElementById('editorialComments');
+        if (commentsInput) {
+            commentsInput.value = comments;
+        }
+
+        var confirmMsg = '';
+        if (decision === 'APPROVED') {
+            confirmMsg = 'Tổng Biên Tập xác nhận PHÊ DUYỆT CẤP CAO đề tài #' + '${topic.topicId}' + ' và chuyển sang giai đoạn tác nghiệp?';
+        } else if (decision === 'REVISION_REQUESTED') {
+            confirmMsg = 'Tổng Biên Tập xác nhận YÊU CẦU HOÀN THIỆN LẠI đề tài #' + '${topic.topicId}' + ' (kích hoạt No-Bypass Rule)?';
+        } else if (decision === 'REJECTED') {
+            confirmMsg = 'Tổng Biên Tập xác nhận BÁC BỎ đề tài #' + '${topic.topicId}' + ' và lưu kho vĩnh viễn?';
+        }
+
+        if (confirm(confirmMsg)) {
+            document.getElementById('decisionInput').value = decision;
+            document.getElementById('evalForm').submit();
+        }
+    }
+
     // Initial calculation on load
     document.addEventListener('DOMContentLoaded', function() {
         recalculateTotal();
-        handleLegalRiskChange(document.getElementById('legalRiskSlider').value);
+        var slider = document.getElementById('legalRiskSlider');
+        if (slider) {
+            handleLegalRiskChange(slider.value);
+        }
     });
 </script>
 </body>

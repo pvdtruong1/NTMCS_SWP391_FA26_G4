@@ -35,6 +35,24 @@
         <url-pattern>/editorial/idea-archive</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>DirectiveTopicServlet</servlet-name>
+        <servlet-class>controller.editorial.DirectiveTopicServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>DirectiveTopicServlet</servlet-name>
+        <url-pattern>/editorial/directive-topic</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>ReporterDispatchServlet</servlet-name>
+        <servlet-class>controller.editorial.ReporterDispatchServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ReporterDispatchServlet</servlet-name>
+        <url-pattern>/editorial/reporter-dispatch</url-pattern>
+    </servlet-mapping>
+
     <welcome-file-list>
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>

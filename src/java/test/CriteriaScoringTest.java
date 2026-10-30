@@ -276,6 +276,123 @@ public class CriteriaScoringTest {
             failed++;
         }
 
+        // Test 10: TBT Binary Review - High-Risk Approval (SCR-2.3B / UC: Review Escalated Pitch)
+        try {
+            // Ensure Topic 3 is in PENDING_EXECUTIVE_APPROVAL for Test 10
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'PENDING_EXECUTIVE_APPROVAL', topic_code = NULL WHERE topic_id = 3;")) {
+                ps.executeUpdate();
+            }
+
+            boolean okTbtApprove = dao.evaluateEscalatedTopic(3, 6, "APPROVED", "Tổng Biên Tập duyệt phê chuẩn vệt bài điều tra trọng điểm.");
+
+            TopicEvaluationDetailDTO updatedTopic3 = dao.getTopicDetailForEvaluation(3);
+            if (okTbtApprove && updatedTopic3 != null && "APPROVED".equals(updatedTopic3.getStatus()) &&
+                updatedTopic3.getTopicCode() != null && updatedTopic3.getTopicCode().startsWith("TOPIC-")) {
+                System.out.println("[PASS] Test 10: TBT high-risk approval successful (SCR-2.3B). Topic #3 status = APPROVED, Code = " + updatedTopic3.getTopicCode());
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 10: TBT approval failed. Status=" + (updatedTopic3 != null ? updatedTopic3.getStatus() : "null"));
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 10: Exception - " + e.getMessage());
+            failed++;
+        }
+
+        // Test 11: TBT Binary Review - Revision Request with Mandatory Feedback (No-Bypass Rule)
+        try {
+            // Set Topic 3 to PENDING_EXECUTIVE_APPROVAL for testing REVISION_REQUESTED
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'PENDING_EXECUTIVE_APPROVAL', topic_code = NULL WHERE topic_id = 3;")) {
+                ps.executeUpdate();
+            }
+
+            boolean okTbtRevise = dao.evaluateEscalatedTopic(3, 6, "REVISION_REQUESTED", "Cần bổ sung ý kiến phản biện từ cơ quan thanh tra tài nguyên.");
+
+            TopicEvaluationDetailDTO updatedTopic3Rev = dao.getTopicDetailForEvaluation(3);
+            if (okTbtRevise && updatedTopic3Rev != null && "REVISION_REQUESTED".equals(updatedTopic3Rev.getStatus())) {
+                System.out.println("[PASS] Test 11: TBT revision request successful (No-Bypass activated). Topic #3 status = REVISION_REQUESTED.");
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 11: TBT revision request failed. Status=" + (updatedTopic3Rev != null ? updatedTopic3Rev.getStatus() : "null"));
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 11: Exception - " + e.getMessage());
+            failed++;
+        }
+
+        // Test 12: TBT Binary Review - Dismissal to Archive (REJECTED)
+        try {
+            // Set Topic 3 to PENDING_EXECUTIVE_APPROVAL for testing REJECTED
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'PENDING_EXECUTIVE_APPROVAL', topic_code = NULL WHERE topic_id = 3;")) {
+                ps.executeUpdate();
+            }
+
+            boolean okTbtDismiss = dao.evaluateEscalatedTopic(3, 6, "REJECTED", "Rủi ro pháp lý quá lớn, không đủ căn cứ điều tra độc lập.");
+
+            TopicEvaluationDetailDTO updatedTopic3Dis = dao.getTopicDetailForEvaluation(3);
+            if (okTbtDismiss && updatedTopic3Dis != null && "REJECTED".equals(updatedTopic3Dis.getStatus())) {
+                System.out.println("[PASS] Test 12: TBT dismissal successful. Topic #3 status = REJECTED (Routed to Idea Archive).");
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 12: TBT dismissal failed. Status=" + (updatedTopic3Dis != null ? updatedTopic3Dis.getStatus() : "null"));
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 12: Exception - " + e.getMessage());
+            failed++;
+        }
+
+        // Test 13: TBT Review Defense-in-Depth Guard (Attempting TBT review on non-escalated topic must throw IllegalStateException)
+        try {
+            // Topic 1 is in SUBMITTED
+            boolean threwTbtGuardException = false;
+            try {
+                dao.evaluateEscalatedTopic(1, 6, "APPROVED", "Cố tình duyệt TBT trên đề tài SUBMITTED");
+            } catch (IllegalStateException ex) {
+                if (ex.getMessage() != null && ex.getMessage().contains("PENDING_EXECUTIVE_APPROVAL")) {
+                    threwTbtGuardException = true;
+                }
+            }
+
+            if (threwTbtGuardException) {
+                System.out.println("[PASS] Test 13: TBT status guard verified (TBT review strictly blocked on non-PENDING_EXECUTIVE_APPROVAL topic).");
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 13: Expected IllegalStateException for non-escalated topic was not thrown.");
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 13: Exception - " + e.getMessage());
+            failed++;
+        }
+
+        // Test 14: TBT Mandatory Feedback Guard (Empty comment on REVISION_REQUESTED/REJECTED must throw IllegalArgumentException)
+        try {
+            // Set Topic 3 to PENDING_EXECUTIVE_APPROVAL
+            try (PreparedStatement ps = dao.getConnection().prepareStatement("UPDATE Topic SET status = 'PENDING_EXECUTIVE_APPROVAL', topic_code = NULL WHERE topic_id = 3;")) {
+                ps.executeUpdate();
+            }
+
+            boolean threwCommentRequired = false;
+            try {
+                dao.evaluateEscalatedTopic(3, 6, "REVISION_REQUESTED", "   ");
+            } catch (IllegalArgumentException ex) {
+                threwCommentRequired = true;
+            }
+
+            if (threwCommentRequired) {
+                System.out.println("[PASS] Test 14: TBT mandatory feedback guard verified (Empty comment rejected for REVISE/DISMISS).");
+                passed++;
+            } else {
+                System.err.println("[FAIL] Test 14: Expected IllegalArgumentException for empty TBT comment was not thrown.");
+                failed++;
+            }
+        } catch (Exception e) {
+            System.err.println("[FAIL] Test 14: Exception - " + e.getMessage());
+            failed++;
+        }
+
         // Restore baseline test data to preserve test isolation
         TopicDAOTest.resetBaselineData(dao);
 

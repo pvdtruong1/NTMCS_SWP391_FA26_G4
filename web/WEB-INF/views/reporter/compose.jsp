@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
 <jsp:include page="/WEB-INF/views/common/header.jsp">
-    <jsp:param name="pageTitle" value="SCR-1.4: Phiếu Đề Xuất Đề Tài Mới — NTMCS" />
+    <jsp:param name="pageTitle" value=" Phiếu Đề Xuất Đề Tài Mới — NTMCS" />
 </jsp:include>
 <c:set var="activeNav" value="compose" scope="request" />
 <jsp:include page="/WEB-INF/views/common/sidebar.jsp" />
@@ -209,7 +209,7 @@ body.dark .schedule-status.status-busy {
 <div class="detail-grid">
     <section class="card">
         <div class="form-title-heading">
-            SCR-1.4: Phiếu Đề Xuất Đề Tài Mới (NTMCS)
+             Phiếu Đề Xuất Đề Tài Mới (NTMCS)
         </div>
 
         <form method="post" action="${pageContext.request.contextPath}/reporter/compose" id="pitch-form">

@@ -174,7 +174,7 @@
         </nav>
         <div class="sidebar-bottom">
             <span class="demo">SE2066 — NHÓM 4</span>
-            <small>Phân hệ Trưởng ban (Trường)</small>
+            <small>Phân hệ Biên tập (WF-02)</small>
         </div>
     </aside>
 

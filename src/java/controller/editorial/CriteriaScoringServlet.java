@@ -4,6 +4,7 @@ import dal.TopicDAO;
 import dto.TopicEvaluationDetailDTO;
 import model.CriteriaConfig;
 import model.User;
+import util.AuthUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;

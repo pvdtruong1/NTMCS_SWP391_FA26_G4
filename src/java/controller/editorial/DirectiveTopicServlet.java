@@ -5,6 +5,7 @@ import model.Category;
 import model.Desk;
 import model.Topic;
 import model.User;
+import util.AuthUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;

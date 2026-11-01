@@ -63,6 +63,7 @@ public class LoginServlet extends HttpServlet {
 
         HttpSession session = request.getSession();
         session.setAttribute("loggedUser", user);
+        session.setAttribute("user", user);
         session.setAttribute("permissions", permissionDAO.getCodesByRole(user.getRoleId()));
         response.sendRedirect(request.getContextPath() + "/home");
     }

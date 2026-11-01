@@ -4,6 +4,7 @@ import dal.TopicDAO;
 import dto.TopicPendingDTO;
 import model.Desk;
 import model.User;
+import util.AuthUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;

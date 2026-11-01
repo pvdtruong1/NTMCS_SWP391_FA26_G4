@@ -12,6 +12,7 @@ import model.Category;
 import model.Desk;
 import model.Topic;
 import model.User;
+import util.AuthUtil;
 
 import java.io.IOException;
 import java.net.URLEncoder;

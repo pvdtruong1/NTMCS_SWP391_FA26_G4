@@ -19,7 +19,11 @@ public class AuthUtil {
         if (session == null) {
             return null;
         }
-        return (User) session.getAttribute("loggedUser");
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) {
+            user = (User) session.getAttribute("user");
+        }
+        return user;
     }
 
     /**
@@ -36,7 +40,7 @@ public class AuthUtil {
         PermissionDAO permissionDAO = new PermissionDAO();
         if (!permissionDAO.roleHasPermission(user.getRoleId(), permissionCode)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                    "You do not have permission to open this page.");
+                    "Bạn không có quyền truy cập trang này (Yêu cầu quyền: " + permissionCode + ").");
             return false;
         }
         return true;

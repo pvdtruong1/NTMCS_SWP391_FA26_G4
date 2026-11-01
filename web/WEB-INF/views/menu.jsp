@@ -17,6 +17,11 @@
     <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('AUDIT_VIEW')}">
         <a href="${base}/audit-log">Audit Log</a>
     </c:if>
+    <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+        <a href="${base}/editorial/pending-queue">Pending Queue</a>
+        <a href="${base}/editorial/idea-archive">Idea Archive</a>
+        <a href="${base}/editorial/directive-creation">Create Directive</a>
+    </c:if>
     <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('QUOTA_MANAGE')}">
         <a href="${base}/dashboard">Dashboard</a>
         <a href="${base}/report">Reports</a>

@@ -47,6 +47,11 @@ public class HomeServlet extends HttpServlet {
         if (codes.contains("AUDIT_VIEW")) {
             screens.add(new String[]{"System audit log", "/audit-log"});
         }
+        if (codes.contains("TOPIC_EVALUATE")) {
+            screens.add(new String[]{"Hàng chờ thẩm định đề tài (Pending Queue)", "/editorial/pending-queue"});
+            screens.add(new String[]{"Kho lưu trữ ý tưởng & Đề tài đình chỉ (Idea Archive)", "/editorial/idea-archive"});
+            screens.add(new String[]{"Đặt hàng & Giao quyền đề tài chỉ đạo (Directive Topic)", "/editorial/directive-creation"});
+        }
         if (codes.contains("QUOTA_MANAGE")) {
             screens.add(new String[]{"Executive dashboard", "/dashboard"});
             screens.add(new String[]{"Performance report builder", "/report"});

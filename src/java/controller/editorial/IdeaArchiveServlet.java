@@ -1,6 +1,8 @@
 package controller.editorial;
 
 import dal.TopicDAO;
+import model.User;
+import util.AuthUtil;
 import dto.TopicArchiveDTO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -25,7 +27,7 @@ import java.util.logging.Logger;
 public class IdeaArchiveServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(IdeaArchiveServlet.class.getName());
     private static final int DEFAULT_MOCK_DESK_ID = 1;      // Ban Thời sự - Chính trị
-    private static final int DEFAULT_MOCK_EDITOR_USER_ID = 1; // BTV Trường
+    private static final int editorUserId = 1; // BTV Trường
     private static final int DEFAULT_PAGE_SIZE = 10;
 
     @Override
@@ -139,7 +141,7 @@ public class IdeaArchiveServlet extends HttpServlet {
 
         if ("reactivate".equalsIgnoreCase(action)) {
             try (TopicDAO dao = new TopicDAO()) {
-                dao.reactivateArchivedTopic(topicId, DEFAULT_MOCK_EDITOR_USER_ID, reactivateNotes);
+                dao.reactivateArchivedTopic(topicId, editorUserId, reactivateNotes);
                 // Strict PRG Pattern
                 response.sendRedirect(request.getContextPath() + "/editorial/idea-archive?msg=reactivated");
                 return;

@@ -129,7 +129,7 @@
         </nav>
         <div class="sidebar-bottom">
             <span class="demo">ITERATION 1 — WALKING SKELETON</span>
-            <small>Actor: Trường (Desk Editor)</small>
+            <small>Phân hệ Biên tập (WF-02)</small>
         </div>
     </aside>
 

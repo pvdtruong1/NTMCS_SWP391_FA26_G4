@@ -17,6 +17,24 @@
             </a>
         </div>
 
+        <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_PITCH')}">
+            <div class="nav-group">
+                <div class="nav-label">PHÂN HỆ PHÓNG VIÊN (WF-01)</div>
+                <a href="${base}/reporter/dashboard" class="nav-item ${param.active == 'reporter-dashboard' ? 'active' : ''}">
+                    <i>📊</i> Tổng quan phóng viên
+                </a>
+                <a href="${base}/reporter/compose" class="nav-item ${param.active == 'reporter-compose' ? 'active' : ''}">
+                    <i>✍️</i> Đề xuất đề tài mới
+                </a>
+                <a href="${base}/reporter/topics" class="nav-item ${param.active == 'reporter-topics' ? 'active' : ''}">
+                    <i>📑</i> Quản lý đề tài của tôi
+                </a>
+                <a href="${base}/reporter/duplicate-search" class="nav-item ${param.active == 'reporter-search' ? 'active' : ''}">
+                    <i>🔍</i> Tra cứu trùng lặp
+                </a>
+            </div>
+        </c:if>
+
         <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ BTV CHUYÊN MÔN (WF-02)</div>

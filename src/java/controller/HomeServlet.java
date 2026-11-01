@@ -36,8 +36,19 @@ public class HomeServlet extends HttpServlet {
         Set<String> codes = permissionDAO.getCodesByRole(user.getRoleId());
         request.getSession().setAttribute("permissions", codes);
 
+        if ("REPORTER".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/reporter/dashboard");
+            return;
+        }
+
         // each entry is { link text, url }
         List<String[]> screens = new ArrayList<>();
+        if (codes.contains("TOPIC_PITCH")) {
+            screens.add(new String[]{"Tổng quan phóng viên (Reporter Dashboard)", "/reporter/dashboard"});
+            screens.add(new String[]{"Đề xuất đề tài mới (Pitch Proposal)", "/reporter/compose"});
+            screens.add(new String[]{"Quản lý đề tài của tôi (Topic List)", "/reporter/topics"});
+            screens.add(new String[]{"Tra cứu trùng lặp (Duplicate Search)", "/reporter/duplicate-search"});
+        }
         if (codes.contains("USER_MANAGE")) {
             screens.add(new String[]{"User accounts", "/users"});
         }
@@ -59,8 +70,6 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"Evaluation criteria", "/criteria"});
             screens.add(new String[]{"Categories and desks", "/categories"});
         }
-        // When another workflow adds a screen, add ONE more "if" here, for example:
-        // if (codes.contains("TOPIC_PITCH")) { screens.add(new String[]{"Pitch a topic", "/topic-pitch"}); }
 
         request.setAttribute("screens", screens);
         request.getRequestDispatcher("/WEB-INF/views/home.jsp").forward(request, response);

@@ -105,6 +105,13 @@ public class User implements Serializable {
         this.deskName = deskName;
     }
 
+    public String getDisplayName() {
+        if (roleName != null && !roleName.isEmpty()) {
+            return fullName + " (" + roleName + ")";
+        }
+        return fullName;
+    }
+
     @Override
     public String toString() {
         return "User{" +

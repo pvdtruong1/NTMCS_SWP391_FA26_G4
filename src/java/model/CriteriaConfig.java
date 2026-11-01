@@ -1,6 +1,7 @@
 package model;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * Model representing an evaluation criterion configured in the system (Criteria_Config).
@@ -10,12 +11,18 @@ public class CriteriaConfig implements Serializable {
 
     private int criteriaId;
     private String criteriaName;
-    private double weightPercent;
+    private BigDecimal weightPercent;   // 0 to 100, two decimals
 
     public CriteriaConfig() {
     }
 
     public CriteriaConfig(int criteriaId, String criteriaName, double weightPercent) {
+        this.criteriaId = criteriaId;
+        this.criteriaName = criteriaName;
+        this.weightPercent = BigDecimal.valueOf(weightPercent);
+    }
+
+    public CriteriaConfig(int criteriaId, String criteriaName, BigDecimal weightPercent) {
         this.criteriaId = criteriaId;
         this.criteriaName = criteriaName;
         this.weightPercent = weightPercent;
@@ -37,12 +44,20 @@ public class CriteriaConfig implements Serializable {
         this.criteriaName = criteriaName;
     }
 
-    public double getWeightPercent() {
+    public BigDecimal getWeightPercent() {
         return weightPercent;
     }
 
-    public void setWeightPercent(double weightPercent) {
+    public double getWeightPercentDouble() {
+        return weightPercent != null ? weightPercent.doubleValue() : 0.0;
+    }
+
+    public void setWeightPercent(BigDecimal weightPercent) {
         this.weightPercent = weightPercent;
+    }
+
+    public void setWeightPercent(double weightPercent) {
+        this.weightPercent = BigDecimal.valueOf(weightPercent);
     }
 
     @Override

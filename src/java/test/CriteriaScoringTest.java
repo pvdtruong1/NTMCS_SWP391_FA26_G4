@@ -31,7 +31,7 @@ public class CriteriaScoringTest {
             List<CriteriaConfig> criteria = dao.getCriteriaConfigs();
             double totalWeight = 0.0;
             for (CriteriaConfig c : criteria) {
-                totalWeight += c.getWeightPercent();
+                totalWeight += c.getWeightPercentDouble();
             }
 
             if (criteria.size() == 4 && Math.abs(totalWeight - 100.0) < 0.01) {

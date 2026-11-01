@@ -2,6 +2,7 @@ package model;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 
 /**
  * Model representing an itemized operational budget estimate for a topic (Topic_Estimate).
@@ -15,13 +16,22 @@ public class TopicEstimate implements Serializable {
     private BigDecimal amount;
 
     public TopicEstimate() {
+        this.amount = BigDecimal.ZERO;
     }
 
     public TopicEstimate(int estimateId, int topicId, String costItem, BigDecimal amount) {
         this.estimateId = estimateId;
         this.topicId = topicId;
         this.costItem = costItem;
-        this.amount = amount;
+        this.amount = amount != null ? amount : BigDecimal.ZERO;
+    }
+
+    public TopicEstimate(int topicId, String costItem, BigDecimal amount) {
+        this(0, topicId, costItem, amount);
+    }
+
+    public TopicEstimate(int topicId, String costItem, double amount) {
+        this(0, topicId, costItem, BigDecimal.valueOf(amount));
     }
 
     public int getEstimateId() {
@@ -49,11 +59,23 @@ public class TopicEstimate implements Serializable {
     }
 
     public BigDecimal getAmount() {
-        return amount;
+        return amount != null ? amount : BigDecimal.ZERO;
     }
 
     public void setAmount(BigDecimal amount) {
-        this.amount = amount;
+        this.amount = amount != null ? amount : BigDecimal.ZERO;
+    }
+
+    public void setAmount(double amount) {
+        this.amount = BigDecimal.valueOf(amount);
+    }
+
+    public String getFormattedAmount() {
+        if (amount == null) {
+            return "0 VNĐ";
+        }
+        DecimalFormat df = new DecimalFormat("#,###");
+        return df.format(amount) + " VNĐ";
     }
 
     @Override

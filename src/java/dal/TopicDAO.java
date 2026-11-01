@@ -9,6 +9,11 @@ import model.CriteriaConfig;
 import model.Desk;
 import model.Topic;
 import model.TopicEstimate;
+import model.TopicMember;
+import model.User;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import java.math.BigDecimal;
 import java.sql.Statement;
@@ -439,8 +444,8 @@ public class TopicDAO extends DBContext {
                                 for (CriteriaConfig cfg : dto.getCriteriaList()) {
                                     Double s = scoreMap.get(cfg.getCriteriaId());
                                     if (s != null) {
-                                        totalWeighted += (s * cfg.getWeightPercent());
-                                        totalWeight += cfg.getWeightPercent();
+                                        totalWeighted += (s * cfg.getWeightPercentDouble());
+                                        totalWeight += cfg.getWeightPercentDouble();
                                     }
                                 }
                                 dto.setCompositeScore(totalWeight > 0 ? (totalWeighted / totalWeight) : 0.0);
@@ -551,8 +556,8 @@ public class TopicDAO extends DBContext {
                     for (CriteriaConfig cfg : configs) {
                         Double s = criteriaScores.get(cfg.getCriteriaId());
                         if (s != null) {
-                            totalWeighted += (s * cfg.getWeightPercent());
-                            totalWeight += cfg.getWeightPercent();
+                            totalWeighted += (s * cfg.getWeightPercentDouble());
+                            totalWeight += cfg.getWeightPercentDouble();
                         }
                     }
                     double composite = (totalWeight > 0) ? (totalWeighted / totalWeight) : 0.0;
@@ -1445,5 +1450,527 @@ public class TopicDAO extends DBContext {
         } finally {
             conn.setAutoCommit(oldAutoCommit);
         }
+    }
+
+    // =========================================================================
+    // WF-01: REPORTER WORKFLOW METHODS (Integrated from TopicRepository)
+    // =========================================================================
+
+    private String baseReporterSelect() {
+        return "SELECT t.topic_id, t.topic_code, t.title, t.summary, t.angle, t.genre, t.priority, "
+             + "       t.status, t.deadline, t.created_date, t.category_id, t.author_user_id, "
+             + "       c.category_name, d.desk_id, d.desk_name, u.full_name AS reporter_name, u.email AS reporter_email, "
+             + "       te.comments AS rejection_reason "
+             + "FROM Topic t "
+             + "JOIN Category c ON t.category_id = c.category_id "
+             + "JOIN Desk d ON c.desk_id = d.desk_id "
+             + "JOIN [User] u ON t.author_user_id = u.user_id "
+             + "LEFT JOIN Topic_Evaluation te ON t.topic_id = te.topic_id "
+             + "     AND te.evaluation_id = (SELECT MAX(te2.evaluation_id) FROM Topic_Evaluation te2 WHERE te2.topic_id = t.topic_id) ";
+    }
+
+    private Topic mapReporterTopicRow(ResultSet rs) throws SQLException {
+        Topic t = new Topic();
+        t.setTopicId(rs.getInt("topic_id"));
+        t.setTopicCode(rs.getString("topic_code"));
+        t.setTitle(rs.getString("title"));
+        t.setSummary(rs.getString("summary"));
+        t.setAngle(rs.getString("angle"));
+        t.setGenre(rs.getString("genre"));
+        t.setPriority(rs.getString("priority"));
+        t.setStatus(rs.getString("status"));
+        t.setDeadline(rs.getDate("deadline"));
+        t.setCreatedDate(rs.getTimestamp("created_date"));
+        t.setCategoryId(rs.getInt("category_id"));
+        t.setAuthorUserId(rs.getInt("author_user_id"));
+        t.setCategoryName(rs.getString("category_name"));
+        t.setDeskName(rs.getString("desk_name"));
+        t.setReporterName(rs.getString("reporter_name"));
+        t.setReporterEmail(rs.getString("reporter_email"));
+        t.setRejectionReason(rs.getString("rejection_reason"));
+        return t;
+    }
+
+    public List<Topic> getTopicsByReporter(int userId, String statusFilter, String searchKeyword) {
+        List<Topic> list = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(baseReporterSelect());
+        sql.append("WHERE t.author_user_id = ? ");
+
+        boolean hasStatus = (statusFilter != null && !statusFilter.trim().isEmpty() && !"ALL".equalsIgnoreCase(statusFilter));
+        if (hasStatus) {
+            sql.append("  AND t.status = ? ");
+        }
+
+        boolean hasKeyword = (searchKeyword != null && !searchKeyword.trim().isEmpty());
+        if (hasKeyword) {
+            sql.append("  AND (t.title LIKE ? OR t.summary LIKE ? OR t.angle LIKE ? OR c.category_name LIKE ?) ");
+        }
+
+        sql.append("ORDER BY t.topic_id DESC");
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+                int idx = 1;
+                ps.setInt(idx++, userId);
+
+                if (hasStatus) {
+                    ps.setString(idx++, statusFilter.trim());
+                }
+
+                if (hasKeyword) {
+                    String p = "%" + searchKeyword.trim() + "%";
+                    ps.setString(idx++, p);
+                    ps.setString(idx++, p);
+                    ps.setString(idx++, p);
+                    ps.setString(idx++, p);
+                }
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        list.add(mapReporterTopicRow(rs));
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch ﾄ黛ｻ・tﾃi c盻ｧa phﾃｳng viﾃｪn #" + userId, ex);
+        } finally {
+            close();
+        }
+        return list;
+    }
+
+    public Topic getTopicDetailForReporter(int topicId, int userId) {
+        String sql = baseReporterSelect() + "WHERE t.topic_id = ? AND (t.author_user_id = ? OR ? = 0)";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, topicId);
+                ps.setInt(2, userId);
+                ps.setInt(3, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapReporterTopicRow(rs);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y chi ti蘯ｿt ﾄ黛ｻ・tﾃi #" + topicId + " cho phﾃｳng viﾃｪn #" + userId, ex);
+        } finally {
+            close();
+        }
+        return null;
+    }
+
+    public Topic saveTopicPitch(Topic topic, List<TopicEstimate> estimates, List<TopicMember> members) throws SQLException {
+        if (topic == null) {
+            throw new IllegalArgumentException("Topic khﾃｴng ﾄ柁ｰ盻｣c null.");
+        }
+        if (topic.getTitle() == null || topic.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Tiﾃｪu ﾄ黛ｻ・ﾄ黛ｻ・tﾃi khﾃｴng ﾄ柁ｰ盻｣c ﾄ黛ｻ・tr盻創g.");
+        }
+        if (topic.getCategoryId() <= 0) {
+            throw new IllegalArgumentException("Vui lﾃｲng ch盻肱 chuyﾃｪn m盻･c h盻｣p l盻・");
+        }
+
+        Connection conn = getConnection();
+        boolean oldAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            if (topic.getTopicId() == 0) {
+                // INSERT NEW TOPIC
+                String insertSql = "INSERT INTO Topic (title, summary, angle, genre, priority, status, deadline, category_id, author_user_id, created_date) "
+                                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, SYSDATETIME());";
+                try (PreparedStatement ps = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, topic.getTitle().trim());
+                    if (topic.getSummary() != null && !topic.getSummary().trim().isEmpty()) {
+                        ps.setString(2, topic.getSummary().trim());
+                    } else {
+                        ps.setNull(2, java.sql.Types.NVARCHAR);
+                    }
+                    if (topic.getAngle() != null && !topic.getAngle().trim().isEmpty()) {
+                        ps.setString(3, topic.getAngle().trim());
+                    } else {
+                        ps.setNull(3, java.sql.Types.NVARCHAR);
+                    }
+                    if (topic.getGenre() != null && !topic.getGenre().trim().isEmpty()) {
+                        ps.setString(4, topic.getGenre().trim());
+                    } else {
+                        ps.setNull(4, java.sql.Types.NVARCHAR);
+                    }
+                    ps.setString(5, (topic.getPriority() != null && !topic.getPriority().trim().isEmpty()) ? topic.getPriority().trim() : "NORMAL");
+                    ps.setString(6, (topic.getStatus() != null && !topic.getStatus().trim().isEmpty()) ? topic.getStatus().trim() : "DRAFT");
+                    if (topic.getDeadline() != null) {
+                        ps.setDate(7, topic.getDeadline());
+                    } else {
+                        ps.setNull(7, java.sql.Types.DATE);
+                    }
+                    ps.setInt(8, topic.getCategoryId());
+                    ps.setInt(9, topic.getAuthorUserId());
+
+                    ps.executeUpdate();
+                    try (ResultSet gk = ps.getGeneratedKeys()) {
+                        if (gk.next()) {
+                            topic.setTopicId(gk.getInt(1));
+                        }
+                    }
+                }
+            } else {
+                // UPDATE EXISTING TOPIC (ch盻・cho phﾃｩp khi 盻・tr蘯｡ng thﾃ｡i DRAFT ho蘯ｷc REVISE)
+                String updateSql = "UPDATE Topic SET title = ?, summary = ?, angle = ?, genre = ?, priority = ?, status = ?, deadline = ?, category_id = ? "
+                                 + "WHERE topic_id = ? AND author_user_id = ? AND status IN ('DRAFT', 'REVISION_REQUESTED', 'REVISION_REQUIRED', 'REVISE', 'REJECTED');";
+                try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                    ps.setString(1, topic.getTitle().trim());
+                    if (topic.getSummary() != null && !topic.getSummary().trim().isEmpty()) {
+                        ps.setString(2, topic.getSummary().trim());
+                    } else {
+                        ps.setNull(2, java.sql.Types.NVARCHAR);
+                    }
+                    if (topic.getAngle() != null && !topic.getAngle().trim().isEmpty()) {
+                        ps.setString(3, topic.getAngle().trim());
+                    } else {
+                        ps.setNull(3, java.sql.Types.NVARCHAR);
+                    }
+                    if (topic.getGenre() != null && !topic.getGenre().trim().isEmpty()) {
+                        ps.setString(4, topic.getGenre().trim());
+                    } else {
+                        ps.setNull(4, java.sql.Types.NVARCHAR);
+                    }
+                    ps.setString(5, (topic.getPriority() != null && !topic.getPriority().trim().isEmpty()) ? topic.getPriority().trim() : "NORMAL");
+                    ps.setString(6, (topic.getStatus() != null && !topic.getStatus().trim().isEmpty()) ? topic.getStatus().trim() : "DRAFT");
+                    if (topic.getDeadline() != null) {
+                        ps.setDate(7, topic.getDeadline());
+                    } else {
+                        ps.setNull(7, java.sql.Types.DATE);
+                    }
+                    ps.setInt(8, topic.getCategoryId());
+                    ps.setInt(9, topic.getTopicId());
+                    ps.setInt(10, topic.getAuthorUserId());
+
+                    int affected = ps.executeUpdate();
+                    if (affected == 0) {
+                        throw new SQLException("Không tìm thấy đề tài hoặc đề tài không ở trạng thái được phép chỉnh sửa.");
+                    }
+                }
+            }
+
+            // Sync Topic_Estimate
+            if (estimates != null) {
+                String delEst = "DELETE FROM Topic_Estimate WHERE topic_id = ?";
+                try (PreparedStatement psDel = conn.prepareStatement(delEst)) {
+                    psDel.setInt(1, topic.getTopicId());
+                    psDel.executeUpdate();
+                }
+
+                String insEst = "INSERT INTO Topic_Estimate (topic_id, cost_item, amount) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insEst)) {
+                    for (TopicEstimate est : estimates) {
+                        if (est == null || est.getCostItem() == null || est.getCostItem().trim().isEmpty()) {
+                            continue;
+                        }
+                        psIns.setInt(1, topic.getTopicId());
+                        psIns.setString(2, est.getCostItem().trim());
+                        psIns.setBigDecimal(3, est.getAmount() != null ? est.getAmount() : BigDecimal.ZERO);
+                        psIns.executeUpdate();
+                    }
+                }
+            }
+
+            // Sync Topic_Member
+            if (members != null) {
+                String delMem = "DELETE FROM Topic_Member WHERE topic_id = ?";
+                try (PreparedStatement psDel = conn.prepareStatement(delMem)) {
+                    psDel.setInt(1, topic.getTopicId());
+                    psDel.executeUpdate();
+                }
+
+                String insMem = "INSERT INTO Topic_Member (topic_id, user_id, role_in_team) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insMem)) {
+                    Set<Integer> addedUsers = new HashSet<>();
+                    for (TopicMember mem : members) {
+                        if (mem == null || mem.getUserId() <= 0 || addedUsers.contains(mem.getUserId())) {
+                            continue;
+                        }
+                        String role = mem.getRoleInTeam();
+                        if (role == null || role.trim().isEmpty()) {
+                            role = "ASSISTANT";
+                        } else {
+                            role = role.trim();
+                        }
+                        psIns.setInt(1, topic.getTopicId());
+                        psIns.setInt(2, mem.getUserId());
+                        psIns.setString(3, role);
+                        psIns.executeUpdate();
+                        addedUsers.add(mem.getUserId());
+                    }
+                }
+            }
+
+            conn.commit();
+            return topic;
+        } catch (SQLException | RuntimeException ex) {
+            conn.rollback();
+            LOGGER.log(Level.SEVERE, "Transaction rollback in saveTopicPitch", ex);
+            throw ex;
+        } finally {
+            conn.setAutoCommit(oldAutoCommit);
+            close();
+        }
+    }
+
+    public boolean deleteReporterDraft(int topicId, int userId) {
+        String sql = "DELETE FROM Topic WHERE topic_id = ? AND author_user_id = ? AND status = 'DRAFT'";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, topicId);
+                ps.setInt(2, userId);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 xﾃｳa b蘯｣n nhﾃ｡p #" + topicId + " c盻ｧa user #" + userId, ex);
+            return false;
+        } finally {
+            close();
+        }
+    }
+
+    public List<Topic> searchSimilarTopics(String query) {
+        List<Topic> list = new ArrayList<>();
+        if (query == null || query.trim().isEmpty()) {
+            return list;
+        }
+
+        String sql = baseReporterSelect()
+                   + "WHERE (t.title LIKE ? OR t.summary LIKE ? OR t.angle LIKE ? OR c.category_name LIKE ?) "
+                   + "ORDER BY t.topic_id DESC";
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                String pattern = "%" + query.trim() + "%";
+                ps.setString(1, pattern);
+                ps.setString(2, pattern);
+                ps.setString(3, pattern);
+                ps.setString(4, pattern);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        list.add(mapReporterTopicRow(rs));
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 tra c盻ｩu ﾄ黛ｻ・tﾃi tﾆｰﾆ｡ng t盻ｱ", ex);
+        } finally {
+            close();
+        }
+        return list;
+    }
+
+    public List<TopicEstimate> findEstimatesByTopicId(int topicId) {
+        List<TopicEstimate> list = new ArrayList<>();
+        if (topicId <= 0) return list;
+
+        String sql = "SELECT estimate_id, topic_id, cost_item, amount FROM Topic_Estimate WHERE topic_id = ? ORDER BY estimate_id ASC";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        TopicEstimate est = new TopicEstimate();
+                        est.setEstimateId(rs.getInt("estimate_id"));
+                        est.setTopicId(rs.getInt("topic_id"));
+                        est.setCostItem(rs.getString("cost_item"));
+                        est.setAmount(rs.getBigDecimal("amount"));
+                        list.add(est);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y chi phﾃｭ cho topic " + topicId, ex);
+        } finally {
+            close();
+        }
+        return list;
+    }
+
+    public List<TopicMember> findMembersByTopicId(int topicId) {
+        List<TopicMember> list = new ArrayList<>();
+        if (topicId <= 0) return list;
+
+        String sql = "SELECT tm.member_id, tm.topic_id, tm.user_id, tm.role_in_team, "
+                   + "       u.full_name, u.email, r.role_name "
+                   + "FROM Topic_Member tm "
+                   + "JOIN [User] u ON tm.user_id = u.user_id "
+                   + "JOIN Role r ON u.role_id = r.role_id "
+                   + "WHERE tm.topic_id = ? "
+                   + "ORDER BY tm.member_id ASC";
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        TopicMember tm = new TopicMember();
+                        tm.setMemberId(rs.getInt("member_id"));
+                        tm.setTopicId(rs.getInt("topic_id"));
+                        tm.setUserId(rs.getInt("user_id"));
+                        tm.setRoleInTeam(rs.getString("role_in_team"));
+                        tm.setUserName(rs.getString("full_name"));
+                        tm.setUserEmail(rs.getString("email"));
+                        tm.setUserRole(rs.getString("role_name"));
+                        list.add(tm);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y thﾃnh viﾃｪn cho topic " + topicId, ex);
+        } finally {
+            close();
+        }
+        return list;
+    }
+
+    public List<User> findAllActiveUsersForTeam() {
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT u.user_id, u.full_name, u.email, u.role_id, r.role_name, u.active_status, u.desk_id, d.desk_name "
+                   + "FROM [User] u "
+                   + "JOIN Role r ON u.role_id = r.role_id "
+                   + "LEFT JOIN Desk d ON u.desk_id = d.desk_id "
+                   + "WHERE u.active_status = 1 "
+                   + "ORDER BY u.user_id ASC";
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    User u = new User();
+                    u.setUserId(rs.getInt("user_id"));
+                    u.setFullName(rs.getString("full_name"));
+                    u.setEmail(rs.getString("email"));
+                    u.setRoleId(rs.getInt("role_id"));
+                    u.setRoleName(rs.getString("role_name"));
+                    u.setActiveStatus(rs.getBoolean("active_status"));
+                    int dId = rs.getInt("desk_id");
+                    if (!rs.wasNull()) {
+                        u.setDeskId(dId);
+                    }
+                    u.setDeskName(rs.getString("desk_name"));
+                    list.add(u);
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch nhﾃ｢n s盻ｱ tﾃ｡c nghi盻㎝", ex);
+        } finally {
+            close();
+        }
+        return list;
+    }
+
+    public Map<Integer, List<String>> getUsersBusySchedule(int excludeTopicId) {
+        Map<Integer, List<String>> map = new HashMap<>();
+        String sql = "SELECT DISTINCT tm_all.user_id, t.topic_id, t.topic_code, t.title, t.status "
+                   + "FROM ( "
+                   + "    SELECT author_user_id AS user_id, topic_id FROM Topic "
+                   + "    UNION "
+                   + "    SELECT user_id, topic_id FROM Topic_Member "
+                   + "    UNION "
+                   + "    SELECT assignee_user_id AS user_id, topic_id FROM Fieldwork_Task WHERE task_status IN ('TODO', 'IN_PROGRESS') "
+                   + ") tm_all "
+                   + "JOIN Topic t ON tm_all.topic_id = t.topic_id "
+                   + "WHERE t.status NOT IN ('DRAFT', 'REJECTED', 'ABORTED', 'ACCEPTED_READY_FOR_CMS') "
+                   + "  AND (? <= 0 OR t.topic_id <> ?) "
+                   + "ORDER BY tm_all.user_id, t.topic_id ASC";
+
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, excludeTopicId);
+                ps.setInt(2, excludeTopicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        int uid = rs.getInt("user_id");
+                        int tid = rs.getInt("topic_id");
+                        String code = rs.getString("topic_code");
+                        String title = rs.getString("title");
+                        String label = (code != null && !code.trim().isEmpty())
+                                ? (code.trim() + " (" + title + ")")
+                                : ("#" + tid + " (" + title + ")");
+                        map.computeIfAbsent(uid, k -> new ArrayList<>()).add(label);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y l盻議h b蘯ｭn nhﾃ｢n s盻ｱ", ex);
+        } finally {
+            close();
+        }
+        return map;
+    }
+
+    public List<String> getUserBusyTopics(int userId, int excludeTopicId) {
+        if (userId <= 0) return Collections.emptyList();
+        Map<Integer, List<String>> map = getUsersBusySchedule(excludeTopicId);
+        return map.getOrDefault(userId, Collections.emptyList());
+    }
+
+    public List<String> findExistingGenres() {
+        List<String> genres = new ArrayList<>();
+        String sql = "SELECT DISTINCT genre FROM Topic WHERE genre IS NOT NULL AND LTRIM(RTRIM(genre)) <> '' ORDER BY genre ASC";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String g = rs.getString("genre");
+                    if (g != null && !g.trim().isEmpty()) {
+                        genres.add(g.trim());
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch th盻・lo蘯｡i t盻ｫ DB", ex);
+        } finally {
+            close();
+        }
+
+        String[] defaults = {"Tin nhanh", "Ph盻熟g v蘯･n", "Phﾃｳng s盻ｱ / Feature", "ﾄ進盻「 tra", "Infographic / 蘯｢nh"};
+        for (String def : defaults) {
+            if (!genres.contains(def)) {
+                genres.add(def);
+            }
+        }
+        return genres;
+    }
+
+    public List<String> findExistingPriorities() {
+        List<String> priorities = new ArrayList<>();
+        String sql = "SELECT DISTINCT priority FROM Topic WHERE priority IS NOT NULL AND LTRIM(RTRIM(priority)) <> '' ORDER BY priority ASC";
+        try {
+            Connection conn = getConnection();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String p = rs.getString("priority");
+                    if (p != null && !p.trim().isEmpty()) {
+                        priorities.add(p.trim());
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch m盻ｩc ﾄ黛ｻ・ﾆｰu tiﾃｪn t盻ｫ DB", ex);
+        } finally {
+            close();
+        }
+
+        if (!priorities.contains("NORMAL")) priorities.add(0, "NORMAL");
+        if (!priorities.contains("HOT")) priorities.add("HOT");
+        if (!priorities.contains("URGENT")) priorities.add("URGENT");
+        return priorities;
     }
 }

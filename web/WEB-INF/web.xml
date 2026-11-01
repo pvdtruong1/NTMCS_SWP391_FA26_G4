@@ -43,6 +43,10 @@
         <servlet-name>DirectiveTopicServlet</servlet-name>
         <url-pattern>/editorial/directive-topic</url-pattern>
     </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>DirectiveTopicServlet</servlet-name>
+        <url-pattern>/editorial/directive-creation</url-pattern>
+    </servlet-mapping>
 
     <servlet>
         <servlet-name>ReporterDispatchServlet</servlet-name>

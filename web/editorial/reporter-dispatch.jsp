@@ -144,54 +144,36 @@
 <body>
 <div class="app">
     <!-- Static Sidebar -->
-    <aside id="sidebar">
-        <div class="brand">
-            <div class="brand-logo">N</div>
-            <div>
-                <b>NTMCS</b>
-                <small>Hệ Thống Tòa Soạn Hội Tụ</small>
-            </div>
-        </div>
-        <nav>
-            <div class="nav-group">
-                <div class="nav-label">BAN BIÊN TẬP (WF-02)</div>
-                <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="nav-item">
-                    <i>📋</i> Hàng đợi chờ thẩm định
-                </a>
-                <a href="${pageContext.request.contextPath}/editorial/directive-topic" class="nav-item active">
-                    <i>⚡</i> Đặt hàng đề tài chỉ đạo
-                </a>
-                <a href="${pageContext.request.contextPath}/editorial/idea-archive" class="nav-item">
-                    <i>🗄️</i> Kho lưu trữ ý tưởng
-                </a>
-            </div>
-            <div class="nav-group">
-                <div class="nav-label">CÁC PHÂN HỆ KHÁC</div>
-                <a href="${pageContext.request.contextPath}/" class="nav-item">
-                    <i>🏠</i> Trang chủ tòa soạn
-                </a>
-            </div>
-        </nav>
-        <div class="sidebar-bottom">
-            <span class="demo">SE2066 — NHÓM 4</span>
-            <small>Phân hệ Trưởng ban (Trường)</small>
-        </div>
-    </aside>
+    <jsp:include page="/WEB-INF/views/sidebar.jsp">
+        <jsp:param name="active" value="directive-creation" />
+    </jsp:include>
 
     <!-- Main Workspace -->
     <div class="main">
         <!-- Topbar -->
-        <header class="topbar">
+                <header class="topbar">
             <button class="icon-btn mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-            <div style="font-weight: 700; color: var(--text);">
-                🏛️ ${desk != null ? desk.deskName : 'Ban Thời sự - Chính trị'}
+            <div class="brand-desk-info">
+                <strong>🏛️ ${desk != null ? desk.deskName : 'Ban Thời sự - Chính trị'}</strong>
             </div>
-            <div class="account-chip">
-                <div class="avatar">TR</div>
-                <div>
-                    <b>Trường</b>
-                    <small>Trưởng ban Biên tập</small>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+                <div class="account-chip">
+                    <div class="avatar"><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName.substring(0, 1).toUpperCase() : (not empty sessionScope.user ? sessionScope.user.fullName.substring(0, 1).toUpperCase() : 'T')}" /></div>
+                    <div>
+                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Trường')}" /></b>
+                        <small>
+                            <c:choose>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'DESK_EDITOR'}">Desk Editor (BTV Chuyên Môn)</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'EXECUTIVE_EDITOR'}">Tổng Biên Tập</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'BUSINESS_ADMINISTRATOR'}">Quản Trị Nghiệp Vụ</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'SYSTEM_ADMINISTRATOR'}">Quản Trị Hệ Thống</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'REPORTER'}">Phóng Viên Tác Nghiệp</c:when>
+                                <c:otherwise><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : (not empty sessionScope.user ? sessionScope.user.roleName : 'Desk Editor')}" /></c:otherwise>
+                            </c:choose>
+                        </small>
+                    </div>
                 </div>
+                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
             </div>
         </header>
 

@@ -14,7 +14,11 @@ public class User implements Serializable {
     private String passwordHash;
     private int roleId;
     private boolean activeStatus;
-    private Integer deskId;
+    private Integer deskId;      // can be null (some admins have no Desk)
+
+    // Display only (filled by JOIN queries)
+    private String roleName;
+    private String deskName;
 
     public User() {
     }
@@ -85,6 +89,29 @@ public class User implements Serializable {
         this.deskId = deskId;
     }
 
+    public String getRoleName() {
+        return roleName;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
+    }
+
+    public String getDeskName() {
+        return deskName;
+    }
+
+    public void setDeskName(String deskName) {
+        this.deskName = deskName;
+    }
+
+    public String getDisplayName() {
+        if (roleName != null && !roleName.isEmpty()) {
+            return fullName + " (" + roleName + ")";
+        }
+        return fullName;
+    }
+
     @Override
     public String toString() {
         return "User{" +
@@ -94,6 +121,8 @@ public class User implements Serializable {
                 ", roleId=" + roleId +
                 ", activeStatus=" + activeStatus +
                 ", deskId=" + deskId +
+                ", roleName='" + roleName + '\'' +
+                ", deskName='" + deskName + '\'' +
                 '}';
     }
 }

@@ -4,18 +4,17 @@ import dal.TopicDAO;
 import dto.TopicPendingDTO;
 import model.Desk;
 import model.User;
+import util.AuthUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,26 +31,11 @@ public class PendingQueueServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-
-        // Support quick role switch in dev mode: ?as=tbt or ?as=editor
-        String asParam = request.getParameter("as");
-        if ("tbt".equalsIgnoreCase(asParam)) {
-            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
-            session.setAttribute("user", tbtUser);
-        } else if ("editor".equalsIgnoreCase(asParam)) {
-            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", editorUser);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
         }
 
-        // 1. Session Context & Fallback Dev Mode
-        User currentUser = (User) session.getAttribute("user");
-        if (currentUser == null) {
-            // Mock Desk Editor (Trường - Desk ID 1: Ban Thời sự - Chính trị)
-            currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", currentUser);
-        }
-
+        User currentUser = AuthUtil.getLoggedUser(request);
         int deskId = (currentUser.getDeskId() != null) ? currentUser.getDeskId() : 1;
 
         // 2. Parse Filter & Pagination Parameters
@@ -136,6 +120,9 @@ public class PendingQueueServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
+        }
         // Pending Queue is a read-only endpoint; redirect to GET for PRG consistency
         response.sendRedirect(request.getContextPath() + "/editorial/pending-queue");
     }

@@ -1,15 +1,63 @@
 <!DOCTYPE html>
-<!--
-Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
-Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Html.html to edit this template
--->
-<html>
-    <head>
-        <title>TODO supply a title</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body>
-        <div>ffasdas</div>
-    </body>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NTMCS — Tòa Soạn Hội Tụ</title>
+    <meta http-equiv="refresh" content="0;url=editorial/pending-queue">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg);
+            text-align: center;
+            padding: 20px;
+        }
+        .portal-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 36px 32px;
+            max-width: 480px;
+            width: 100%;
+        }
+        .portal-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #5574ef, #2b49b9);
+            color: #fff;
+            font-size: 28px;
+            font-weight: 900;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 16px;
+        }
+        h1 {
+            font-size: 22px;
+            margin: 0 0 8px;
+            color: var(--text);
+        }
+        p {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 0 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="portal-card">
+        <div class="portal-logo">N</div>
+        <h1>Tòa Soạn Hội Tụ NTMCS</h1>
+        <p>Hệ thống Quản lý và Điều phối Đề tài Báo chí (SWP391 — Group 4)</p>
+        <p><small class="muted">Đang tự động chuyển hướng đến Hàng đợi Thẩm định...</small></p>
+        <a href="editorial/pending-queue" class="btn primary full" style="margin-top: 14px;">
+            Vào Hàng Đợi Thẩm Định (Trường - Desk Editor) &rarr;
+        </a>
+    </div>
+</body>
 </html>

@@ -5,9 +5,11 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 
 /**
- * Represents a cost item in a topic proposal estimate (Topic_Estimate).
+ * Model representing an itemized operational budget estimate for a topic (Topic_Estimate).
  */
 public class TopicEstimate implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int estimateId;
     private int topicId;
     private String costItem;

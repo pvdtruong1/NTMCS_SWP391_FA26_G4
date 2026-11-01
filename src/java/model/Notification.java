@@ -3,7 +3,7 @@ package model;
 import java.io.Serializable;
 
 /**
- * Model ánh xạ bảng Notification trong SQL Server.
+ * Model mapping Notification table in SQL Server.
  */
 public class Notification implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -58,12 +58,16 @@ public class Notification implements Serializable {
         this.message = message;
     }
 
+    public boolean isRead() {
+        return isRead;
+    }
+
     public boolean isIsRead() {
         return isRead;
     }
 
-    public void setIsRead(boolean isRead) {
-        this.isRead = isRead;
+    public void setRead(boolean read) {
+        isRead = read;
     }
 
     public String getCreatedAt() {
@@ -72,5 +76,16 @@ public class Notification implements Serializable {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @Override
+    public String toString() {
+        return "Notification{" +
+                "notificationId=" + notificationId +
+                ", userId=" + userId +
+                ", topicId=" + topicId +
+                ", message='" + message + '\'' +
+                ", isRead=" + isRead +
+                '}';
     }
 }

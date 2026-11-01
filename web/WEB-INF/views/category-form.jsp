@@ -3,51 +3,88 @@
 <c:set var="base" value="${pageContext.request.contextPath}" />
 <c:set var="isEdit" value="${category.categoryId > 0}" />
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Category Form</title>
-        <link rel="stylesheet" href="${base}/css/style.css">
-    </head>
-    <body>
-        <jsp:include page="menu.jsp" />
-        <div class="content">
-            <h2>${isEdit ? 'Edit category' : 'Add category'}</h2>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${isEdit ? 'Chỉnh Sửa Chuyên Mục' : 'Thêm Chuyên Mục Mới'} — NTMCS</title>
+    <link rel="stylesheet" href="${base}/css/style.css">
+</head>
+<body>
+<div class="app">
+    <jsp:include page="sidebar.jsp">
+        <jsp:param name="active" value="categories"/>
+    </jsp:include>
+    <div class="main">
+        <jsp:include page="topbar.jsp">
+            <jsp:param name="title" value="Cấu Hình Chuyên Mục Tin Tức"/>
+        </jsp:include>
+        <main>
+            <div class="page-head">
+                <div>
+                    <span class="eyebrow">ORGANIZATION SETUP / WF-05</span>
+                    <h1>${isEdit ? 'Chỉnh Sửa Chuyên Mục' : 'Tạo Chuyên Mục Tin Tức Mới'}</h1>
+                    <p>Thiết lập chuyên mục cha/con và gán vào ban chuyên môn phụ trách.</p>
+                </div>
+                <div class="page-actions">
+                    <a href="${base}/categories" class="btn" style="text-decoration: none;">
+                        &larr; Quay lại danh sách
+                    </a>
+                </div>
+            </div>
 
             <c:if test="${not empty error}">
-                <p class="error"><c:out value="${error}" /></p>
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-weight: 600;">
+                    ✕ <c:out value="${error}" />
+                </div>
             </c:if>
 
-            <form method="post" action="${base}/categories">
-                <input type="hidden" name="action" value="${isEdit ? 'updateCategory' : 'createCategory'}">
-                <input type="hidden" name="id" value="${category.categoryId}">
+            <div class="card" style="max-width: 650px;">
+                <form method="post" action="${base}/categories">
+                    <input type="hidden" name="action" value="${isEdit ? 'updateCategory' : 'createCategory'}">
+                    <input type="hidden" name="id" value="${category.categoryId}">
 
-                <label>Category name</label>
-                <input type="text" name="categoryName" value="<c:out value='${category.categoryName}' />">
+                    <div class="form-grid">
+                        <div class="field full">
+                            <span>TÊN CHUYÊN MỤC (CATEGORY NAME) <b style="color: var(--danger);">*</b></span>
+                            <input type="text" name="categoryName" value="<c:out value='${category.categoryName}' />" required placeholder="Ví dụ: Chính trị - Ngoại giao">
+                        </div>
 
-                <label>Parent category</label>
-                <select name="parentId">
-                    <option value="">-- None (top level) --</option>
-                    <c:forEach var="p" items="${treeList}">
-                        <c:if test="${not excluded.contains(p.categoryId)}">
-                            <option value="${p.categoryId}" ${p.categoryId == category.parentCategoryId ? 'selected' : ''}>${indents[p.categoryId]}<c:out value="${p.categoryName}" /></option>
-                        </c:if>
-                    </c:forEach>
-                </select>
+                        <div class="field">
+                            <span>CHUYÊN MỤC CHA (PARENT CATEGORY)</span>
+                            <select name="parentId">
+                                <option value="">-- Cấp cao nhất (Top level) --</option>
+                                <c:forEach var="p" items="${treeList}">
+                                    <c:if test="${not excluded.contains(p.categoryId)}">
+                                        <option value="${p.categoryId}" ${p.categoryId == category.parentCategoryId ? 'selected' : ''}>${indents[p.categoryId]}<c:out value="${p.categoryName}" /></option>
+                                    </c:if>
+                                </c:forEach>
+                            </select>
+                        </div>
 
-                <label>Desk</label>
-                <select name="deskId">
-                    <option value="">-- Choose a desk --</option>
-                    <c:forEach var="d" items="${deskList}">
-                        <option value="${d.deskId}" ${d.deskId == category.deskId ? 'selected' : ''}><c:out value="${d.deskName}" /></option>
-                    </c:forEach>
-                </select>
+                        <div class="field">
+                            <span>BAN CHUYÊN MÔN PHỤ TRÁCH (DESK) <b style="color: var(--danger);">*</b></span>
+                            <select name="deskId" required>
+                                <option value="">-- Chọn ban phụ trách --</option>
+                                <c:forEach var="d" items="${deskList}">
+                                    <option value="${d.deskId}" ${d.deskId == category.deskId ? 'selected' : ''}>🏛️ <c:out value="${d.deskName}" /></option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                    </div>
 
-                <p>
-                    <button type="submit">Save</button>
-                    <a href="${base}/categories">Cancel</a>
-                </p>
-            </form>
-        </div>
-    </body>
+                    <div style="display: flex; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line);">
+                        <button type="submit" class="btn primary">
+                            💾 Lưu Chuyên Mục
+                        </button>
+                        <a href="${base}/categories" class="btn" style="text-decoration: none;">
+                            Hủy bỏ
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
 </html>

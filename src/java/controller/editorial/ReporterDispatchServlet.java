@@ -29,7 +29,6 @@ import java.util.logging.Logger;
 public class ReporterDispatchServlet extends HttpServlet {
 
     private static final Logger LOGGER = Logger.getLogger(ReporterDispatchServlet.class.getName());
-    private final TopicDAO topicDAO = new TopicDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -54,20 +53,22 @@ public class ReporterDispatchServlet extends HttpServlet {
             return;
         }
 
-        Topic topic = topicDAO.getTopicById(topicId);
-        if (topic == null) {
-            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
-            return;
-        }
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            Topic topic = topicDAO.getTopicById(topicId);
+            if (topic == null) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
+                return;
+            }
 
-        // Domain guard: Must be in DRAFT status
-        if (!"DRAFT".equalsIgnoreCase(topic.getStatus())) {
-            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_status_for_dispatch");
-            return;
-        }
+            // Domain guard: Must be in DRAFT status
+            if (!"DRAFT".equalsIgnoreCase(topic.getStatus())) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_status_for_dispatch");
+                return;
+            }
 
-        prepareViewData(request, topic, currentDeskId);
-        request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+            prepareViewData(request, topic, currentDeskId, topicDAO);
+            request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+        }
     }
 
     @Override
@@ -95,54 +96,56 @@ public class ReporterDispatchServlet extends HttpServlet {
             return;
         }
 
-        Topic topic = topicDAO.getTopicById(topicId);
-        if (topic == null) {
-            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
-            return;
-        }
-
-        int leadReporterId = 0;
-        try {
-            if (leadReporterIdParam != null && !leadReporterIdParam.trim().isEmpty()) {
-                leadReporterId = Integer.parseInt(leadReporterIdParam.trim());
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            Topic topic = topicDAO.getTopicById(topicId);
+            if (topic == null) {
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
+                return;
             }
-        } catch (NumberFormatException ignored) {
-        }
 
-        // Validation: Reporter selection is required
-        if (leadReporterId <= 0) {
-            request.setAttribute("error", "Vui lòng chọn một phóng viên phụ trách chính (Trưởng nhóm tác nghiệp) từ danh sách.");
-            request.setAttribute("commissionNotes", commissionNotes);
-            prepareViewData(request, topic, currentDeskId);
-            request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
-            return;
-        }
+            int leadReporterId = 0;
+            try {
+                if (leadReporterIdParam != null && !leadReporterIdParam.trim().isEmpty()) {
+                    leadReporterId = Integer.parseInt(leadReporterIdParam.trim());
+                }
+            } catch (NumberFormatException ignored) {
+            }
 
-        try {
-            // Execute atomic commissioning transaction
-            String topicCode = topicDAO.commissionDirectiveTopic(
-                    topicId,
-                    leadReporterId,
-                    currentUser.getUserId(),
-                    commissionNotes
-            );
+            // Validation: Reporter selection is required
+            if (leadReporterId <= 0) {
+                request.setAttribute("error", "Vui lòng chọn một phóng viên phụ trách chính (Trưởng nhóm tác nghiệp) từ danh sách.");
+                request.setAttribute("commissionNotes", commissionNotes);
+                prepareViewData(request, topic, currentDeskId, topicDAO);
+                request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+                return;
+            }
 
-            // Post-Redirect-Get pattern
-            String redirectUrl = request.getContextPath()
-                    + "/editorial/pending-queue?msg=directive_commissioned&code="
-                    + URLEncoder.encode(topicCode, StandardCharsets.UTF_8);
-            response.sendRedirect(redirectUrl);
+            try {
+                // Execute atomic commissioning transaction
+                String topicCode = topicDAO.commissionDirectiveTopic(
+                        topicId,
+                        leadReporterId,
+                        currentUser.getUserId(),
+                        commissionNotes
+                );
 
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "Lỗi khi phát lệnh đặt hàng đề tài chỉ đạo #" + topicId, ex);
-            request.setAttribute("error", "Không thể phát lệnh đặt hàng: " + ex.getMessage());
-            request.setAttribute("commissionNotes", commissionNotes);
-            prepareViewData(request, topic, currentDeskId);
-            request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+                // Post-Redirect-Get pattern
+                String redirectUrl = request.getContextPath()
+                        + "/editorial/pending-queue?msg=directive_commissioned&code="
+                        + URLEncoder.encode(topicCode, StandardCharsets.UTF_8);
+                response.sendRedirect(redirectUrl);
+
+            } catch (Exception ex) {
+                LOGGER.log(Level.SEVERE, "Lỗi khi phát lệnh đặt hàng đề tài chỉ đạo #" + topicId, ex);
+                request.setAttribute("error", "Không thể phát lệnh đặt hàng: " + ex.getMessage());
+                request.setAttribute("commissionNotes", commissionNotes);
+                prepareViewData(request, topic, currentDeskId, topicDAO);
+                request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+            }
         }
     }
 
-    private void prepareViewData(HttpServletRequest request, Topic topic, int currentDeskId) {
+    private void prepareViewData(HttpServletRequest request, Topic topic, int currentDeskId, TopicDAO topicDAO) {
         // Resolve category name
         String categoryName = "Chưa phân loại";
         List<Category> categories = topicDAO.getCategoriesByDesk(currentDeskId);

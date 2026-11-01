@@ -11,7 +11,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -31,23 +30,11 @@ public class CriteriaScoringServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-
-        // 1. Session Context & Fallback Dev Mode (with quick role switch support: ?as=tbt or ?as=editor)
-        String asParam = request.getParameter("as");
-        if ("tbt".equalsIgnoreCase(asParam)) {
-            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
-            session.setAttribute("user", tbtUser);
-        } else if ("editor".equalsIgnoreCase(asParam)) {
-            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", editorUser);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
         }
 
-        User currentUser = (User) session.getAttribute("user");
-        if (currentUser == null) {
-            currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", currentUser);
-        }
+        User currentUser = AuthUtil.getLoggedUser(request);
 
         // 2. Parse topicId parameter
         String topicIdStr = request.getParameter("topicId");
@@ -94,24 +81,12 @@ public class CriteriaScoringServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
-        HttpSession session = request.getSession();
 
-        // Support quick role switch in dev mode: ?as=tbt or ?as=editor
-        String asParam = request.getParameter("as");
-        if ("tbt".equalsIgnoreCase(asParam)) {
-            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
-            session.setAttribute("user", tbtUser);
-        } else if ("editor".equalsIgnoreCase(asParam)) {
-            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", editorUser);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
         }
 
-        // 1. Session Context & Fallback Dev Mode
-        User currentUser = (User) session.getAttribute("user");
-        if (currentUser == null) {
-            currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", currentUser);
-        }
+        User currentUser = AuthUtil.getLoggedUser(request);
 
         // 2. Parse topicId and decision
         String topicIdStr = request.getParameter("topicId");
@@ -174,7 +149,7 @@ public class CriteriaScoringServlet extends HttpServlet {
             }
 
             // =========================================================================
-            // BRANCH 2: Level-1 Rubric Review by Desk Editor (Trường - SCR-2.3)
+            // BRANCH 2: Level-1 Rubric Review by Desk Editor (SCR-2.3)
             // =========================================================================
             if (!"SUBMITTED".equalsIgnoreCase(existingTopic.getStatus())) {
                 LOGGER.log(Level.WARNING, "Blocked illegal evaluation attempt on topic {0} with status {1}",

@@ -1,8 +1,6 @@
 package controller.editorial;
 
 import dal.TopicDAO;
-import model.User;
-import util.AuthUtil;
 import dto.TopicArchiveDTO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -11,6 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import model.Category;
 import model.Desk;
+import model.User;
+import util.AuthUtil;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -26,14 +26,17 @@ import java.util.logging.Logger;
 @WebServlet(name = "IdeaArchiveServlet", urlPatterns = {"/editorial/idea-archive"})
 public class IdeaArchiveServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(IdeaArchiveServlet.class.getName());
-    private static final int DEFAULT_MOCK_DESK_ID = 1;      // Ban Thời sự - Chính trị
-    private static final int editorUserId = 1; // BTV Trường
     private static final int DEFAULT_PAGE_SIZE = 10;
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int deskId = DEFAULT_MOCK_DESK_ID;
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
+        }
+
+        User currentUser = AuthUtil.getLoggedUser(request);
+        int deskId = (currentUser.getDeskId() != null) ? currentUser.getDeskId() : 1;
 
         // Parse filter parameters
         String keyword = request.getParameter("keyword");
@@ -120,6 +123,12 @@ public class IdeaArchiveServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
+        }
+
+        User currentUser = AuthUtil.getLoggedUser(request);
+
         String action = request.getParameter("action");
         String topicIdStr = request.getParameter("topicId");
         String reactivateNotes = request.getParameter("reactivateNotes");
@@ -141,7 +150,7 @@ public class IdeaArchiveServlet extends HttpServlet {
 
         if ("reactivate".equalsIgnoreCase(action)) {
             try (TopicDAO dao = new TopicDAO()) {
-                dao.reactivateArchivedTopic(topicId, editorUserId, reactivateNotes);
+                dao.reactivateArchivedTopic(topicId, currentUser.getUserId(), reactivateNotes);
                 // Strict PRG Pattern
                 response.sendRedirect(request.getContextPath() + "/editorial/idea-archive?msg=reactivated");
                 return;

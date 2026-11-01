@@ -12,11 +12,12 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.sql.Date;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.logging.Level;
@@ -27,22 +28,43 @@ import java.util.logging.Logger;
  * Allows the Desk Editor to draft editorial directives, define mandatory angles and deadlines,
  * and proceed to the Reporter Dispatch desk (SCR-2.5) for atomic commissioning.
  */
-@WebServlet(name = "DirectiveTopicServlet", urlPatterns = {"/editorial/directive-topic"})
+@WebServlet(name = "DirectiveTopicServlet", urlPatterns = {"/editorial/directive-topic", "/editorial/directive-creation"})
 public class DirectiveTopicServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(DirectiveTopicServlet.class.getName());
+
+    /**
+     * Minimum remaining hours required in the current day for a same-day deadline to be valid.
+     * Prevents unrealistic same-day work pressure where reporters have insufficient time (< 4 hours) to produce stories.
+     */
+    public static final int MIN_SAME_DAY_DEADLINE_HOURS = 4;
+
+    /**
+     * Determines whether the remaining time in today is sufficient (>= MIN_SAME_DAY_DEADLINE_HOURS)
+     * for a reporter to receive and execute a same-day deadline.
+     */
+    public static boolean isSameDayDeadlineAllowed(LocalTime currentTime) {
+        long remainingMinutes = Duration.between(currentTime, LocalTime.MAX).toMinutes();
+        return remainingMinutes >= (MIN_SAME_DAY_DEADLINE_HOURS * 60L);
+    }
+
+    /**
+     * Calculates the earliest allowable deadline date formatted as YYYY-MM-DD.
+     */
+    public static String resolveMinDeadlineDate(LocalDate today, LocalTime currentTime) {
+        if (!isSameDayDeadlineAllowed(currentTime)) {
+            return today.plusDays(1).toString();
+        }
+        return today.toString();
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        HttpSession session = request.getSession();
-
-        // 1. Session Context & Fallback Dev Mode (Trường - Desk ID 1: Ban Thời sự - Chính trị)
-        User currentUser = (User) session.getAttribute("user");
-        if (currentUser == null) {
-            currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", currentUser);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
         }
 
+        User currentUser = AuthUtil.getLoggedUser(request);
         int deskId = (currentUser.getDeskId() != null) ? currentUser.getDeskId() : 1;
 
         try (TopicDAO topicDAO = new TopicDAO()) {
@@ -67,12 +89,18 @@ public class DirectiveTopicServlet extends HttpServlet {
                 }
             }
 
+            LocalDate today = LocalDate.now();
+            LocalTime nowTime = LocalTime.now();
+            String minDeadlineDate = resolveMinDeadlineDate(today, nowTime);
+
             request.setAttribute("categories", categories);
             request.setAttribute("currentDesk", currentDesk);
             request.setAttribute("deskQuota", deskQuota);
             request.setAttribute("productionCount", productionCount);
             request.setAttribute("currentPeriod", currentPeriod);
-            request.setAttribute("todayDate", LocalDate.now().toString());
+            request.setAttribute("todayDate", today.toString());
+            request.setAttribute("minDeadlineDate", minDeadlineDate);
+            request.setAttribute("minSameDayHours", MIN_SAME_DAY_DEADLINE_HOURS);
             request.setAttribute("topic", topic);
 
             request.getRequestDispatcher("/editorial/directive-creation.jsp").forward(request, response);
@@ -86,15 +114,12 @@ public class DirectiveTopicServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
-        HttpSession session = request.getSession();
 
-        // 1. Session Context & Fallback Dev Mode
-        User currentUser = (User) session.getAttribute("user");
-        if (currentUser == null) {
-            currentUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            session.setAttribute("user", currentUser);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
         }
 
+        User currentUser = AuthUtil.getLoggedUser(request);
         int deskId = (currentUser.getDeskId() != null) ? currentUser.getDeskId() : 1;
 
         // 2. Parse Form Parameters
@@ -144,8 +169,22 @@ public class DirectiveTopicServlet extends HttpServlet {
             } else {
                 try {
                     LocalDate parsedDate = LocalDate.parse(deadlineStr.trim());
-                    if (parsedDate.isBefore(LocalDate.now())) {
+                    LocalDate today = LocalDate.now();
+                    if (parsedDate.isBefore(today)) {
                         validationError = "Hạn chót nộp bài không thể ở trong quá khứ.";
+                    } else if (parsedDate.isEqual(today)) {
+                        LocalTime nowTime = LocalTime.now();
+                        if (!isSameDayDeadlineAllowed(nowTime)) {
+                            long remainingMinutes = Duration.between(nowTime, LocalTime.MAX).toMinutes();
+                            long remainingHours = remainingMinutes / 60;
+                            long remainingMins = remainingMinutes % 60;
+                            validationError = "Thời gian còn lại trong ngày không đủ cho phóng viên tác nghiệp (chỉ còn "
+                                    + (remainingHours > 0 ? remainingHours + " giờ " : "")
+                                    + remainingMins + " phút, yêu cầu tối thiểu "
+                                    + MIN_SAME_DAY_DEADLINE_HOURS + " giờ). Vui lòng chọn hạn chót từ ngày mai trở đi.";
+                        } else {
+                            deadlineDate = Date.valueOf(parsedDate);
+                        }
                     } else {
                         deadlineDate = Date.valueOf(parsedDate);
                     }
@@ -164,6 +203,10 @@ public class DirectiveTopicServlet extends HttpServlet {
                 int deskQuota = topicDAO.getDeskQuota(deskId, currentPeriod);
                 int productionCount = topicDAO.getDeskProductionCount(deskId);
 
+                LocalDate today = LocalDate.now();
+                LocalTime nowTime = LocalTime.now();
+                String minDeadlineDate = resolveMinDeadlineDate(today, nowTime);
+
                 // Preserve entered values in mock topic object
                 Topic mockTopic = new Topic(topicId, null, title, angle, "DRAFT", deadlineDate, categoryId, currentUser.getUserId());
 
@@ -172,7 +215,9 @@ public class DirectiveTopicServlet extends HttpServlet {
                 request.setAttribute("deskQuota", deskQuota);
                 request.setAttribute("productionCount", productionCount);
                 request.setAttribute("currentPeriod", currentPeriod);
-                request.setAttribute("todayDate", LocalDate.now().toString());
+                request.setAttribute("todayDate", today.toString());
+                request.setAttribute("minDeadlineDate", minDeadlineDate);
+                request.setAttribute("minSameDayHours", MIN_SAME_DAY_DEADLINE_HOURS);
                 request.setAttribute("topic", mockTopic);
                 request.setAttribute("errorMessage", validationError);
 

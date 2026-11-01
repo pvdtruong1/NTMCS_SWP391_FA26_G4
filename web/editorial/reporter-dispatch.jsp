@@ -166,9 +166,12 @@
                 </a>
             </div>
             <div class="nav-group">
-                <div class="nav-label">CÁC PHÂN HỆ KHÁC</div>
-                <a href="${pageContext.request.contextPath}/" class="nav-item">
-                    <i>🏠</i> Trang chủ tòa soạn
+                <div class="nav-label">HỆ THỐNG</div>
+                <a href="${pageContext.request.contextPath}/home" class="nav-item">
+                    <i>🏠</i> Trang chủ điều hành
+                </a>
+                <a href="${pageContext.request.contextPath}/logout" class="nav-item" style="color: #e53e3e;">
+                    <i>🚪</i> Đăng xuất
                 </a>
             </div>
         </nav>
@@ -186,12 +189,15 @@
             <div style="font-weight: 700; color: var(--text);">
                 🏛️ ${desk != null ? desk.deskName : 'Ban Thời sự - Chính trị'}
             </div>
-            <div class="account-chip">
-                <div class="avatar">TR</div>
-                <div>
-                    <b>Trường</b>
-                    <small>Trưởng ban Biên tập</small>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="account-chip">
+                    <div class="avatar">👤</div>
+                    <div>
+                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Người dùng')}" /></b>
+                        <small><c:out value="${not empty sessionScope.loggedUser.roleName ? sessionScope.loggedUser.roleName : (not empty sessionScope.user.roleName ? sessionScope.user.roleName : 'Trưởng ban Biên tập')}" /></small>
+                    </div>
                 </div>
+                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 12px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
             </div>
         </header>
 

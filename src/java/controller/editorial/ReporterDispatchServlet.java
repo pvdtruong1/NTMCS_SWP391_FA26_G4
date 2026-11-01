@@ -7,7 +7,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import model.Category;
 import model.Desk;
 import model.Topic;
@@ -23,7 +22,7 @@ import java.util.logging.Logger;
 
 /**
  * Controller for SCR-2.5: Reporter Dispatch & Workload Desk (UC: Assign Lead Reporter).
- * Enables the Desk Editor (Trường - Role 2, Desk 1) to inspect reporter workload metrics
+ * Enables the Desk Editor to inspect reporter workload metrics
  * and atomically commission a directive topic by assigning a Lead Reporter.
  */
 @WebServlet(name = "ReporterDispatchServlet", urlPatterns = {"/editorial/reporter-dispatch"})
@@ -38,7 +37,11 @@ public class ReporterDispatchServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         response.setContentType("text/html;charset=UTF-8");
 
-        User currentUser = resolveCurrentUser(request);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
+        }
+
+        User currentUser = AuthUtil.getLoggedUser(request);
         int currentDeskId = currentUser.getDeskId() != null ? currentUser.getDeskId() : 1;
 
         // Parse and validate topicId
@@ -73,7 +76,11 @@ public class ReporterDispatchServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         response.setContentType("text/html;charset=UTF-8");
 
-        User currentUser = resolveCurrentUser(request);
+        if (!AuthUtil.check(request, response, "TOPIC_EVALUATE")) {
+            return;
+        }
+
+        User currentUser = AuthUtil.getLoggedUser(request);
         int currentDeskId = currentUser.getDeskId() != null ? currentUser.getDeskId() : 1;
 
         String topicIdParam = request.getParameter("topicId");
@@ -154,21 +161,5 @@ public class ReporterDispatchServlet extends HttpServlet {
         request.setAttribute("categoryName", categoryName);
         request.setAttribute("reporters", reporters);
         request.setAttribute("desk", desk);
-    }
-
-    private User resolveCurrentUser(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session != null && session.getAttribute("user") != null) {
-            return (User) session.getAttribute("user");
-        }
-        // Dev fallback for Trường (Desk Editor - Role 2, Desk 1)
-        User mockEditor = new User();
-        mockEditor.setUserId(1);
-        mockEditor.setFullName("Trường");
-        mockEditor.setEmail("truong.editor@newsroom.vn");
-        mockEditor.setRoleId(2);
-        mockEditor.setDeskId(1);
-        mockEditor.setActiveStatus(true);
-        return mockEditor;
     }
 }

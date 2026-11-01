@@ -3,29 +3,34 @@ package model;
 import java.io.Serializable;
 
 /**
- * Represents a user in the newsroom system.
+ * Entity representing internal newsroom personnel.
  */
 public class User implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int userId;
     private String fullName;
     private String email;
+    private String passwordHash;
     private int roleId;
-    private String roleName;
     private boolean activeStatus;
-    private Integer deskId;
+    private Integer deskId;      // can be null (some admins have no Desk)
+
+    // Display only (filled by JOIN queries)
+    private String roleName;
     private String deskName;
 
     public User() {
-        this.activeStatus = true;
     }
 
-    public User(int userId, String fullName, String email, int roleId, String roleName, boolean activeStatus) {
+    public User(int userId, String fullName, String email, String passwordHash, int roleId, boolean activeStatus, Integer deskId) {
         this.userId = userId;
         this.fullName = fullName;
         this.email = email;
+        this.passwordHash = passwordHash;
         this.roleId = roleId;
-        this.roleName = roleName;
         this.activeStatus = activeStatus;
+        this.deskId = deskId;
     }
 
     public int getUserId() {
@@ -52,20 +57,20 @@ public class User implements Serializable {
         this.email = email;
     }
 
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public int getRoleId() {
         return roleId;
     }
 
     public void setRoleId(int roleId) {
         this.roleId = roleId;
-    }
-
-    public String getRoleName() {
-        return roleName;
-    }
-
-    public void setRoleName(String roleName) {
-        this.roleName = roleName;
     }
 
     public boolean isActiveStatus() {
@@ -82,6 +87,14 @@ public class User implements Serializable {
 
     public void setDeskId(Integer deskId) {
         this.deskId = deskId;
+    }
+
+    public String getRoleName() {
+        return roleName;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
     }
 
     public String getDeskName() {
@@ -105,7 +118,11 @@ public class User implements Serializable {
                 "userId=" + userId +
                 ", fullName='" + fullName + '\'' +
                 ", email='" + email + '\'' +
+                ", roleId=" + roleId +
+                ", activeStatus=" + activeStatus +
+                ", deskId=" + deskId +
                 ", roleName='" + roleName + '\'' +
+                ", deskName='" + deskName + '\'' +
                 '}';
     }
 }

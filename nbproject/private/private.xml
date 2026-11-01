@@ -1,15 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
-    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/web/WEB-INF/views/reporter/detail.jsp</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/web/WEB-INF/views/reporter/duplicate-search.jsp</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/web/WEB-INF/views/reporter/dashboard.jsp</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/dao/DBContext.java</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/dao/TopicRepository.java</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/Asset.java</file>
-            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/controller/ReporterServlet.java</file>
-        </group>
-    </open-files>
+
 </project-private>

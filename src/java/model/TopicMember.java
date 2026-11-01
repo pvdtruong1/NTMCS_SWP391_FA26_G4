@@ -6,6 +6,8 @@ import java.io.Serializable;
  * Represents an assigned team member on a topic (Topic_Member).
  */
 public class TopicMember implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int memberId;
     private int topicId;
     private int userId;

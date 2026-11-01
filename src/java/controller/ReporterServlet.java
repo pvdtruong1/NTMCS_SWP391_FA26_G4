@@ -1,8 +1,8 @@
 package controller;
 
-import dao.CategoryDAO;
-import dao.NotificationDAO;
-import dao.TopicRepository;
+import dal.CategoryDAO;
+import dal.NotificationDAO;
+import dal.TopicDAO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -13,57 +13,63 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import model.Category;
 import model.Notification;
 import model.Topic;
 import model.TopicEstimate;
 import model.TopicMember;
 import model.User;
+import util.AuthUtil;
 
+/**
+ * Controller for Reporter Workflow (WF-01).
+ * Secured by RBAC permission "TOPIC_PITCH" and dynamically bound to session user.
+ */
 @WebServlet(name = "ReporterServlet", urlPatterns = {"/reporter/*"})
 public class ReporterServlet extends HttpServlet {
 
-    public static final String DEMO_REPORTER_EMAIL = "hung.reporter@newsroom.vn";
-    public static final String DEMO_REPORTER_NAME = "Mai Khánh Hùng";
-    public static final String DEMO_REPORTER_ROLE = "REPORTER";
-    public static final String DEMO_REPORTER_DESK = "Thời sự";
-
-    private final TopicRepository repository = TopicRepository.getInstance();
+    private static final Logger LOGGER = Logger.getLogger(ReporterServlet.class.getName());
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
-        setUserAttributes(request);
+
+        if (!AuthUtil.check(request, response, "TOPIC_PITCH")) {
+            return;
+        }
+
+        User loggedUser = AuthUtil.getLoggedUser(request);
+        setUserAttributes(request, loggedUser);
 
         String path = request.getPathInfo();
         if (path == null || "/".equals(path) || "/dashboard".equals(path)) {
-            showDashboard(request, response);
+            showDashboard(request, response, loggedUser);
         } else if ("/topics".equals(path)) {
-            showTopics(request, response);
+            showTopics(request, response, loggedUser);
         } else if ("/duplicate-search".equals(path)) {
             searchDuplicates(request, response);
         } else if ("/compose".equals(path)) {
-            showCompose(request, response);
+            showCompose(request, response, loggedUser);
         } else if ("/check-schedule".equals(path)) {
             handleCheckSchedule(request, response);
         } else if ("/detail".equals(path)) {
-            showDetail(request, response);
+            showDetail(request, response, loggedUser);
         } else if ("/delete".equals(path)) {
-            handleDelete(request, response);
+            handleDelete(request, response, loggedUser);
         } else if ("/quick-submit".equals(path)) {
-            handleQuickSubmit(request, response);
+            handleQuickSubmit(request, response, loggedUser);
         } else if ("/notifications".equals(path)) {
-            handleGetNotifications(request, response);
+            handleGetNotifications(request, response, loggedUser);
         } else if ("/reset".equals(path)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/dashboard?message=resetDisabled");
+            response.sendRedirect(request.getContextPath() + "/reporter/dashboard?message=resetDisabled");
         } else {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
         }
@@ -74,24 +80,29 @@ public class ReporterServlet extends HttpServlet {
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
-        setUserAttributes(request);
+
+        if (!AuthUtil.check(request, response, "TOPIC_PITCH")) {
+            return;
+        }
+
+        User loggedUser = AuthUtil.getLoggedUser(request);
+        setUserAttributes(request, loggedUser);
 
         String path = request.getPathInfo();
         if ("/delete".equals(path)) {
-            handleDelete(request, response);
+            handleDelete(request, response, loggedUser);
             return;
         }
         if ("/quick-submit".equals(path)) {
-            handleQuickSubmit(request, response);
+            handleQuickSubmit(request, response, loggedUser);
             return;
         }
         if ("/notifications".equals(path)) {
-            handlePostNotifications(request, response);
+            handlePostNotifications(request, response, loggedUser);
             return;
         }
         if ("/reset".equals(path)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/dashboard?message=resetDisabled");
+            response.sendRedirect(request.getContextPath() + "/reporter/dashboard?message=resetDisabled");
             return;
         }
         if (!"/compose".equals(path)) {
@@ -108,105 +119,111 @@ public class ReporterServlet extends HttpServlet {
         String title = trim(request.getParameter("title"));
         String summary = trim(request.getParameter("summary"));
         String angle = trim(request.getParameter("angle"));
-        String category = trim(request.getParameter("category"));
         String genre = trim(request.getParameter("genre"));
         String priority = trim(request.getParameter("priority"));
         String deadlineText = trim(request.getParameter("deadline"));
+
+        String catParam = trim(request.getParameter("categoryId"));
+        if (catParam.isEmpty()) {
+            catParam = trim(request.getParameter("category"));
+        }
+        int categoryId = 0;
+        try {
+            categoryId = Integer.parseInt(catParam);
+        } catch (NumberFormatException ignored) {}
 
         List<TopicEstimate> estimates = parseEstimatesFromRequest(request);
         List<TopicMember> members = parseMembersFromRequest(request);
 
         Topic topic;
         try {
-            // Resolve the requested topic before validating or saving. An invalid ID must not create a new topic.
-            topic = requestTopic(request);
+            topic = requestTopic(request, loggedUser);
         } catch (IllegalArgumentException e) {
             Topic formTopic = createFormTopic();
-            fillTopicFromForm(formTopic, title, summary, angle, category,
+            fillTopicFromForm(formTopic, title, summary, angle, categoryId, null,
                     genre, priority, deadlineText);
             forwardComposeWithError(request, response, e.getMessage(), formTopic, estimates, members);
             return;
         }
 
-        String error = validate(title, summary, angle, category, genre,
+        String error = validate(title, summary, angle, categoryId, genre,
                 priority, deadlineText, action);
         if (error != null) {
-            fillTopicFromForm(topic, title, summary, angle, category,
+            fillTopicFromForm(topic, title, summary, angle, categoryId, null,
                     genre, priority, deadlineText);
             forwardComposeWithError(request, response, error, topic, estimates, members);
             return;
         }
 
-        fillTopicFromForm(topic, title, summary, angle, category,
+        fillTopicFromForm(topic, title, summary, angle, categoryId, null,
                 genre, priority, deadlineText);
-        topic.setReporterEmail(DEMO_REPORTER_EMAIL);
-        topic.setReporterName(DEMO_REPORTER_NAME);
-        topic.setDesk(DEMO_REPORTER_DESK);
+        topic.setAuthorUserId(loggedUser.getUserId());
+        topic.setReporterEmail(loggedUser.getEmail());
+        topic.setReporterName(loggedUser.getFullName());
+        topic.setDeskName(loggedUser.getDeskName());
         topic.setStatus("submit".equals(action) ? "SUBMITTED" : "DRAFT");
         if ("submit".equals(action)) {
             topic.setRejectionReason(null);
         }
 
-        try {
-            repository.save(topic, estimates, members);
-        } catch (IllegalArgumentException | IllegalStateException e) {
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            topicDAO.saveTopicPitch(topic, estimates, members);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Lỗi khi lưu đề xuất đề tài", e);
             forwardComposeWithError(request, response,
                     safeMessage(e, "Không thể lưu đề tài. Vui lòng thử lại."), topic, estimates, members);
             return;
         }
 
         String message = "submit".equals(action) ? "submitted" : "draftSaved";
-        response.sendRedirect(request.getContextPath()
-                + "/reporter/topics?message=" + message);
+        response.sendRedirect(request.getContextPath() + "/reporter/topics?message=" + message);
     }
 
-    private void setUserAttributes(HttpServletRequest request) {
-        request.setAttribute("currentUserName", DEMO_REPORTER_NAME);
-        request.setAttribute("currentUserEmail", DEMO_REPORTER_EMAIL);
-        request.setAttribute("currentUserRole", DEMO_REPORTER_ROLE);
-        request.setAttribute("currentUserDesk", DEMO_REPORTER_DESK);
+    private void setUserAttributes(HttpServletRequest request, User loggedUser) {
+        if (loggedUser == null) {
+            return;
+        }
+        request.setAttribute("currentUserId", loggedUser.getUserId());
+        request.setAttribute("currentUserName", loggedUser.getFullName());
+        request.setAttribute("currentUserEmail", loggedUser.getEmail());
+        request.setAttribute("currentUserRole", loggedUser.getRoleName());
+        request.setAttribute("currentUserDesk", loggedUser.getDeskName());
         request.setAttribute("userAvatar", "PV");
 
-        NotificationDAO notifDAO = new NotificationDAO();
-        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
-        request.setAttribute("currentUserId", userId);
-        request.setAttribute("unreadNotifCount", notifDAO.countUnreadByUserId(userId));
+        try (NotificationDAO notifDAO = new NotificationDAO()) {
+            request.setAttribute("unreadNotifCount", notifDAO.countUnreadByUserId(loggedUser.getUserId()));
+        }
     }
 
     private void populateFormOptions(HttpServletRequest request) {
         request.setAttribute("today", LocalDate.now());
-        request.setAttribute("categories", repository.findAllCategories());
-        request.setAttribute("genres", repository.findExistingGenres());
-        request.setAttribute("priorities", repository.findExistingPriorities());
-        request.setAttribute("activeUsers", repository.findAllActiveUsers());
+        CategoryDAO catDAO = new CategoryDAO();
+        request.setAttribute("categories", catDAO.getAll());
 
-        int topicId = 0;
-        try {
-            String idText = request.getParameter("id");
-            if (idText == null || idText.trim().isEmpty()) {
-                idText = request.getParameter("topicId");
-            }
-            if (idText != null && !idText.trim().isEmpty()) {
-                topicId = Integer.parseInt(idText.trim());
-            }
-        } catch (Exception ignored) {}
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            request.setAttribute("genres", topicDAO.findExistingGenres());
+            request.setAttribute("priorities", topicDAO.findExistingPriorities());
+            request.setAttribute("activeUsers", topicDAO.findAllActiveUsersForTeam());
 
-        Map<Integer, List<String>> schedules = repository.getUsersBusySchedule(topicId);
-        request.setAttribute("userBusySchedules", schedules);
-        request.setAttribute("userBusySchedulesJson", toScheduleJson(schedules));
+            int topicId = 0;
+            try {
+                String idText = request.getParameter("id");
+                if (idText == null || idText.trim().isEmpty()) {
+                    idText = request.getParameter("topicId");
+                }
+                if (idText != null && !idText.trim().isEmpty()) {
+                    topicId = Integer.parseInt(idText.trim());
+                }
+            } catch (Exception ignored) {}
+
+            Map<Integer, List<String>> schedules = topicDAO.getUsersBusySchedule(topicId);
+            request.setAttribute("userBusySchedules", schedules);
+            request.setAttribute("userBusySchedulesJson", toScheduleJson(schedules));
+        }
     }
 
-    /**
-     * Returns a new topic only when topicId is empty; invalid IDs are rejected.
-     */
-    /**
-     * Returns a new topic when topicId is empty or zero. Loads an existing
-     * topic only when topicId is a positive number.
-     */
-    private Topic requestTopic(HttpServletRequest request) {
+    private Topic requestTopic(HttpServletRequest request, User loggedUser) {
         String idText = trim(request.getParameter("topicId"));
-
-        // Tạo đề tài mới nếu ID không được gửi hoặc bằng 0.
         if (idText.isEmpty() || "0".equals(idText)) {
             return createFormTopic();
         }
@@ -218,18 +235,18 @@ public class ReporterServlet extends HttpServlet {
             throw new IllegalArgumentException("ID đề tài không hợp lệ.");
         }
 
-        if (id < 0) {
+        if (id <= 0) {
             throw new IllegalArgumentException("ID đề tài không hợp lệ.");
         }
 
-        Topic existing = repository.findById(id, DEMO_REPORTER_EMAIL);
-
-        if (existing == null) {
-            throw new IllegalArgumentException(
-                    "Không tìm thấy đề tài hoặc bạn không có quyền chỉnh sửa đề tài này.");
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            Topic existing = topicDAO.getTopicDetailForReporter(id, loggedUser.getUserId());
+            if (existing == null) {
+                throw new IllegalArgumentException(
+                        "Không tìm thấy đề tài hoặc bạn không có quyền chỉnh sửa đề tài này.");
+            }
+            return existing;
         }
-
-        return existing;
     }
 
     private Topic createFormTopic() {
@@ -237,38 +254,35 @@ public class ReporterServlet extends HttpServlet {
         topic.setPriority("NORMAL");
         topic.setGenre("Tin nhanh");
         List<Category> categories = new CategoryDAO().getAll();
-        if (categories != null && !categories.isEmpty()
-                && categories.get(0) != null) {
-            topic.setCategory(categories.get(0).getCategoryName());
+        if (categories != null && !categories.isEmpty() && categories.get(0) != null) {
+            topic.setCategoryId(categories.get(0).getCategoryId());
+            topic.setCategoryName(categories.get(0).getCategoryName());
         }
         topic.setDeadline(LocalDate.now().plusDays(7));
         return topic;
     }
 
     private void fillTopicFromForm(Topic topic, String title, String summary,
-            String angle, String category, String genre, String priority,
+            String angle, int categoryId, String categoryName, String genre, String priority,
             String deadlineText) {
         topic.setTitle(title);
         topic.setSummary(summary);
         topic.setAngle(angle);
-        topic.setCategory(category);
-        topic.setGenre(genre.isEmpty() ? "Tin nhanh" : genre);
-        topic.setPriority(priority.isEmpty() ? "NORMAL" : priority);
-        if (!deadlineText.isEmpty()) {
+        if (categoryId > 0) {
+            topic.setCategoryId(categoryId);
+        }
+        if (categoryName != null && !categoryName.isEmpty()) {
+            topic.setCategoryName(categoryName);
+        }
+        topic.setGenre(genre == null || genre.isEmpty() ? "Tin nhanh" : genre);
+        topic.setPriority(priority == null || priority.isEmpty() ? "NORMAL" : priority);
+        if (deadlineText != null && !deadlineText.isEmpty()) {
             try {
                 topic.setDeadline(LocalDate.parse(deadlineText));
-            } catch (DateTimeParseException ignored) {
-                // Keep the existing/default deadline so the form can be redisplayed with the validation message.
-            }
+            } catch (DateTimeParseException ignored) {}
         } else {
             topic.setDeadline(LocalDate.now().plusDays(7));
         }
-    }
-
-    private void forwardComposeWithError(HttpServletRequest request,
-            HttpServletResponse response, String error, Topic topic)
-            throws ServletException, IOException {
-        forwardComposeWithError(request, response, error, topic, null, null);
     }
 
     private void forwardComposeWithError(HttpServletRequest request,
@@ -284,12 +298,11 @@ public class ReporterServlet extends HttpServlet {
         if (members != null) {
             request.setAttribute("formMembers", members);
         }
-        request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp")
-                .forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp").forward(request, response);
     }
 
     private String validate(String title, String summary, String angle,
-            String category, String genre, String priority, String deadline,
+            int categoryId, String genre, String priority, String deadline,
             String action) {
         if (title.isEmpty()) {
             return "Vui lòng nhập tiêu đề đề tài.";
@@ -301,7 +314,7 @@ public class ReporterServlet extends HttpServlet {
             if (angle.isEmpty()) {
                 return "Khi nộp đề xuất, vui lòng nhập góc tiếp cận (Angle).";
             }
-            if (category.isEmpty()) {
+            if (categoryId <= 0) {
                 return "Vui lòng chọn chuyên mục cho đề tài.";
             }
             if (deadline.isEmpty()) {
@@ -309,18 +322,8 @@ public class ReporterServlet extends HttpServlet {
             }
         }
 
-        if (!category.isEmpty() && !isValidCategory(category)) {
+        if (categoryId > 0 && !isValidCategory(categoryId)) {
             return "Chuyên mục không hợp lệ. Vui lòng chọn lại chuyên mục.";
-        }
-
-        if (!genre.isEmpty()
-                && !repository.findExistingGenres().contains(genre)) {
-            return "Thể loại đề tài không hợp lệ.";
-        }
-
-        if (!priority.isEmpty()
-                && !repository.findExistingPriorities().contains(priority)) {
-            return "Mức độ ưu tiên không hợp lệ.";
         }
 
         if (!deadline.isEmpty()) {
@@ -335,18 +338,17 @@ public class ReporterServlet extends HttpServlet {
         return null;
     }
 
-    private boolean isValidCategory(String categoryName) {
-        for (Category category : new CategoryDAO().getAll()) {
-            if (category != null && categoryName.equals(category.getCategoryName())) {
-                return true;
-            }
-        }
-        return false;
+    private boolean isValidCategory(int categoryId) {
+        Category cat = new CategoryDAO().getById(categoryId);
+        return cat != null;
     }
 
     private void showDashboard(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
-        List<Topic> topics = repository.findByReporter(DEMO_REPORTER_EMAIL);
+            HttpServletResponse response, User loggedUser) throws ServletException, IOException {
+        List<Topic> topics;
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            topics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), null, null);
+        }
         int draft = 0;
         int submitted = 0;
         int approved = 0;
@@ -383,57 +385,58 @@ public class ReporterServlet extends HttpServlet {
         request.setAttribute("readyCmsCount", readyCms);
         request.setAttribute("activeCount", approved + inProgress);
         request.setAttribute("message", request.getParameter("message"));
-        request.getRequestDispatcher("/WEB-INF/views/reporter/dashboard.jsp")
-                .forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/dashboard.jsp").forward(request, response);
     }
 
     private void showTopics(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+            HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         String status = trim(request.getParameter("status"));
-        String keyword = trim(request.getParameter("keyword")).toLowerCase();
-        List<Topic> all = repository.findByReporter(DEMO_REPORTER_EMAIL);
-        List<Topic> filtered = new ArrayList<>();
-
-        for (Topic topic : all) {
-            boolean statusMatch = status.isEmpty()
-                    || status.equalsIgnoreCase(topic.getStatus());
-            boolean keywordMatch = keyword.isEmpty()
-                    || containsIgnoreCase(topic.getTitle(), keyword)
-                    || containsIgnoreCase(topic.getSummary(), keyword)
-                    || containsIgnoreCase(topic.getAngle(), keyword)
-                    || containsIgnoreCase(topic.getTopicCode(), keyword);
-            if (statusMatch && keywordMatch) {
-                filtered.add(topic);
-            }
+        String keyword = trim(request.getParameter("keyword"));
+        List<Topic> filtered;
+        int totalTopics;
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            filtered = topicDAO.getTopicsByReporter(loggedUser.getUserId(), status, keyword);
+            totalTopics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), null, null).size();
         }
 
         request.setAttribute("topics", filtered);
-        request.setAttribute("totalTopicsCount", all.size());
+        request.setAttribute("totalTopicsCount", totalTopics);
         request.setAttribute("status", status);
-        request.setAttribute("keyword", trim(request.getParameter("keyword")));
+        request.setAttribute("keyword", keyword);
         request.setAttribute("message", request.getParameter("message"));
-        request.getRequestDispatcher("/WEB-INF/views/reporter/topics.jsp")
-                .forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/topics.jsp").forward(request, response);
     }
 
     private void showCompose(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+            HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         populateFormOptions(request);
         String idParam = trim(request.getParameter("id"));
 
         if (!idParam.isEmpty()) {
             try {
                 int id = Integer.parseInt(idParam);
-                Topic topic = id > 0
-                        ? repository.findById(id, DEMO_REPORTER_EMAIL) : null;
+                Topic topic = null;
+                List<TopicEstimate> estimates = null;
+                List<TopicMember> members = null;
+
+                if (id > 0) {
+                    try (TopicDAO topicDAO = new TopicDAO()) {
+                        topic = topicDAO.getTopicDetailForReporter(id, loggedUser.getUserId());
+                        if (topic != null) {
+                            estimates = topicDAO.findEstimatesByTopicId(id);
+                            members = topicDAO.findMembersByTopicId(id);
+                        }
+                    }
+                }
+
                 if (topic == null) {
                     request.setAttribute("error",
                             "Không tìm thấy đề tài hoặc bạn không có quyền chỉnh sửa đề tài này.");
                     request.setAttribute("formTopic", createFormTopic());
                 } else {
                     request.setAttribute("formTopic", topic);
-                    request.setAttribute("formEstimates", repository.findEstimatesByTopicId(id));
-                    request.setAttribute("formMembers", repository.findMembersByTopicId(id));
+                    request.setAttribute("formEstimates", estimates);
+                    request.setAttribute("formMembers", members);
                 }
             } catch (NumberFormatException e) {
                 request.setAttribute("error", "ID đề tài không hợp lệ.");
@@ -443,54 +446,45 @@ public class ReporterServlet extends HttpServlet {
             request.setAttribute("formTopic", createFormTopic());
         }
 
-        request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp")
-                .forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp").forward(request, response);
     }
 
     private void showDetail(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+            HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         Topic topic = null;
+        List<TopicEstimate> estimates = null;
+        List<TopicMember> members = null;
         String idText = trim(request.getParameter("id"));
         try {
             int id = Integer.parseInt(idText);
             if (id > 0) {
-                topic = repository.findById(id, DEMO_REPORTER_EMAIL);
+                try (TopicDAO topicDAO = new TopicDAO()) {
+                    topic = topicDAO.getTopicDetailForReporter(id, loggedUser.getUserId());
+                    if (topic != null) {
+                        estimates = topicDAO.findEstimatesByTopicId(topic.getTopicId());
+                        members = topicDAO.findMembersByTopicId(topic.getTopicId());
+                    }
+                }
             }
-        } catch (NumberFormatException ignored) {
-            // Invalid ID is handled by rendering the detail page without a topic.
-        }
+        } catch (NumberFormatException ignored) {}
+
         request.setAttribute("topic", topic);
         if (topic != null) {
             request.setAttribute("stepRank", calculateWorkflowRank(topic.getStatus()));
-            request.setAttribute("estimates", repository.findEstimatesByTopicId(topic.getTopicId()));
-            request.setAttribute("members", repository.findMembersByTopicId(topic.getTopicId()));
+            request.setAttribute("estimates", estimates);
+            request.setAttribute("members", members);
         }
-        request.getRequestDispatcher("/WEB-INF/views/reporter/detail.jsp")
-                .forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/detail.jsp").forward(request, response);
     }
 
     private int calculateWorkflowRank(String status) {
-        if ("DRAFT".equals(status)) {
-            return 1;
-        }
-        if ("SUBMITTED".equals(status)) {
-            return 2;
-        }
-        if ("PENDING_EXECUTIVE_APPROVAL".equals(status)) {
-            return 3;
-        }
-        if ("APPROVED".equals(status)) {
-            return 4;
-        }
-        if ("IN_PROGRESS".equals(status)) {
-            return 5;
-        }
-        if ("DELIVERED".equals(status)) {
-            return 6;
-        }
-        if ("ACCEPTED_READY_FOR_CMS".equals(status)) {
-            return 7;
-        }
+        if ("DRAFT".equals(status)) return 1;
+        if ("SUBMITTED".equals(status)) return 2;
+        if ("PENDING_EXECUTIVE_APPROVAL".equals(status)) return 3;
+        if ("APPROVED".equals(status)) return 4;
+        if ("IN_PROGRESS".equals(status)) return 5;
+        if ("DELIVERED".equals(status)) return 6;
+        if ("ACCEPTED_READY_FOR_CMS".equals(status)) return 7;
         return 1;
     }
 
@@ -498,68 +492,65 @@ public class ReporterServlet extends HttpServlet {
             HttpServletResponse response) throws ServletException, IOException {
         String keyword = trim(request.getParameter("keyword"));
         request.setAttribute("keyword", keyword);
-        request.setAttribute("matches",
-                repository.searchSimilar(keyword, DEMO_REPORTER_EMAIL));
-        request.getRequestDispatcher("/WEB-INF/views/reporter/duplicate-search.jsp")
-                .forward(request, response);
+        List<Topic> matches = new ArrayList<>();
+        if (!keyword.isEmpty()) {
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                matches = topicDAO.searchSimilarTopics(keyword);
+            }
+        }
+        request.setAttribute("matches", matches);
+        request.getRequestDispatcher("/WEB-INF/views/reporter/duplicate-search.jsp").forward(request, response);
     }
 
     private void handleDelete(HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
+            HttpServletResponse response, User loggedUser) throws IOException {
         String idText = trim(request.getParameter("id"));
         if (idText.isEmpty()) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=deleteFailed");
+            response.sendRedirect(request.getContextPath() + "/reporter/topics?message=deleteFailed");
             return;
         }
         try {
             int id = Integer.parseInt(idText);
-            if (id <= 0 || repository.findById(id, DEMO_REPORTER_EMAIL) == null) {
-                response.sendRedirect(request.getContextPath()
-                        + "/reporter/topics?message=deleteFailed");
-                return;
+            boolean ok = false;
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                ok = topicDAO.deleteReporterDraft(id, loggedUser.getUserId());
             }
-            repository.delete(id, DEMO_REPORTER_EMAIL);
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=deleted");
+            if (ok) {
+                response.sendRedirect(request.getContextPath() + "/reporter/topics?message=deleted");
+            } else {
+                response.sendRedirect(request.getContextPath() + "/reporter/topics?message=deleteFailed");
+            }
         } catch (NumberFormatException e) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=deleteFailed");
+            response.sendRedirect(request.getContextPath() + "/reporter/topics?message=deleteFailed");
         }
     }
 
     private void handleQuickSubmit(HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
+            HttpServletResponse response, User loggedUser) throws IOException {
         String idText = trim(request.getParameter("id"));
         if (idText.isEmpty()) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=submitFailed");
+            response.sendRedirect(request.getContextPath() + "/reporter/topics?message=submitFailed");
             return;
         }
         try {
             int id = Integer.parseInt(idText);
-            Topic topic = id > 0
-                    ? repository.findById(id, DEMO_REPORTER_EMAIL) : null;
-            if (topic == null || !("DRAFT".equals(topic.getStatus())
-                    || "REVISION_REQUESTED".equals(topic.getStatus())
-                    || "REVISION_REQUIRED".equals(topic.getStatus()))) {
-                response.sendRedirect(request.getContextPath()
-                        + "/reporter/topics?message=submitFailed");
-                return;
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                Topic topic = topicDAO.getTopicDetailForReporter(id, loggedUser.getUserId());
+                if (topic == null || !("DRAFT".equals(topic.getStatus())
+                        || "REVISION_REQUESTED".equals(topic.getStatus())
+                        || "REVISION_REQUIRED".equals(topic.getStatus()))) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/topics?message=submitFailed");
+                    return;
+                }
+                topic.setStatus("SUBMITTED");
+                topic.setRejectionReason(null);
+                topicDAO.saveTopicPitch(topic, null, null);
+                response.sendRedirect(request.getContextPath() + "/reporter/topics?message=submitted");
             }
-            topic.setStatus("SUBMITTED");
-            topic.setRejectionReason(null);
-            repository.save(topic);
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=submitted");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            response.sendRedirect(request.getContextPath()
-                    + "/reporter/topics?message=submitFailed");
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Lỗi nộp nhanh đề tài", e);
+            response.sendRedirect(request.getContextPath() + "/reporter/topics?message=submitFailed");
         }
-    }
-
-    private boolean containsIgnoreCase(String value, String keyword) {
-        return value != null && value.toLowerCase().contains(keyword);
     }
 
     private String safeMessage(Exception exception, String fallback) {
@@ -587,7 +578,11 @@ public class ReporterServlet extends HttpServlet {
             }
         } catch (NumberFormatException ignored) {}
 
-        List<String> busyTopics = repository.getUserBusyTopics(userId, topicId);
+        List<String> busyTopics;
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            busyTopics = topicDAO.getUserBusyTopics(userId, topicId);
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append("{\"userId\":").append(userId);
         sb.append(",\"busy\":").append(!busyTopics.isEmpty());
@@ -677,56 +672,56 @@ public class ReporterServlet extends HttpServlet {
         return sb.toString();
     }
 
-    private void handleGetNotifications(HttpServletRequest request, HttpServletResponse response)
+    private void handleGetNotifications(HttpServletRequest request, HttpServletResponse response, User loggedUser)
             throws IOException {
         response.setContentType("application/json;charset=UTF-8");
-        NotificationDAO notifDAO = new NotificationDAO();
-        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
-        List<Notification> list = notifDAO.findByUserId(userId);
-        int unread = notifDAO.countUnreadByUserId(userId);
+        try (NotificationDAO notifDAO = new NotificationDAO()) {
+            List<Notification> list = notifDAO.findByUserId(loggedUser.getUserId());
+            int unread = notifDAO.countUnreadByUserId(loggedUser.getUserId());
 
-        StringBuilder json = new StringBuilder();
-        json.append("{\"unreadCount\":").append(unread)
-            .append(",\"totalCount\":").append(list.size())
-            .append(",\"notifications\":[");
+            StringBuilder json = new StringBuilder();
+            json.append("{\"unreadCount\":").append(unread)
+                .append(",\"totalCount\":").append(list.size())
+                .append(",\"notifications\":[");
 
-        for (int i = 0; i < list.size(); i++) {
-            Notification n = list.get(i);
-            if (i > 0) {
-                json.append(",");
+            for (int i = 0; i < list.size(); i++) {
+                Notification n = list.get(i);
+                if (i > 0) {
+                    json.append(",");
+                }
+                json.append("{")
+                    .append("\"id\":").append(n.getNotificationId()).append(",")
+                    .append("\"userId\":").append(n.getUserId()).append(",")
+                    .append("\"topicId\":").append(n.getTopicId() == null ? "null" : n.getTopicId()).append(",")
+                    .append("\"message\":\"").append(escapeJson(n.getMessage())).append("\",")
+                    .append("\"isRead\":").append(n.isIsRead()).append(",")
+                    .append("\"createdAt\":\"").append(escapeJson(n.getCreatedAt())).append("\"")
+                    .append("}");
             }
-            json.append("{")
-                .append("\"id\":").append(n.getNotificationId()).append(",")
-                .append("\"userId\":").append(n.getUserId()).append(",")
-                .append("\"topicId\":").append(n.getTopicId() == null ? "null" : n.getTopicId()).append(",")
-                .append("\"message\":\"").append(escapeJson(n.getMessage())).append("\",")
-                .append("\"isRead\":").append(n.isIsRead()).append(",")
-                .append("\"createdAt\":\"").append(escapeJson(n.getCreatedAt())).append("\"")
-                .append("}");
-        }
-        json.append("]}");
+            json.append("]}");
 
-        response.getWriter().write(json.toString());
+            response.getWriter().write(json.toString());
+        }
     }
 
-    private void handlePostNotifications(HttpServletRequest request, HttpServletResponse response)
+    private void handlePostNotifications(HttpServletRequest request, HttpServletResponse response, User loggedUser)
             throws IOException {
         response.setContentType("application/json;charset=UTF-8");
-        NotificationDAO notifDAO = new NotificationDAO();
-        int userId = notifDAO.findUserIdByEmail(DEMO_REPORTER_EMAIL);
+        int userId = loggedUser.getUserId();
+        try (NotificationDAO notifDAO = new NotificationDAO()) {
+            String action = trim(request.getParameter("action"));
+            if ("markAllRead".equals(action)) {
+                notifDAO.markAllAsRead(userId);
+            } else if ("markRead".equals(action)) {
+                try {
+                    int id = Integer.parseInt(trim(request.getParameter("id")));
+                    notifDAO.markAsRead(id, userId);
+                } catch (Exception ignored) {}
+            }
 
-        String action = trim(request.getParameter("action"));
-        if ("markAllRead".equals(action)) {
-            notifDAO.markAllAsRead(userId);
-        } else if ("markRead".equals(action)) {
-            try {
-                int id = Integer.parseInt(trim(request.getParameter("id")));
-                notifDAO.markAsRead(id, userId);
-            } catch (Exception ignored) {}
+            int unread = notifDAO.countUnreadByUserId(userId);
+            response.getWriter().write("{\"success\":true,\"unreadCount\":" + unread + "}");
         }
-
-        int unread = notifDAO.countUnreadByUserId(userId);
-        response.getWriter().write("{\"success\":true,\"unreadCount\":" + unread + "}");
     }
 
     private String escapeJson(String s) {
@@ -737,4 +732,3 @@ public class ReporterServlet extends HttpServlet {
                 .replace("\r", "\\r");
     }
 }
-

@@ -257,19 +257,29 @@
     <!-- Main Content Area -->
     <div class="main">
         <!-- Top Bar -->
-        <header class="topbar">
+                <header class="topbar">
+            <button class="icon-btn mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
             <div class="brand-desk-info">
                 <strong>🏛️ ${topic.deskName != null ? topic.deskName : 'Ban Thời sự - Chính trị'}</strong>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
                 <div class="account-chip">
-                    <div class="avatar">👤</div>
+                    <div class="avatar"><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName.substring(0, 1).toUpperCase() : (not empty sessionScope.user ? sessionScope.user.fullName.substring(0, 1).toUpperCase() : 'T')}" /></div>
                     <div>
-                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Người dùng')}" /></b>
-                        <small><c:out value="${not empty sessionScope.loggedUser.roleName ? sessionScope.loggedUser.roleName : (not empty sessionScope.user.roleName ? sessionScope.user.roleName : 'Desk Editor')}" /></small>
+                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Trường')}" /></b>
+                        <small>
+                            <c:choose>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'DESK_EDITOR'}">Desk Editor (BTV Chuyên Môn)</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'EXECUTIVE_EDITOR'}">Tổng Biên Tập</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'BUSINESS_ADMINISTRATOR'}">Quản Trị Nghiệp Vụ</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'SYSTEM_ADMINISTRATOR'}">Quản Trị Hệ Thống</c:when>
+                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'REPORTER'}">Phóng Viên Tác Nghiệp</c:when>
+                                <c:otherwise><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : (not empty sessionScope.user ? sessionScope.user.roleName : 'Desk Editor')}" /></c:otherwise>
+                            </c:choose>
+                        </small>
                     </div>
                 </div>
-                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 12px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
+                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
             </div>
         </header>
 

@@ -1619,7 +1619,7 @@ public class TopicDAO extends DBContext {
             } else {
                 // UPDATE EXISTING TOPIC (ch盻・cho phﾃｩp khi 盻・tr蘯｡ng thﾃ｡i DRAFT ho蘯ｷc REVISE)
                 String updateSql = "UPDATE Topic SET title = ?, summary = ?, angle = ?, genre = ?, priority = ?, status = ?, deadline = ?, category_id = ? "
-                                 + "WHERE topic_id = ? AND author_user_id = ? AND status IN ('DRAFT', 'REVISE');";
+                                 + "WHERE topic_id = ? AND author_user_id = ? AND status IN ('DRAFT', 'REVISION_REQUESTED', 'REVISION_REQUIRED', 'REVISE', 'REJECTED');";
                 try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
                     ps.setString(1, topic.getTitle().trim());
                     if (topic.getSummary() != null && !topic.getSummary().trim().isEmpty()) {
@@ -1650,7 +1650,7 @@ public class TopicDAO extends DBContext {
 
                     int affected = ps.executeUpdate();
                     if (affected == 0) {
-                        throw new SQLException("Khﾃｴng tﾃｬm th蘯･y ﾄ黛ｻ・tﾃi ho蘯ｷc ﾄ黛ｻ・tﾃi khﾃｴng 盻・tr蘯｡ng thﾃ｡i ﾄ柁ｰ盻｣c phﾃｩp ch盻穎h s盻ｭa.");
+                        throw new SQLException("Không tìm thấy đề tài hoặc đề tài không ở trạng thái được phép chỉnh sửa.");
                     }
                 }
             }

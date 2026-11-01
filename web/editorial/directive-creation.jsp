@@ -123,91 +123,9 @@
 <body>
 <div class="app">
     <!-- Static Sidebar -->
-    <aside id="sidebar">
-        <div class="brand">
-            <div class="brand-logo">N</div>
-            <div>
-                <b>NTMCS</b>
-                <small>Hệ Thống Tòa Soạn Hội Tụ</small>
-            </div>
-        </div>
-                <nav>
-            <div class="nav-group">
-                <div class="nav-label">TỔNG QUAN</div>
-                <a href="${pageContext.request.contextPath}/home" class="nav-item">
-                    <i>🏠</i> Trang chủ điều hành
-                </a>
-            </div>
-
-            <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
-                <div class="nav-group">
-                    <div class="nav-label">PHÂN HỆ BTV CHUYÊN MÔN (WF-02)</div>
-                    <a href="${pageContext.request.contextPath}/editorial/pending-queue" class="nav-item">
-                        <i>📋</i> Hàng đợi chờ thẩm định
-                    </a>
-                    <a href="${pageContext.request.contextPath}/editorial/directive-creation" class="nav-item active">
-                        <i>⚡</i> Đặt hàng đề tài chỉ đạo
-                    </a>
-                    <a href="${pageContext.request.contextPath}/editorial/idea-archive" class="nav-item">
-                        <i>🗄️</i> Kho lưu trữ ý tưởng
-                    </a>
-                </div>
-            </c:if>
-
-            <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('USER_MANAGE') or sessionScope.permissions.contains('RBAC_MANAGE') or sessionScope.permissions.contains('AUDIT_VIEW'))}">
-                <div class="nav-group">
-                    <div class="nav-label">QUẢN TRỊ HỆ THỐNG (WF-05)</div>
-                    <c:if test="${sessionScope.permissions.contains('USER_MANAGE')}">
-                        <a href="${pageContext.request.contextPath}/users" class="nav-item">
-                            <i>👥</i> Tài khoản người dùng
-                        </a>
-                    </c:if>
-                    <c:if test="${sessionScope.permissions.contains('RBAC_MANAGE')}">
-                        <a href="${pageContext.request.contextPath}/rbac" class="nav-item">
-                            <i>🛡️</i> Ma trận quyền (RBAC)
-                        </a>
-                    </c:if>
-                    <c:if test="${sessionScope.permissions.contains('AUDIT_VIEW')}">
-                        <a href="${pageContext.request.contextPath}/audit-log" class="nav-item">
-                            <i>📜</i> Nhật ký hệ thống (Audit)
-                        </a>
-                    </c:if>
-                </div>
-            </c:if>
-
-            <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('QUOTA_MANAGE')}">
-                <div class="nav-group">
-                    <div class="nav-label">ĐIỀU HÀNH &amp; CHỈ TIÊU (WF-05)</div>
-                    <a href="${pageContext.request.contextPath}/dashboard" class="nav-item">
-                        <i>📊</i> Dashboard điều hành
-                    </a>
-                    <a href="${pageContext.request.contextPath}/report" class="nav-item">
-                        <i>📈</i> Báo cáo hiệu suất
-                    </a>
-                    <a href="${pageContext.request.contextPath}/quota" class="nav-item">
-                        <i>🎯</i> Chỉ tiêu phòng ban (Quota)
-                    </a>
-                    <a href="${pageContext.request.contextPath}/criteria" class="nav-item">
-                        <i>⚖️</i> Bộ tiêu chí Rubric
-                    </a>
-                    <a href="${pageContext.request.contextPath}/categories" class="nav-item">
-                        <i>🗂️</i> Chuyên mục &amp; Phòng ban
-                    </a>
-                </div>
-            </c:if>
-
-            <div class="nav-group">
-                <div class="nav-label">HỆ THỐNG</div>
-                <a href="${pageContext.request.contextPath}/logout" class="nav-item" style="color: #e53e3e;">
-                    <i>🚪</i> Đăng xuất
-                </a>
-            </div>
-        </nav>
-        <div class="sidebar-bottom">
-            <span class="demo">SE2066 — NHÓM 4</span>
-            <small>Phân hệ Biên tập (WF-02)</small>
-        </div>
-    </aside>
+    <jsp:include page="/WEB-INF/views/sidebar.jsp">
+        <jsp:param name="active" value="directive-creation" />
+    </jsp:include>
 
     <!-- Main Workspace -->
     <div class="main">

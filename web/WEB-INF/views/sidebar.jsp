@@ -23,7 +23,7 @@
                 <a href="${base}/editorial/pending-queue" class="nav-item ${param.active == 'pending-queue' ? 'active' : ''}">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
-                <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' ? 'active' : ''}">
+                <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' or param.active == 'directive-topic' ? 'active' : ''}">
                     <i>⚡</i> Đặt hàng đề tài chỉ đạo
                 </a>
                 <a href="${base}/editorial/idea-archive" class="nav-item ${param.active == 'idea-archive' ? 'active' : ''}">
@@ -55,7 +55,7 @@
 
         <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('QUOTA_MANAGE')}">
             <div class="nav-group">
-                <div class="nav-label">ĐIỀU HÀNH & CHỈ TIÊU (WF-05)</div>
+                <div class="nav-label">ĐIỀU HÀNH &amp; CHỈ TIÊU (WF-05)</div>
                 <a href="${base}/dashboard" class="nav-item ${param.active == 'dashboard' ? 'active' : ''}">
                     <i>📊</i> Dashboard điều hành
                 </a>

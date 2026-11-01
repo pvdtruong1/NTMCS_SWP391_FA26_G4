@@ -1,13 +1,17 @@
 -- =========================================================================
 -- MIGRATION SCRIPT: PHÂN HỆ PHÓNG VIÊN (WF-01) - NTMCS
--- Tác giả: Nhóm 4 - SE2066 (SWP391)
--- Mô tả: Bổ sung an toàn 4 cột nghiệp vụ vào bảng Topic và cấp quyền TOPIC_PITCH
+-- Tác giả: Phạm Vũ Đình Trường & Nhóm 4 (SE2066)
+-- Mô tả:
+--   1. Tự động kiểm tra & bỏ qua nếu đã có (Idempotent execution).
+--   2. Bổ sung an toàn 4 cột nghiệp vụ vào bảng Topic: summary, genre, priority, created_date.
+--   3. Xóa bỏ an toàn cột thừa [rejection_reason] (cùng ràng buộc mặc định nếu có) để đồng bộ với DB chuẩn.
+--   4. Đảm bảo vai trò REPORTER sở hữu quyền TOPIC_PITCH.
 -- =========================================================================
 
 USE NTMCS;
 GO
 
--- 1. Bổ sung an toàn 4 cột vào bảng Topic (nếu chưa có)
+-- 1. Bổ sung 4 cột nghiệp vụ cho phân hệ Phóng viên (Bỏ qua nếu đã tồn tại)
 IF COL_LENGTH('Topic', 'summary') IS NULL
 BEGIN
     ALTER TABLE Topic ADD [summary] NVARCHAR(MAX) NULL;
@@ -15,7 +19,7 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Cột [summary] đã tồn tại.';
+    PRINT 'Cột [summary] đã tồn tại (bỏ qua).';
 END
 GO
 
@@ -26,7 +30,7 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Cột [genre] đã tồn tại.';
+    PRINT 'Cột [genre] đã tồn tại (bỏ qua).';
 END
 GO
 
@@ -37,7 +41,7 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Cột [priority] đã tồn tại.';
+    PRINT 'Cột [priority] đã tồn tại (bỏ qua).';
 END
 GO
 
@@ -48,11 +52,36 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Cột [created_date] đã tồn tại.';
+    PRINT 'Cột [created_date] đã tồn tại (bỏ qua).';
 END
 GO
 
--- 2. Đảm bảo Role REPORTER sở hữu Permission TOPIC_PITCH
+-- 2. Xóa bỏ an toàn cột thừa [rejection_reason] nếu có (Dành cho DB của Hưng hoặc các máy đã tự ý thêm cột này)
+IF COL_LENGTH('Topic', 'rejection_reason') IS NOT NULL
+BEGIN
+    -- Tìm và xóa mọi constraint (DEFAULT constraint) gắn với cột rejection_reason nếu có
+    DECLARE @ConstraintName NVARCHAR(200);
+    SELECT @ConstraintName = d.name
+    FROM sys.default_constraints d
+    JOIN sys.columns c ON d.parent_column_id = c.column_id AND d.parent_object_id = c.object_id
+    WHERE d.parent_object_id = OBJECT_ID('Topic') AND c.name = 'rejection_reason';
+
+    IF @ConstraintName IS NOT NULL
+    BEGIN
+        EXEC('ALTER TABLE Topic DROP CONSTRAINT ' + @ConstraintName);
+        PRINT 'Đã xóa ràng buộc mặc định ' + @ConstraintName + ' trên cột rejection_reason.';
+    END
+
+    ALTER TABLE Topic DROP COLUMN [rejection_reason];
+    PRINT 'Đã xóa an toàn cột thừa [rejection_reason] khỏi bảng Topic (Lý do từ chối được lấy chuẩn qua bảng Topic_Evaluation).';
+END
+ELSE
+BEGIN
+    PRINT 'Cột [rejection_reason] không tồn tại trong bảng Topic (bỏ qua).';
+END
+GO
+
+-- 3. Đảm bảo Role REPORTER sở hữu Permission TOPIC_PITCH (Bỏ qua nếu đã có)
 IF NOT EXISTS (
     SELECT 1 FROM Role_Permission rp
     JOIN Role r ON rp.role_id = r.role_id
@@ -68,6 +97,6 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Vai trò REPORTER đã có quyền TOPIC_PITCH.';
+    PRINT 'Vai trò REPORTER đã có quyền TOPIC_PITCH (bỏ qua).';
 END
 GO

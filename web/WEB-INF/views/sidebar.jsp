@@ -50,6 +50,33 @@
             </div>
         </c:if>
 
+        <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('TOPIC_EVALUATE'))}">
+            <div class="nav-group">
+                <div class="nav-label">HIỆN TRƯỜNG &amp; ĐIỀU PHỐI (WF-04)</div>
+                <c:if test="${sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+                    <a href="${base}/fieldwork/kanban" class="nav-item ${param.active == 'fieldwork-kanban' ? 'active' : ''}">
+                        <i>📌</i> Bảng Kanban tác nghiệp
+                    </a>
+                </c:if>
+                <c:if test="${sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('FIELDWORK_TRACK')}">
+                    <a href="${base}/fieldwork/todo" class="nav-item ${param.active == 'fieldwork-todo' ? 'active' : ''}">
+                        <i>✅</i> Việc hiện trường của tôi
+                    </a>
+                </c:if>
+                <c:if test="${sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+                    <a href="${base}/fieldwork/nudge" class="nav-item ${param.active == 'fieldwork-nudge' ? 'active' : ''}">
+                        <i>🔔</i> Đôn đốc tiến độ (Nudge)
+                    </a>
+                    <a href="${base}/fieldwork/audit" class="nav-item ${param.active == 'fieldwork-audit' ? 'active' : ''}">
+                        <i>📡</i> Nhật ký phát thanh &amp; Ping
+                    </a>
+                    <a href="${base}/fieldwork/sla" class="nav-item ${param.active == 'fieldwork-sla' ? 'active' : ''}">
+                        <i>⏱️</i> Cấu hình hạn mức SLA
+                    </a>
+                </c:if>
+            </div>
+        </c:if>
+
         <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('USER_MANAGE') or sessionScope.permissions.contains('RBAC_MANAGE') or sessionScope.permissions.contains('AUDIT_VIEW'))}">
             <div class="nav-group">
                 <div class="nav-label">QUẢN TRỊ HỆ THỐNG (WF-05)</div>

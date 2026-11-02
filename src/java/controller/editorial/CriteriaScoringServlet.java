@@ -74,6 +74,9 @@ public class CriteriaScoringServlet extends HttpServlet {
         boolean isExecReviewer = (currentUser.getRoleId() == 3) && "PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(topicDetail.getStatus());
         request.setAttribute("isExecReviewer", isExecReviewer);
 
+        boolean isTbtDirectOverride = (currentUser.getRoleId() == 3) && "SUBMITTED".equalsIgnoreCase(topicDetail.getStatus());
+        request.setAttribute("isTbtDirectOverride", isTbtDirectOverride);
+
         request.getRequestDispatcher("/editorial/criteria-scoring.jsp").forward(request, response);
     }
 
@@ -149,12 +152,20 @@ public class CriteriaScoringServlet extends HttpServlet {
             }
 
             // =========================================================================
-            // BRANCH 2: Level-1 Rubric Review by Desk Editor (SCR-2.3)
+            // BRANCH 2: Level-1 Rubric Review by Desk Editor (SCR-2.3) or TBT Executive Override
             // =========================================================================
             if (!"SUBMITTED".equalsIgnoreCase(existingTopic.getStatus())) {
                 LOGGER.log(Level.WARNING, "Blocked illegal evaluation attempt on topic {0} with status {1}",
                         new Object[]{topicId, existingTopic.getStatus()});
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
+                return;
+            }
+
+            // Defense-in-Depth Guard: TBT cannot escalate to themselves
+            if (currentUser.getRoleId() == 3 && "ESCALATED".equals(decision)) {
+                LOGGER.log(Level.WARNING, "Blocked invalid self-escalation by TBT {0} on topic {1}",
+                        new Object[]{currentUser.getUserId(), topicId});
+                response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=tbt_cannot_escalate");
                 return;
             }
 
@@ -175,8 +186,8 @@ public class CriteriaScoringServlet extends HttpServlet {
                 }
             }
 
-            // Executive Escalation Guard Clause: if legal_risk >= 8.0, decision MUST be ESCALATED
-            if (legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
+            // Executive Escalation Guard Clause for Desk Editors: if legal_risk >= 8.0, decision MUST be ESCALATED
+            if (currentUser.getRoleId() != 3 && legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
                 decision = "ESCALATED";
             }
 
@@ -228,10 +239,11 @@ public class CriteriaScoringServlet extends HttpServlet {
                 return;
             }
 
-            // 5. Execute Atomic Transaction in DAL
+            // 5. Execute Atomic Transaction in DAL (supports Desk Editor & TBT Executive Override)
             boolean success = topicDAO.evaluateTopic(
                     topicId,
                     currentUser.getUserId(),
+                    currentUser.getRoleId(),
                     decision,
                     comments != null ? comments.trim() : "",
                     criteriaScores,
@@ -251,6 +263,8 @@ public class CriteriaScoringServlet extends HttpServlet {
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_locked_by_exec");
             } else if (ex.getMessage() != null && ex.getMessage().contains("PENDING_EXECUTIVE_APPROVAL")) {
                 response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_status_for_tbt");
+            } else if (ex.getMessage() != null && ex.getMessage().contains("Tổng Biên Tập là cấp thẩm quyền cao nhất")) {
+                response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=tbt_cannot_escalate");
             } else {
                 response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=score_below_threshold");
             }

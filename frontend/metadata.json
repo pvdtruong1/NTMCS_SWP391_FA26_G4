@@ -1,0 +1,8 @@
+{
+  "name": "NTMCS - Hệ thống Đăng ký & Điều phối Đề tài Báo chí",
+  "description": "Hệ thống quản lý vòng đời đề tài, thẩm định nhuận bút rubric, điều phối phương tiện tác nghiệp và giám sát SLA hiện trường cho tòa soạn báo chí.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

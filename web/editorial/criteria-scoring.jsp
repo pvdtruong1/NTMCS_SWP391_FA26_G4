@@ -223,6 +223,9 @@
                     <span style="font-size: 20px;">⚠️</span>
                     <div>
                         <c:choose>
+                            <c:when test="${param.error == 'tbt_cannot_escalate'}">
+                                <b>Thao tác không hợp lệ:</b> Tổng Biên Tập là cấp thẩm quyền cao nhất, không thể chuyển đề tài lên chính mình.
+                            </c:when>
                             <c:when test="${param.error == 'score_below_threshold'}">
                                 <b>Không đủ điều kiện phê duyệt Cấp 1:</b> Điểm tổng hợp Rubric của đề tài chưa đạt ngưỡng chất lượng tối thiểu (yêu cầu &ge; 5.0/10). BTV chỉ được phép chọn <i>"Yêu cầu chỉnh sửa đề cương"</i> hoặc <i>"Bác bỏ đề tài"</i>.
                             </c:when>
@@ -583,15 +586,30 @@
                                     </div>
                                 </c:when>
                                 <c:otherwise>
+                                    <c:if test="${isTbtDirectOverride}">
+                                        <div style="margin-bottom: 12px; padding: 10px 14px; background: linear-gradient(135deg, #1b263b, #2b4570); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                                            <span>⭐</span>
+                                            <span>PHIÊN THẨM ĐỊNH ĐẶC CÁCH CỦA TỔNG BIÊN TẬP (EXECUTIVE OVERRIDE)</span>
+                                        </div>
+                                    </c:if>
                                     <div class="btn-decision-group">
                                         <button type="button" id="btnApprove" class="btn-decision btn-approve"
                                                 onclick="submitDecision('APPROVED')">
-                                            ✔ Phê duyệt Cấp 1 (APPROVED)
+                                            <c:choose>
+                                                <c:when test="${isTbtDirectOverride}">
+                                                    ⭐ Duyệt đặc cách (Executive Approve)
+                                                </c:when>
+                                                <c:otherwise>
+                                                    ✔ Phê duyệt Cấp 1 (APPROVED)
+                                                </c:otherwise>
+                                            </c:choose>
                                         </button>
-                                        <button type="button" id="btnEscalate" class="btn-decision btn-escalate"
-                                                onclick="submitDecision('ESCALATED')">
-                                            🚀 Chuyển lên Tổng Biên Tập
-                                        </button>
+                                        <c:if test="${not isTbtDirectOverride and (sessionScope.user == null or sessionScope.user.roleId != 3)}">
+                                            <button type="button" id="btnEscalate" class="btn-decision btn-escalate"
+                                                    onclick="submitDecision('ESCALATED')">
+                                                🚀 Chuyển lên Tổng Biên Tập
+                                            </button>
+                                        </c:if>
                                         <button type="button" class="btn-decision btn-revise"
                                                 onclick="submitDecision('REVISION_REQUESTED')">
                                             🔄 Yêu cầu chỉnh sửa đề cương
@@ -707,8 +725,9 @@
         }
 
         // Approval button state
+        var isTbt = ${isTbtDirectOverride or (sessionScope.user != null and sessionScope.user.roleId == 3)};
         if (btnApprove) {
-            if (isScoreFailed || isHighLegalRisk) {
+            if (isScoreFailed || (isHighLegalRisk && !isTbt)) {
                 btnApprove.disabled = true;
                 if (isScoreFailed && isHighLegalRisk) {
                     btnApprove.title = 'Điểm < 5.0 và Rủi ro >= 8.0: Không đủ điều kiện phê duyệt Cấp 1.';
@@ -719,7 +738,7 @@
                 }
             } else {
                 btnApprove.disabled = false;
-                btnApprove.title = 'Đủ điều kiện phê duyệt Cấp 1 trực tiếp.';
+                btnApprove.title = isTbt ? 'Tổng Biên Tập đủ thẩm quyền duyệt đặc cách đề tài.' : 'Đủ điều kiện phê duyệt Cấp 1 trực tiếp.';
             }
         }
     }
@@ -728,13 +747,14 @@
     function submitDecision(decision) {
         var finalScore = parseFloat(document.getElementById('totalWeightedScore').innerText) || 0.0;
         var legalScore = parseFloat(document.getElementById('legalRiskSlider').value) || 0.0;
+        var isTbt = ${isTbtDirectOverride or (sessionScope.user != null and sessionScope.user.roleId == 3)};
 
         if (decision === 'APPROVED') {
             if (finalScore < 5.0) {
                 alert('CẢNH BÁO BẢO MẬT: Điểm tổng hợp (' + finalScore.toFixed(1) + '/10) chưa đạt ngưỡng tối thiểu 5.0/10! Bạn chỉ có thể chọn "Yêu cầu chỉnh sửa đề cương" hoặc "Bác bỏ đề tài".');
                 return;
             }
-            if (legalScore >= 8.0) {
+            if (legalScore >= 8.0 && !isTbt) {
                 alert('CẢNH BÁO BẢO MẬT: Đề tài có rủi ro pháp lý >= 8.0! Bạn phải chọn "Chuyển lên Tổng Biên Tập".');
                 return;
             }
@@ -749,7 +769,9 @@
 
         var confirmMsg = '';
         if (decision === 'APPROVED') {
-            confirmMsg = 'Xác nhận PHÊ DUYỆT đề tài #' + '${topic.topicId}' + ' và sinh mã Topic_Code chính thức?';
+            confirmMsg = isTbt 
+                ? 'Tổng Biên Tập xác nhận DUYỆT ĐẶC CÁCH đề tài #' + '${topic.topicId}' + ' và sinh mã Topic_Code chính thức?'
+                : 'Xác nhận PHÊ DUYỆT đề tài #' + '${topic.topicId}' + ' và sinh mã Topic_Code chính thức?';
         } else if (decision === 'ESCALATED') {
             confirmMsg = 'Xác nhận CHUYỂN đề tài #' + '${topic.topicId}' + ' lên Tổng Biên Tập phê duyệt vượt cấp?';
         } else if (decision === 'REVISION_REQUESTED') {

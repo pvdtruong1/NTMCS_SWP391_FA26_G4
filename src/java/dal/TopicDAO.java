@@ -472,6 +472,19 @@ public class TopicDAO extends DBContext {
     public boolean evaluateTopic(int topicId, int evaluatorUserId, String decision, String comments,
                                  Map<Integer, Double> criteriaScores, Map<Integer, String> criteriaComments,
                                  double legalRiskScore) throws SQLException {
+        return evaluateTopic(topicId, evaluatorUserId, 2, decision, comments, criteriaScores, criteriaComments, legalRiskScore);
+    }
+
+    /**
+     * Executes atomic ACID transaction for topic evaluation (supports Desk Editor Level 1 & TBT Executive Override):
+     * 1. Inserts Topic_Evaluation record with appropriate evaluation_stage ('DESK_REVIEW' or 'EXECUTIVE_APPROVAL')
+     * 2. Inserts individual Evaluation_Detail criterion scores
+     * 3. Updates Topic.status (and mints topic_code if APPROVED)
+     * 4. Inserts Notification for topic author reflecting whether Desk Editor or TBT approved
+     */
+    public boolean evaluateTopic(int topicId, int evaluatorUserId, int evaluatorRoleId, String decision, String comments,
+                                 Map<Integer, Double> criteriaScores, Map<Integer, String> criteriaComments,
+                                 double legalRiskScore) throws SQLException {
         Connection conn = getConnection();
         boolean oldAutoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
@@ -495,21 +508,29 @@ public class TopicDAO extends DBContext {
                 }
             }
 
+            // Defense-in-Depth Guard: TBT cannot escalate to themselves
+            if (evaluatorRoleId == 3 && "ESCALATED".equalsIgnoreCase(decision)) {
+                conn.rollback();
+                throw new IllegalStateException("Tổng Biên Tập là cấp thẩm quyền cao nhất, không thể chuyển đề tài lên chính mình.");
+            }
+
             // Format full comments with Legal Risk Tag if legalRiskScore > 0
             String fullComments = comments != null ? comments.trim() : "";
             if (legalRiskScore > 0) {
                 fullComments = String.format(java.util.Locale.US, "[Rủi ro pháp lý: %.1f/10] ", legalRiskScore) + fullComments;
             }
 
-            // 1. Insert into Topic_Evaluation
+            // 1. Insert into Topic_Evaluation (stage is EXECUTIVE_APPROVAL if TBT overrides, otherwise DESK_REVIEW)
+            String evaluationStage = (evaluatorRoleId == 3) ? "EXECUTIVE_APPROVAL" : "DESK_REVIEW";
             int evalId = 0;
             String insertEvalSql = "INSERT INTO Topic_Evaluation (topic_id, evaluator_user_id, evaluation_stage, decision, comments) " +
-                                  "VALUES (?, ?, 'DESK_REVIEW', ?, ?);";
+                                  "VALUES (?, ?, ?, ?, ?);";
             try (PreparedStatement ps = conn.prepareStatement(insertEvalSql, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setInt(1, topicId);
                 ps.setInt(2, evaluatorUserId);
-                ps.setString(3, decision);
-                ps.setString(4, fullComments);
+                ps.setString(3, evaluationStage);
+                ps.setString(4, decision);
+                ps.setString(5, fullComments);
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (rs.next()) {
@@ -542,8 +563,8 @@ public class TopicDAO extends DBContext {
             String newStatus;
             String topicCode = null;
             if ("APPROVED".equalsIgnoreCase(decision)) {
-                // Defense-in-Depth Guard 1: Legal Risk must be strictly below 8.0
-                if (legalRiskScore >= 8.0) {
+                // Defense-in-Depth Guard 1: For Desk Editors (role != 3), Legal Risk must be strictly below 8.0
+                if (evaluatorRoleId != 3 && legalRiskScore >= 8.0) {
                     conn.rollback();
                     throw new IllegalStateException("Không được phép phê duyệt trực tiếp đề tài có rủi ro pháp lý >= 8.0 (Yêu cầu chuyển TBT duyệt vượt cấp).");
                 }
@@ -612,13 +633,25 @@ public class TopicDAO extends DBContext {
             if (authorId > 0) {
                 String notifMsg;
                 if ("APPROVED".equals(newStatus)) {
-                    notifMsg = "Đề tài #" + topicId + " đã được BTV phê duyệt cấp 1 thành công (Mã: " + topicCode + ").";
+                    if (evaluatorRoleId == 3) {
+                        notifMsg = "Đề tài #" + topicId + " đã được Tổng Biên Tập trực tiếp phê duyệt đặc cách (Mã: " + topicCode + ").";
+                    } else {
+                        notifMsg = "Đề tài #" + topicId + " đã được BTV phê duyệt cấp 1 thành công (Mã: " + topicCode + ").";
+                    }
                 } else if ("PENDING_EXECUTIVE_APPROVAL".equals(newStatus)) {
                     notifMsg = "Đề tài #" + topicId + " đã được chuyển lên Tổng Biên Tập thẩm định vượt cấp (Rủi ro pháp lý: " + legalRiskScore + "/10).";
                 } else if ("REVISION_REQUESTED".equals(newStatus)) {
-                    notifMsg = "Đề tài #" + topicId + " được yêu cầu chỉnh sửa đề cương: " + (comments != null ? comments : "");
+                    if (evaluatorRoleId == 3) {
+                        notifMsg = "Tổng Biên Tập yêu cầu chỉnh sửa đề cương đề tài #" + topicId + ": " + (comments != null ? comments : "");
+                    } else {
+                        notifMsg = "Đề tài #" + topicId + " được yêu cầu chỉnh sửa đề cương: " + (comments != null ? comments : "");
+                    }
                 } else {
-                    notifMsg = "Đề tài #" + topicId + " đã bị từ chối thẩm định: " + (comments != null ? comments : "");
+                    if (evaluatorRoleId == 3) {
+                        notifMsg = "Tổng Biên Tập đã bác bỏ đề tài #" + topicId + ": " + (comments != null ? comments : "");
+                    } else {
+                        notifMsg = "Đề tài #" + topicId + " đã bị từ chối thẩm định: " + (comments != null ? comments : "");
+                    }
                 }
 
                 String insertNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";

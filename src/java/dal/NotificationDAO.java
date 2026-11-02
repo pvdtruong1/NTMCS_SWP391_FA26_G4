@@ -65,6 +65,10 @@ public class NotificationDAO extends DBContext {
         return list;
     }
 
+    public List<Notification> getByUserId(int userId) {
+        return findByUserId(userId);
+    }
+
     /**
      * Count unread notifications for a specific user.
      */
@@ -157,6 +161,10 @@ public class NotificationDAO extends DBContext {
         } finally {
             close();
         }
+    }
+
+    public boolean markOneAsRead(int notificationId, int userId) {
+        return markAsRead(notificationId, userId);
     }
 
     /**

@@ -21,7 +21,7 @@ import util.PasswordUtil;
  *   "loggedUser"  = the model.User who logged in
  *   "permissions" = the permission codes of that user's role (used by the menu)
  */
-@WebServlet(name = "LoginServlet", urlPatterns = {"/login"})
+@WebServlet(name = "LoginServlet", urlPatterns = {"/login", ""})
 public class LoginServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();

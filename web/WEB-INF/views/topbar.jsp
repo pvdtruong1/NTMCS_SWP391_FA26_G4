@@ -120,7 +120,16 @@
                 '</span>';
 
             if (n.topicId) {
-                html += '<a href="${base}/reporter/detail?id=' + n.topicId + '" class="notif-detail-link" onclick="handleDetailClick(event, ' + n.id + ', \x27${base}/reporter/detail?id=' + n.topicId + '\x27)">' +
+                var detailUrl = '${base}/reporter/detail?id=' + n.topicId;
+                <c:choose>
+                    <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+                        detailUrl = '${base}/editorial/criteria-scoring?topicId=' + n.topicId;
+                    </c:when>
+                    <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('FIELDWORK_TRACK')}">
+                        detailUrl = '${base}/fieldwork/kanban';
+                    </c:when>
+                </c:choose>
+                html += '<a href="' + detailUrl + '" class="notif-detail-link" onclick="handleDetailClick(event, ' + n.id + ', \x27' + detailUrl + '\x27)">' +
                     'Xem hồ sơ đề tài #' + n.topicId + ' ↗</a>';
             } else if (isUnread) {
                 html += '<button type="button" class="btn sm" style="padding: 3px 8px; font-size: 11px;" onclick="markSingleRead(' + n.id + ')">Đánh dấu đã đọc</button>';

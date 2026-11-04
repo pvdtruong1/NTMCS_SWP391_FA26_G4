@@ -63,6 +63,15 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"Kho lưu trữ ý tưởng & Đề tài đình chỉ (Idea Archive)", "/editorial/idea-archive"});
             screens.add(new String[]{"Đặt hàng & Giao quyền đề tài chỉ đạo (Directive Topic)", "/editorial/directive-creation"});
         }
+        if (codes.contains("FIELDWORK_TRACK") || codes.contains("TOPIC_EVALUATE")) {
+            screens.add(new String[]{"Bảng Kanban điều phối hiện trường", "/fieldwork/kanban"});
+            screens.add(new String[]{"Đôn đốc tiến độ tác nghiệp (Nudge)", "/fieldwork/nudge"});
+            screens.add(new String[]{"Nhật ký phát thanh & Ping nhắc việc", "/fieldwork/audit"});
+            screens.add(new String[]{"Cấu hình SLA hiện trường", "/fieldwork/sla"});
+        }
+        if (codes.contains("TOPIC_PITCH") || codes.contains("FIELDWORK_TRACK")) {
+            screens.add(new String[]{"Việc hiện trường của tôi", "/fieldwork/todo"});
+        }
         if (codes.contains("QUOTA_MANAGE")) {
             screens.add(new String[]{"Executive dashboard", "/dashboard"});
             screens.add(new String[]{"Performance report builder", "/report"});

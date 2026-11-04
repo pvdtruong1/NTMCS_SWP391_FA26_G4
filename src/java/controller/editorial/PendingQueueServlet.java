@@ -37,6 +37,12 @@ public class PendingQueueServlet extends HttpServlet {
 
         User currentUser = AuthUtil.getLoggedUser(request);
         int deskId = (currentUser.getDeskId() != null) ? currentUser.getDeskId() : 1;
+        String deskParam = request.getParameter("deskId");
+        if (deskParam != null && !deskParam.trim().isEmpty() && (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 6 || currentUser.getRoleId() == 7)) {
+            try {
+                deskId = Integer.parseInt(deskParam.trim());
+            } catch (NumberFormatException ignored) {}
+        }
 
         // 2. Parse Filter & Pagination Parameters
         String status = request.getParameter("status");

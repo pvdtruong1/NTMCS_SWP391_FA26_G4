@@ -242,7 +242,7 @@
                                 <b>Lỗi hệ thống:</b> Đã xảy ra lỗi trong quá trình xử lý. Vui lòng kiểm tra lại kết nối.
                             </c:when>
                             <c:otherwise>
-                                <b>Có lỗi xảy ra:</b> Không thể hoàn tất thẩm định (${param.error}).
+                                <b>Có lỗi xảy ra:</b> Không thể hoàn tất thẩm định (<c:out value="${param.error}"/>).
                             </c:otherwise>
                         </c:choose>
                     </div>

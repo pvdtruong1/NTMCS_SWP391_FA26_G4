@@ -78,7 +78,8 @@ public class TaskNudgeDAO extends DBContext {
 
                 // Allow Fieldwork Coordinator, Desk Editor, and System Admin
                 if (!"FIELDWORK_COORDINATOR".equals(actorRole) 
-                        && !"DESK_EDITOR".equals(actorRole) 
+                        && !"DESK_EDITOR".equals(actorRole)
+                        && !"EXECUTIVE_EDITOR".equals(actorRole) 
                         && !"SYSTEM_ADMINISTRATOR".equals(actorRole)) {
                     throw new IllegalArgumentException("Tài khoản không có quyền gửi lời nhắc đôn đốc.");
                 }

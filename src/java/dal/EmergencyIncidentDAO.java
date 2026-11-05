@@ -32,7 +32,7 @@ public class EmergencyIncidentDAO extends DBContext {
                                + "VALUES (?, ?, ?, 0)";
         String coordinatorSql = "SELECT u.user_id FROM [User] u "
                               + "JOIN Role r ON u.role_id = r.role_id "
-                              + "WHERE r.role_name IN ('FIELDWORK_COORDINATOR', 'DESK_EDITOR') AND u.active_status = 1";
+                              + "WHERE r.role_name IN ('FIELDWORK_COORDINATOR', 'DESK_EDITOR', 'EXECUTIVE_EDITOR') AND u.active_status = 1";
 
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
@@ -77,7 +77,8 @@ public class EmergencyIncidentDAO extends DBContext {
 
                 // If none found dynamically, fallback to default roles (e.g. 2, 4)
                 if (recipientUserIds.isEmpty()) {
-                    recipientUserIds.add(2); // Desk Editor
+                    recipientUserIds.add(1); // Desk Editor (Trường)
+                    recipientUserIds.add(6); // Executive Editor (TBT)
                     recipientUserIds.add(4); // Fieldwork Coordinator
                 }
 

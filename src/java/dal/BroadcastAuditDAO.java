@@ -65,7 +65,8 @@ public class BroadcastAuditDAO extends DBContext {
                     }
                     String role = roleResult.getString(1);
                     if (!"FIELDWORK_COORDINATOR".equals(role) 
-                            && !"DESK_EDITOR".equals(role) 
+                            && !"DESK_EDITOR".equals(role)
+                            && !"EXECUTIVE_EDITOR".equals(role) 
                             && !"SYSTEM_ADMINISTRATOR".equals(role)) {
                         throw new IllegalArgumentException("Bạn không có quyền xem nhật ký kiểm toán thông báo.");
                     }
@@ -119,7 +120,8 @@ public class BroadcastAuditDAO extends DBContext {
                     }
                 }
                 if (!"FIELDWORK_COORDINATOR".equals(role) 
-                        && !"DESK_EDITOR".equals(role) 
+                        && !"DESK_EDITOR".equals(role)
+                        && !"EXECUTIVE_EDITOR".equals(role) 
                         && !"SYSTEM_ADMINISTRATOR".equals(role)) {
                     throw new IllegalArgumentException("Bạn không có quyền Ping người nhận.");
                 }

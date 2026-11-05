@@ -52,7 +52,7 @@ public class SLAConfigServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
 
         User loggedUser = AuthUtil.getLoggedUser(request);
-        if (loggedUser != null && loggedUser.getRoleId() != 5 && loggedUser.getRoleId() != 7 && loggedUser.getRoleId() != 2) {
+        if (loggedUser != null && loggedUser.getRoleId() != 5 && loggedUser.getRoleId() != 7 && loggedUser.getRoleId() != 2 && loggedUser.getRoleId() != 3) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.getWriter().write("{\"error\":\"Chỉ Điều phối viên Hiện trường, Trưởng ban Biên tập hoặc Quản trị hệ thống mới có quyền đổi cấu hình SLA.\"}");
             return;

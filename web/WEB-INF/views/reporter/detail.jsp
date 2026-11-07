@@ -46,6 +46,7 @@
                         </div>
                         <div class="page-actions">
                             <a class="btn" href="${base}/reporter/topics">&larr; Danh sách</a>
+                            <a class="btn" href="${base}/reporter/requests?topicId=${topic.topicId}" style="background-color: #0d6efd; color: white;">📋 Đề xuất & Xin hỗ trợ</a>
                             <c:if test="${topic.status eq 'DRAFT' or topic.status eq 'REVISION_REQUESTED' or topic.status eq 'REVISE'}">
                                 <a class="btn primary" href="${base}/reporter/compose?id=${topic.topicId}">
                                     ✍️ Chỉnh sửa đề tài

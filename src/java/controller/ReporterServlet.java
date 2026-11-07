@@ -441,7 +441,7 @@ public class ReporterServlet extends HttpServlet {
             } catch (NumberFormatException e) {
                 request.setAttribute("error", "ID đề tài không hợp lệ.");
                 request.setAttribute("formTopic", createFormTopic());
-            }
+            }   
         } else {
             request.setAttribute("formTopic", createFormTopic());
         }

@@ -1533,7 +1533,7 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch ﾄ黛ｻ・tﾃi c盻ｧa phﾃｳng viﾃｪn #" + userId, ex);
+            LOGGER.log(Level.SEVERE, "Lấy danh sách chứa đề tài của phóng viên #" + userId, ex);
         } finally {
             close();
         }
@@ -1564,7 +1564,7 @@ public class TopicDAO extends DBContext {
 
     public Topic saveTopicPitch(Topic topic, List<TopicEstimate> estimates, List<TopicMember> members) throws SQLException {
         if (topic == null) {
-            throw new IllegalArgumentException("Topic khﾃｴng ﾄ柁ｰ盻｣c null.");
+            throw new IllegalArgumentException("Topic không được null.");
         }
         if (topic.getTitle() == null || topic.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Tiﾃｪu ﾄ黛ｻ・ﾄ黛ｻ・tﾃi khﾃｴng ﾄ柁ｰ盻｣c ﾄ黛ｻ・tr盻創g.");

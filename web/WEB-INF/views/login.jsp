@@ -46,7 +46,7 @@
                         👑 <b>Tổng Biên Tập</b> (Thẩm định tối cao): <code>tbt.exec@newsroom.vn</code>
                     </a>
                     <a href="javascript:void(0)" onclick="fill('hung.reporter@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
-                        ✍️ <b>Hùng</b> (Phóng viên - WF-01): <code>hung.reporter@newsroom.vn</code>
+                        ✍️ <b>Hưng</b> (Phóng viên - WF-01): <code>hung.reporter@newsroom.vn</code>
                     </a>
                 </div>
             </div>

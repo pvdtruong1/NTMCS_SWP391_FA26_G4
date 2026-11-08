@@ -32,6 +32,9 @@
                 <a href="${base}/reporter/duplicate-search" class="nav-item ${param.active == 'reporter-search' ? 'active' : ''}">
                     <i>🔍</i> Tra cứu trùng lặp
                 </a>
+                <a href="${base}/reporter/requests" class="nav-item ${param.active == 'reporter-requests' ? 'active' : ''}">
+                    <i>🤝</i> Đề xuất xin hỗ trợ
+                </a>
             </div>
         </c:if>
 

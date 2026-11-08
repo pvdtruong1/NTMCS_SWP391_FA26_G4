@@ -55,6 +55,15 @@
         <url-pattern>/reporter/*</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>TopicRequestServlet</servlet-name>
+        <servlet-class>controller.TopicRequestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TopicRequestServlet</servlet-name>
+        <url-pattern>/reporter/requests</url-pattern>
+    </servlet-mapping>
+
     <!-- WF-02: Editorial Servlets -->
     <servlet>
         <servlet-name>EditorialDashboardServlet</servlet-name>

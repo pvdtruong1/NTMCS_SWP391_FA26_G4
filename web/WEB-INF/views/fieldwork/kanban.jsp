@@ -230,9 +230,7 @@
                                         <span style="color:#64748b; display:flex; align-items:center; gap:4px;">
                                             👤 <b><c:out value="${task.assigneeName}" /></b>
                                         </span>
-                                        <button type="button" class="btn" style="padding:4px 8px; font-size:11px;" onclick="updateTaskStatus(${task.taskId}, 'IN_PROGRESS')">
-                                            Bắt đầu &rarr;
-                                        </button>
+                                        <span style="color:var(--muted); font-size:11px;">⏳ Chờ tiếp nhận</span>
                                     </div>
                                 </div>
                             </c:if>
@@ -268,12 +266,7 @@
                                         <span style="color:#64748b;">
                                             👤 <b><c:out value="${task.assigneeName}" /></b>
                                         </span>
-                                        <div style="display:flex; gap:4px;">
-                                            <button type="button" class="btn" style="padding:4px 6px; font-size:11px;" title="Lùi lại TODO" onclick="updateTaskStatus(${task.taskId}, 'TODO')">&larr;</button>
-                                            <button type="button" class="btn primary" style="padding:4px 8px; font-size:11px;" onclick="openDeliverableModal(${task.taskId}, '${task.topicCode}', '${task.topicTitle}')">
-                                                📦 Nộp bài
-                                            </button>
-                                        </div>
+                                        <span style="color:#b45309; font-weight:600; font-size:11px;">⚡ Đang tác nghiệp</span>
                                     </div>
                                 </div>
                             </c:if>
@@ -309,12 +302,7 @@
                                         <span style="color:#64748b;">
                                             👤 <b><c:out value="${task.assigneeName}" /></b>
                                         </span>
-                                        <div style="display:flex; gap:4px;">
-                                            <button type="button" class="btn" style="padding:4px 6px; font-size:11px;" title="Lùi lại IN_PROGRESS" onclick="updateTaskStatus(${task.taskId}, 'IN_PROGRESS')">&larr;</button>
-                                            <button type="button" class="btn" style="padding:4px 8px; font-size:11px; background:#e0f2fe; color:#0369a1; border-color:#bae6fd;" onclick="openDeliverableModal(${task.taskId}, '${task.topicCode}', '${task.topicTitle}')">
-                                                📦 Nộp thêm
-                                            </button>
-                                        </div>
+                                        <span style="color:#15803d; font-weight:600; font-size:11px;">✓ Đã nộp sản phẩm</span>
                                     </div>
                                 </div>
                             </c:if>

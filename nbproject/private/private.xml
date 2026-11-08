@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
-
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/Topic.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/TopicEstimate.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/web/WEB-INF/views/reporter/compose.jsp</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/TopicEvaluation.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/FieldworkTask.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/controller/ReporterServlet.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/User.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/Desk.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/dao/DBContext.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/Notification.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/dao/TopicRepository.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/Asset.java</file>
+            <file>file:/D:/Class's%20works/SWP301-HE204492/SRC_NTMCS/NTMCS_SWP391_FA26_G4/src/java/model/TopicMember.java</file>
+        </group>
+    </open-files>
 </project-private>

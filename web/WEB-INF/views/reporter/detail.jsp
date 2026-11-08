@@ -92,10 +92,48 @@
                                 </div>
 
                                 <c:if test="${not empty topic.rejectionReason}">
-                                    <div class="alert danger" style="background:#ffedf0;color:#bd3344;border:1px solid #f0c8ce;padding:14px 16px;border-radius:10px;margin-top:16px">
-                                        <strong>Phản hồi từ Ban Biên tập:</strong>
-                                        <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
-                                    </div>
+                                    <c:set var="riskLevel" value="${topic.legalRiskLevel}" />
+                                    <c:choose>
+                                        <%-- 1. Nếu đề tài bị REJECTED -> Luôn hiển thị đỏ báo động --%>
+                                        <c:when test="${topic.status eq 'REJECTED'}">
+                                            <div class="alert danger" style="background:#ffedf0;color:#bd3344;border:1px solid #f0c8ce;padding:14px 16px;border-radius:10px;margin-top:16px">
+                                                <strong>❌ Lý do từ chối từ Ban Biên tập:</strong>
+                                                <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
+                                            </div>
+                                        </c:when>
+
+                                        <%-- 2. Nếu đề tài bị yêu cầu sửa đổi (REVISION_REQUESTED) -> Màu vàng cam cảnh báo --%>
+                                        <c:when test="${topic.status eq 'REVISION_REQUESTED' or topic.status eq 'REVISE'}">
+                                            <div class="alert warning" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:14px 16px;border-radius:10px;margin-top:16px">
+                                                <strong>⚠️ Yêu cầu hoàn thiện từ Ban Biên tập:</strong>
+                                                <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
+                                            </div>
+                                        </c:when>
+
+                                        <%-- 3. Nếu đề tài có RỦI RO PHÁP LÝ CAO (>= 8.0) -> Màu đỏ cảnh báo an toàn --%>
+                                        <c:when test="${riskLevel eq 'HIGH'}">
+                                            <div class="alert danger" style="background:#ffedf0;color:#bd3344;border:1px solid #f0c8ce;padding:14px 16px;border-radius:10px;margin-top:16px">
+                                                <strong>🚨 Lưu ý rủi ro pháp lý cao từ Ban Biên tập:</strong>
+                                                <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
+                                            </div>
+                                        </c:when>
+
+                                        <%-- 4. Nếu rủi ro TRUNG BÌNH (5.0 <= score < 8.0) -> Màu vàng cảnh báo vừa --%>
+                                        <c:when test="${riskLevel eq 'MEDIUM'}">
+                                            <div class="alert warning" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:14px 16px;border-radius:10px;margin-top:16px">
+                                                <strong>🛡️ Đánh giá rủi ro pháp lý (Mức trung bình):</strong>
+                                                <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
+                                            </div>
+                                        </c:when>
+
+                                        <%-- 5. Rủi ro THẤP (< 5.0, vd 3.0/10) hoặc đề tài duyệt an toàn -> Màu xanh dương dịu thông tin, KHÔNG HIỆN ĐỎ --%>
+                                        <c:otherwise>
+                                            <div class="alert info" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:14px 16px;border-radius:10px;margin-top:16px">
+                                                <strong>📋 Phản hồi &amp; Đánh giá từ Ban Biên tập:</strong>
+                                                <p style="margin:4px 0 0;font-weight:600"><c:out value="${topic.rejectionReason}"/></p>
+                                            </div>
+                                        </c:otherwise>
+                                    </c:choose>
                                 </c:if>
 
                                 <div class="content-block">

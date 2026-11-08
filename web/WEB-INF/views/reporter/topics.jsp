@@ -122,9 +122,24 @@
                                         </small>
                                     </c:if>
                                     <c:if test="${not empty t.rejectionReason}">
-                                        <small style="color:var(--danger);font-weight:600;margin-top:4px;display:block">
-                                            &ldquo;<c:out value="${t.rejectionReason}"/>&rdquo;
-                                        </small>
+                                        <c:set var="tRiskLevel" value="${t.legalRiskLevel}" />
+                                        <c:choose>
+                                            <c:when test="${t.status eq 'REJECTED' or tRiskLevel eq 'HIGH'}">
+                                                <small style="color:var(--danger);font-weight:600;margin-top:4px;display:block">
+                                                    &ldquo;<c:out value="${t.rejectionReason}"/>&rdquo;
+                                                </small>
+                                            </c:when>
+                                            <c:when test="${t.status eq 'REVISION_REQUESTED' or t.status eq 'REVISE' or tRiskLevel eq 'MEDIUM'}">
+                                                <small style="color:#d97706;font-weight:600;margin-top:4px;display:block">
+                                                    &ldquo;<c:out value="${t.rejectionReason}"/>&rdquo;
+                                                </small>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <small style="color:var(--muted);font-weight:600;margin-top:4px;display:block">
+                                                    &ldquo;<c:out value="${t.rejectionReason}"/>&rdquo;
+                                                </small>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </c:if>
                                 </td>
 

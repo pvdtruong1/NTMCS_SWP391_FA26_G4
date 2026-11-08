@@ -247,6 +247,42 @@ public class Topic implements Serializable {
         this.rejectionReason = rejectionReason;
     }
 
+    /**
+     * Extracts numerical legal risk score from evaluation comments (e.g. "[Rủi ro pháp lý: 3.0/10] ...").
+     * Returns null if no legal risk score was recorded.
+     */
+    public Double getLegalRiskScore() {
+        if (rejectionReason == null) return null;
+        int idx = rejectionReason.indexOf("[Rủi ro pháp lý: ");
+        if (idx == -1) {
+            idx = rejectionReason.indexOf("[Rui ro phap ly: ");
+        }
+        if (idx != -1) {
+            int start = idx + (rejectionReason.startsWith("[Rủi ro pháp lý: ", idx) 
+                    ? "[Rủi ro pháp lý: ".length() 
+                    : "[Rui ro phap ly: ".length());
+            int end = rejectionReason.indexOf("/10]", start);
+            if (end != -1) {
+                try {
+                    String num = rejectionReason.substring(start, end).trim();
+                    return Double.parseDouble(num);
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns risk tier: HIGH (>= 8.0), MEDIUM (>= 5.0), LOW (< 5.0), or NONE.
+     */
+    public String getLegalRiskLevel() {
+        Double score = getLegalRiskScore();
+        if (score == null) return "NONE";
+        if (score >= 8.0) return "HIGH";
+        if (score >= 5.0) return "MEDIUM";
+        return "LOW";
+    }
+
     @Override
     public String toString() {
         return "Topic{" +

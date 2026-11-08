@@ -522,7 +522,10 @@ public class TopicDAO extends DBContext {
 
         try {
             // 0. Defense-in-Depth Guard: Verify topic status before evaluating
-            String checkTopicStatusSql = "SELECT status FROM Topic WHERE topic_id = ?;";
+            String evalTopicTitle = "";
+            String evalTopicAngle = "";
+            int evalAuthorId = 0;
+            String checkTopicStatusSql = "SELECT status, title, angle, author_user_id FROM Topic WHERE topic_id = ?;";
             try (PreparedStatement psCheck = conn.prepareStatement(checkTopicStatusSql)) {
                 psCheck.setInt(1, topicId);
                 try (ResultSet rsCheck = psCheck.executeQuery()) {
@@ -531,6 +534,9 @@ public class TopicDAO extends DBContext {
                         throw new IllegalArgumentException("Đề tài #" + topicId + " không tồn tại.");
                     }
                     String currentStatus = rsCheck.getString("status");
+                    evalTopicTitle = rsCheck.getString("title");
+                    evalTopicAngle = rsCheck.getString("angle");
+                    evalAuthorId = rsCheck.getInt("author_user_id");
                     if (!"SUBMITTED".equalsIgnoreCase(currentStatus)) {
                         conn.rollback();
                         throw new IllegalStateException("Đề tài #" + topicId + " đang ở trạng thái '" + currentStatus
@@ -640,6 +646,13 @@ public class TopicDAO extends DBContext {
                     ps.setInt(3, topicId);
                     ps.executeUpdate();
                 }
+
+                // Tự động sinh Primary Task cho phóng viên phụ trách (WF-04)
+                int leadReporterId = resolveLeadReporterId(conn, topicId, evalAuthorId);
+                String angleText = (evalTopicAngle != null && !evalTopicAngle.trim().isEmpty()) ? " (Góc tiếp cận: " + evalTopicAngle.trim() + ")" : "";
+                String notesText = (comments != null && !comments.trim().isEmpty()) ? " - Ý kiến BTV: " + comments.trim() : "";
+                String primaryTaskDesc = "Triển khai tác nghiệp đề tài: [" + topicCode + "] " + evalTopicTitle + angleText + notesText;
+                ensurePrimaryFieldworkTask(conn, topicId, leadReporterId, primaryTaskDesc);
             } else {
                 String updateTopicSql = "UPDATE Topic SET status = ? WHERE topic_id = ?;";
                 try (PreparedStatement ps = conn.prepareStatement(updateTopicSql)) {
@@ -723,7 +736,9 @@ public class TopicDAO extends DBContext {
 
         try {
             // 1. Guard check: Topic must exist and currently be in PENDING_EXECUTIVE_APPROVAL status
-            String checkTopicSql = "SELECT status, author_user_id FROM Topic WHERE topic_id = ?;";
+            String execTopicTitle = "";
+            String execTopicAngle = "";
+            String checkTopicSql = "SELECT status, author_user_id, title, angle FROM Topic WHERE topic_id = ?;";
             int authorId = 0;
             try (PreparedStatement psCheck = conn.prepareStatement(checkTopicSql)) {
                 psCheck.setInt(1, topicId);
@@ -733,6 +748,8 @@ public class TopicDAO extends DBContext {
                         throw new IllegalArgumentException("Đề tài #" + topicId + " không tồn tại.");
                     }
                     String currentStatus = rsCheck.getString("status");
+                    execTopicTitle = rsCheck.getString("title");
+                    execTopicAngle = rsCheck.getString("angle");
                     if (!"PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(currentStatus)) {
                         conn.rollback();
                         throw new IllegalStateException("Đề tài #" + topicId + " đang ở trạng thái '" + currentStatus
@@ -776,6 +793,13 @@ public class TopicDAO extends DBContext {
                     ps.setInt(2, topicId);
                     ps.executeUpdate();
                 }
+
+                // Tự động sinh Primary Task cho phóng viên phụ trách (WF-04)
+                int leadReporterId = resolveLeadReporterId(conn, topicId, authorId);
+                String angleText = (execTopicAngle != null && !execTopicAngle.trim().isEmpty()) ? " (Góc tiếp cận: " + execTopicAngle.trim() + ")" : "";
+                String notesText = (comments != null && !comments.trim().isEmpty()) ? " - Ý kiến TBT: " + comments.trim() : "";
+                String primaryTaskDesc = "Triển khai tác nghiệp đề tài: [" + topicCode + "] " + execTopicTitle + angleText + notesText;
+                ensurePrimaryFieldworkTask(conn, topicId, leadReporterId, primaryTaskDesc);
             } else {
                 String updateStatusSql = "UPDATE Topic SET status = ? WHERE topic_id = ?;";
                 try (PreparedStatement ps = conn.prepareStatement(updateStatusSql)) {
@@ -863,6 +887,62 @@ public class TopicDAO extends DBContext {
     /**
      * Retrieve all active categories for a specific desk.
      */
+    /**
+     * Tự động sinh đầu việc tác nghiệp gốc (Primary Task) cho đề tài vừa được phê duyệt APPROVED.
+     * Bảo đảm tính lũy đẳng (Idempotent): nếu đề tài đã có task thì bỏ qua, không tạo trùng lặp.
+     */
+    private void ensurePrimaryFieldworkTask(Connection conn, int topicId, int assigneeUserId, String taskDescription) throws SQLException {
+        if (assigneeUserId <= 0) {
+            return;
+        }
+        String checkSql = "SELECT COUNT(*) FROM Fieldwork_Task WHERE topic_id = ?;";
+        try (PreparedStatement psCheck = conn.prepareStatement(checkSql)) {
+            psCheck.setInt(1, topicId);
+            try (ResultSet rs = psCheck.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return; // Đã có task, bảo đảm tính lũy đẳng
+                }
+            }
+        }
+
+        String insertTaskSql = "INSERT INTO Fieldwork_Task (topic_id, assignee_user_id, task_status, description) "
+                             + "VALUES (?, ?, 'TODO', ?);";
+        try (PreparedStatement psInsert = conn.prepareStatement(insertTaskSql)) {
+            psInsert.setInt(1, topicId);
+            psInsert.setInt(2, assigneeUserId);
+            psInsert.setString(3, taskDescription != null ? taskDescription : "Triển khai tác nghiệp thực địa cho đề tài #" + topicId);
+            psInsert.executeUpdate();
+        }
+    }
+
+    /**
+     * Tìm ID của Trưởng nhóm tác nghiệp (LEAD_REPORTER) hoặc Tác giả đề tài.
+     */
+    private int resolveLeadReporterId(Connection conn, int topicId, int fallbackAuthorId) throws SQLException {
+        String findLeadSql = "SELECT user_id FROM Topic_Member WHERE topic_id = ? AND role_in_team = 'LEAD_REPORTER';";
+        try (PreparedStatement ps = conn.prepareStatement(findLeadSql)) {
+            ps.setInt(1, topicId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int leadId = rs.getInt("user_id");
+                    if (leadId > 0) return leadId;
+                }
+            }
+        }
+        // Fallback to any member
+        String findAnyMemberSql = "SELECT TOP 1 user_id FROM Topic_Member WHERE topic_id = ? ORDER BY member_id ASC;";
+        try (PreparedStatement ps = conn.prepareStatement(findAnyMemberSql)) {
+            ps.setInt(1, topicId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int memberId = rs.getInt("user_id");
+                    if (memberId > 0) return memberId;
+                }
+            }
+        }
+        return fallbackAuthorId;
+    }
+
     public List<Category> getCategoriesByDesk(int deskId) {
         List<Category> cached = CACHED_CATEGORIES.get(deskId);
         if (cached != null && !cached.isEmpty()) {
@@ -1476,6 +1556,11 @@ public class TopicDAO extends DBContext {
                 ps.setInt(2, leadReporterId);
                 ps.executeUpdate();
             }
+
+            // Tự động sinh Primary Task cho phóng viên chỉ định (WF-04)
+            String notesText = (commissionNotes != null && !commissionNotes.trim().isEmpty()) ? " - Chỉ đạo: " + commissionNotes.trim() : "";
+            String primaryTaskDesc = "Nhiệm vụ tác nghiệp chỉ đạo: [" + topicCode + "] " + title + notesText;
+            ensurePrimaryFieldworkTask(conn, topicId, leadReporterId, primaryTaskDesc);
 
             // 6. Dispatch Notification to Lead Reporter
             String deadlineNote = deadline != null ? ". Hạn hoàn thành: " + deadline : "";

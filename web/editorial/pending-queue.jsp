@@ -98,39 +98,13 @@
 </head>
 <body>
 <div class="app">
-    <!-- Sidebar Navigation -->
     <jsp:include page="/WEB-INF/views/sidebar.jsp">
-        <jsp:param name="active" value="pending-queue" />
+        <jsp:param name="active" value="pending-queue"/>
     </jsp:include>
-
-    <!-- Main Content Area -->
     <div class="main">
-        <!-- Top Bar -->
-                <header class="topbar">
-            <button class="icon-btn mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-            <div class="brand-desk-info">
-                <strong>🏛️ ${currentDesk != null ? currentDesk.deskName : 'Ban Thời sự - Chính trị'}</strong>
-            </div>
-            <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
-                <div class="account-chip">
-                    <div class="avatar"><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName.substring(0, 1).toUpperCase() : (not empty sessionScope.user ? sessionScope.user.fullName.substring(0, 1).toUpperCase() : 'T')}" /></div>
-                    <div>
-                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Trường')}" /></b>
-                        <small>
-                            <c:choose>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'DESK_EDITOR'}">Desk Editor (BTV Chuyên Môn)</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'EXECUTIVE_EDITOR'}">Tổng Biên Tập</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'BUSINESS_ADMINISTRATOR'}">Quản Trị Nghiệp Vụ</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'SYSTEM_ADMINISTRATOR'}">Quản Trị Hệ Thống</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'REPORTER'}">Phóng Viên Tác Nghiệp</c:when>
-                                <c:otherwise><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : (not empty sessionScope.user ? sessionScope.user.roleName : 'Desk Editor')}" /></c:otherwise>
-                            </c:choose>
-                        </small>
-                    </div>
-                </div>
-                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
-            </div>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="🏛️ ${currentDesk != null ? currentDesk.deskName : 'Ban Thời sự - Chính trị'}"/>
+        </jsp:include>
 
         <!-- Main Body -->
         <main>
@@ -149,12 +123,16 @@
                      ${param.msg == 'approved' or param.msg == 'tbt_approved' or param.msg == 'directive_commissioned' ? 'background: #e8f7ef; color: #15734f; border: 1px solid #ccebdd;' : ''}
                      ${param.msg == 'escalated' ? 'background: #fff4dd; color: #9a6200; border: 1px solid #f4ddb2;' : ''}
                      ${param.msg == 'revision_requested' or param.msg == 'tbt_revision_requested' ? 'background: #f1ebff; color: #6e4cb1; border: 1px solid #d8c7ff;' : ''}
-                     ${param.msg == 'rejected' or param.msg == 'tbt_rejected' ? 'background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce;' : ''}">
+                     ${param.msg == 'rejected' or param.msg == 'tbt_rejected' ? 'background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce;' : ''}
+                     ${param.msg == 'logged_out' ? 'background: #f0f7ff; color: #1e40af; border: 1px solid #bfdbfe;' : ''}">
                     <span style="font-size: 20px;">
-                        ${param.msg == 'approved' ? '🎉' : (param.msg == 'directive_commissioned' ? '⚡' : (param.msg == 'escalated' ? '🚀' : (param.msg == 'revision_requested' or param.msg == 'tbt_revision_requested' ? '🔄' : '✖')))}
+                        ${param.msg == 'approved' ? '🎉' : (param.msg == 'directive_commissioned' ? '⚡' : (param.msg == 'escalated' ? '🚀' : (param.msg == 'revision_requested' or param.msg == 'tbt_revision_requested' ? '🔄' : (param.msg == 'logged_out' ? '🚪' : '✖'))))}
                     </span>
                     <div>
                         <c:choose>
+                            <c:when test="${param.msg == 'logged_out'}">
+                                <b>Đã đăng xuất!</b> Phiên làm việc đã kết thúc an toàn.
+                            </c:when>
                             <c:when test="${param.msg == 'directive_commissioned'}">
                                 <b>Phát lệnh đặt hàng thành công!</b> Đề tài chỉ đạo đã được cấp mã định danh <b><c:out value="${param.code}"/></b>, chuyển sang trạng thái <b>ĐÃ DUYỆT (APPROVED)</b> và thông báo giao việc đã được gửi tới Trưởng nhóm phóng viên.
                             </c:when>
@@ -411,6 +389,14 @@
                 </c:if>
             </div>
         </main>
+        <footer style="padding: 20px 28px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 32px;">
+            <div>
+                <strong>NTMCS</strong> — Newsroom Topic Management &amp; Coordination System &middot; <em>Phân hệ BTV Chuyên Môn (WF-02)</em>
+            </div>
+            <div>
+                SE2066 &middot; Nhóm 4 &middot; BTV: <strong>Phạm Vũ Đình Trường</strong>
+            </div>
+        </footer>
     </div>
 </div>
 

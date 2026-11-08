@@ -38,10 +38,13 @@
         <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ BTV CHUYÊN MÔN (WF-02)</div>
-                <a href="${base}/editorial/pending-queue" class="nav-item ${param.active == 'pending-queue' ? 'active' : ''}">
+                <a href="${base}/editorial/dashboard" class="nav-item ${param.active == 'editorial-dashboard' ? 'active' : ''}">
+                    <i>📊</i> Dashboard Điều phối & Nghiệm thu
+                </a>
+                <a href="${base}/editorial/pending-queue" class="nav-item ${param.active == 'pending-queue' or param.active == 'criteria-scoring' ? 'active' : ''}">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
-                <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' or param.active == 'directive-topic' ? 'active' : ''}">
+                <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' or param.active == 'directive-topic' or param.active == 'reporter-dispatch' ? 'active' : ''}">
                     <i>⚡</i> Đặt hàng đề tài chỉ đạo
                 </a>
                 <a href="${base}/editorial/idea-archive" class="nav-item ${param.active == 'idea-archive' ? 'active' : ''}">

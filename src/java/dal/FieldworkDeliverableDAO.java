@@ -159,4 +159,41 @@ public class FieldworkDeliverableDAO extends DBContext {
         }
         return list;
     }
+
+    public List<FieldworkDeliverable> getDeliverablesByTopicId(int topicId) throws SQLException {
+        List<FieldworkDeliverable> list = new ArrayList<>();
+        String sql = "SELECT fd.*, u.full_name AS submitter_name "
+                   + "FROM Fieldwork_Deliverable fd "
+                   + "JOIN Fieldwork_Task ft ON fd.task_id = ft.task_id "
+                   + "JOIN [User] u ON fd.submitted_by_user_id = u.user_id "
+                   + "WHERE ft.topic_id = ? "
+                   + "ORDER BY fd.submitted_at DESC";
+
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, topicId);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    FieldworkDeliverable d = new FieldworkDeliverable();
+                    d.setDeliverableId(rs.getInt("deliverable_id"));
+                    d.setTaskId(rs.getInt("task_id"));
+                    d.setSubmittedByUserId(rs.getInt("submitted_by_user_id"));
+                    d.setSubmissionType(rs.getString("submission_type"));
+                    d.setDeliverableNote(rs.getString("deliverable_note"));
+                    d.setOriginalFileName(rs.getString("original_file_name"));
+                    d.setStoredFilePath(rs.getString("stored_file_path"));
+                    d.setContentType(rs.getString("content_type"));
+
+                    long size = rs.getLong("file_size_bytes");
+                    d.setFileSizeBytes(rs.wasNull() ? null : size);
+
+                    d.setExternalUrl(rs.getString("external_url"));
+                    d.setSubmittedAt(rs.getTimestamp("submitted_at"));
+                    d.setSubmitterName(rs.getString("submitter_name"));
+                    list.add(d);
+                }
+            }
+        }
+        return list;
+    }
 }

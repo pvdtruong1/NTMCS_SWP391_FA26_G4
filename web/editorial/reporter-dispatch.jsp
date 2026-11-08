@@ -143,39 +143,13 @@
 </head>
 <body>
 <div class="app">
-    <!-- Static Sidebar -->
     <jsp:include page="/WEB-INF/views/sidebar.jsp">
-        <jsp:param name="active" value="directive-creation" />
+        <jsp:param name="active" value="directive-creation"/>
     </jsp:include>
-
-    <!-- Main Workspace -->
     <div class="main">
-        <!-- Topbar -->
-                <header class="topbar">
-            <button class="icon-btn mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-            <div class="brand-desk-info">
-                <strong>🏛️ ${desk != null ? desk.deskName : 'Ban Thời sự - Chính trị'}</strong>
-            </div>
-            <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
-                <div class="account-chip">
-                    <div class="avatar"><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName.substring(0, 1).toUpperCase() : (not empty sessionScope.user ? sessionScope.user.fullName.substring(0, 1).toUpperCase() : 'T')}" /></div>
-                    <div>
-                        <b><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.fullName : (not empty sessionScope.user ? sessionScope.user.fullName : 'Trường')}" /></b>
-                        <small>
-                            <c:choose>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'DESK_EDITOR'}">Desk Editor (BTV Chuyên Môn)</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'EXECUTIVE_EDITOR'}">Tổng Biên Tập</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'BUSINESS_ADMINISTRATOR'}">Quản Trị Nghiệp Vụ</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'SYSTEM_ADMINISTRATOR'}">Quản Trị Hệ Thống</c:when>
-                                <c:when test="${(not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : sessionScope.user.roleName) == 'REPORTER'}">Phóng Viên Tác Nghiệp</c:when>
-                                <c:otherwise><c:out value="${not empty sessionScope.loggedUser ? sessionScope.loggedUser.roleName : (not empty sessionScope.user ? sessionScope.user.roleName : 'Desk Editor')}" /></c:otherwise>
-                            </c:choose>
-                        </small>
-                    </div>
-                </div>
-                <a href="${pageContext.request.contextPath}/logout" class="btn sm danger" style="padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none; border-radius: 8px;">Đăng xuất</a>
-            </div>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="🏛️ ${desk != null ? desk.deskName : 'Ban Thời sự - Chính trị'}"/>
+        </jsp:include>
 
         <!-- Main Content -->
         <main>
@@ -412,6 +386,14 @@
                 </div>
             </form>
         </main>
+        <footer style="padding: 20px 28px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 32px;">
+            <div>
+                <strong>NTMCS</strong> — Newsroom Topic Management &amp; Coordination System &middot; <em>Phân hệ BTV Chuyên Môn (WF-02)</em>
+            </div>
+            <div>
+                SE2066 &middot; Nhóm 4 &middot; BTV: <strong>Phạm Vũ Đình Trường</strong>
+            </div>
+        </footer>
     </div>
 </div>
 

@@ -1,193 +1,259 @@
-<%@page contentType="text/html" pageEncoding="UTF-8"%>
-<%@page import="model.AssetRequest"%>
-<%@page import="java.text.SimpleDateFormat"%>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="model.AssetRequest,java.text.SimpleDateFormat" %>
+
+<%!
+private String esc(String s) {
+    if (s == null || s.isEmpty()) return "-";
+    return s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;");
+}
+
+private String statusLabel(String s) {
+    if ("PENDING".equals(s)) return "Chờ duyệt (PENDING)";
+    if ("APPROVED".equals(s)) return "Đã duyệt (APPROVED)";
+    if ("REJECTED".equals(s)) return "Đã từ chối (REJECTED)";
+    if ("CHECKED_OUT".equals(s)) return "Đang bàn giao (CHECKED_OUT)";
+    if ("RETURNED".equals(s)) return "Đã nhận lại (RETURNED)";
+    return s != null ? s : "Không xác định";
+}
+
+private String assetStatusLabel(String s) {
+    if ("AVAILABLE".equals(s)) return "Sẵn sàng";
+    if ("CHECKED_OUT".equals(s)) return "Đang bàn giao";
+    if ("MAINTENANCE".equals(s)) return "Đang bảo trì";
+    return s != null ? s : "Không xác định";
+}
+
+private String statusCss(String s) {
+    if (s == null) return "";
+    return s.toUpperCase();
+}
+%>
 
 <%
-    AssetRequest item =
-        (AssetRequest) request.getAttribute("assetRequest");
+AssetRequest x = (AssetRequest) request.getAttribute("assetRequest");
 
-    if (item == null) {
-        response.sendError(404, "Không tìm thấy yêu cầu.");
-        return;
-    }
+if (x == null) {
+    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Không tìm thấy yêu cầu tài sản.");
+    return;
+}
 
-    String ctx = request.getContextPath();
+String ctx = request.getContextPath();
+String status = x.getStatus() != null ? x.getStatus() : "";
 
-    SimpleDateFormat dateFormat =
-        new SimpleDateFormat("dd/MM/yyyy HH:mm");
+SimpleDateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+
+long durationHours = 0;
+if (x.getStartTime() != null && x.getEndTime() != null) {
+    durationHours = Math.max(0, (x.getEndTime().getTime() - x.getStartTime().getTime()) / 3600000);
+}
+
+request.setAttribute("wf03Active", "requests");
 %>
 
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chi tiết yêu cầu tài sản</title>
-
-    <link rel="stylesheet"
-          href="<%=ctx%>/assets/css/asset-management.css">
-
-    <style>
-        .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
-        }
-
-        .detail-item {
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-            border-radius: 9px;
-        }
-
-        .detail-item label {
-            display: block;
-            color: #64748b;
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
-
-        .detail-item strong {
-            font-size: 15px;
-            color: #1e293b;
-        }
-
-        .detail-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 22px;
-        }
-
-        @media(max-width: 650px) {
-            .detail-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chi tiết yêu cầu #AR-<%=x.getRequestId()%> | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
 <body>
 <div class="app">
+    <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
-    <aside class="sidebar">
-        <div class="brand">NTMCS</div>
-
-        <div class="nav-label">QUẢN LÝ</div>
-
-        <a class="nav-link" href="<%=ctx%>/assets">
-            Quản lý tài sản
-        </a>
-
-        <a class="nav-link active" href="<%=ctx%>/asset-requests">
-            Yêu cầu tài sản
-        </a>
-
-        <div class="side-foot">Logistics Management</div>
-    </aside>
-
-    <div class="main">
-
+    <section class="main">
         <header class="topbar">
-            <strong>Chi tiết yêu cầu</strong>
+            <span>NTMCS / Hậu cần / <a href="<%=ctx%>/asset-requests" style="color:inherit;text-decoration:none;">Yêu cầu</a> / <b>Chi tiết #AR-<%=x.getRequestId()%></b></span>
+            <span>LOGISTICS COORDINATOR</span>
         </header>
 
         <main>
-
             <div class="head">
                 <div>
-                    <div class="eyebrow">ASSET REQUEST / DETAIL</div>
-                    <h2>Yêu cầu tài sản #<%=item.getRequestId()%></h2>
-                    <p>Thông tin chi tiết yêu cầu sử dụng tài sản.</p>
+                    <div class="eyebrow">WF-03 • XỬ LÝ PHIẾU YÊU CẦU #AR-<%=x.getRequestId()%></div>
+                    <h1>Chi tiết yêu cầu sử dụng tài sản</h1>
+                    <p>Đề tài: <b><%=esc(x.getTopicCode())%> - <%=esc(x.getTopicTitle())%></b></p>
+                </div>
+
+                <div class="head-actions">
+                    <a class="btn" href="<%=ctx%>/asset-requests">
+                        ⬅ Danh sách yêu cầu
+                    </a>
+                    <a class="btn" href="<%=ctx%>/asset-requests?action=schedule&id=<%=x.getRequestId()%>">
+                        📅 Kiểm tra trùng lịch
+                    </a>
+                    <a class="btn" href="<%=ctx%>/asset-requests?action=history&assetId=<%=x.getAssetId()%>">
+                        📜 Lịch sử mượn trả
+                    </a>
                 </div>
             </div>
 
             <section class="card">
-
-                <div class="card-head">
-                    <div>
-                        <h3>Thông tin yêu cầu</h3>
+                <div class="detail-hero">
+                    <div class="brand-mark" style="width: 64px; height: 64px; font-size: 32px; border-radius: 16px;">
+                        📋
                     </div>
 
-                    <span class="request-status <%=item.getStatus()%>">
-                        <%=item.getStatus()%>
-                    </span>
+                    <div>
+                        <div style="margin-bottom: 8px;">
+                            <span class="request-status <%=statusCss(status)%>" style="font-size: 13px; padding: 6px 14px;">
+                                <%=statusLabel(status)%>
+                            </span>
+                        </div>
+                        <h2 style="margin: 0; font-size: 22px;">Phiếu yêu cầu #AR-<%=x.getRequestId()%></h2>
+                        <p style="margin: 4px 0 0; color: #718096;">
+                            Tài sản: <b><%=esc(x.getAssetName())%></b> (<%=esc(x.getAssetCode())%>) • Phóng viên: <b><%=esc(x.getRequesterName())%></b>
+                        </p>
+                    </div>
                 </div>
 
-                <div class="detail-grid">
+                <h3 style="margin: 20px 0 12px; color: #2d3748; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;">
+                    Thông tin đề tài và tài sản tác nghiệp
+                </h3>
 
+                <div class="detail-grid">
                     <div class="detail-item">
-                        <label>Mã yêu cầu</label>
-                        <strong>#<%=item.getRequestId()%></strong>
+                        <label>Mã phiếu yêu cầu</label>
+                        <b>#AR-<%=x.getRequestId()%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Trạng thái</label>
-                        <strong><%=item.getStatus()%></strong>
+                        <label>Trạng thái yêu cầu</label>
+                        <b class="request-status <%=statusCss(status)%>">
+                            <%=statusLabel(status)%>
+                        </b>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Tên đề tài báo chí</label>
+                        <b><%=esc(x.getTopicTitle())%></b>
                     </div>
 
                     <div class="detail-item">
                         <label>Mã đề tài</label>
-                        <strong><%=item.getTopicCode() == null
-                            ? "Chưa có mã" : item.getTopicCode()%></strong>
+                        <b><%=esc(x.getTopicCode())%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Tên đề tài</label>
-                        <strong><%=item.getTopicTitle()%></strong>
+                        <label>Tài sản mượn tác nghiệp</label>
+                        <b><%=esc(x.getAssetName())%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Tài sản yêu cầu</label>
-                        <strong><%=item.getAssetName()%></strong>
+                        <label>Mã tài sản & Trạng thái tài sản hiện tại</label>
+                        <b><%=esc(x.getAssetCode())%></b> —
+                        <span class="badge <%=statusCss(x.getAssetStatus()).toLowerCase()%>">
+                            <%=assetStatusLabel(x.getAssetStatus())%>
+                        </span>
                     </div>
 
                     <div class="detail-item">
-                        <label>Mã tài sản nội bộ</label>
-                        <strong><%=item.getAssetId()%></strong>
+                        <label>Phóng viên / Người gửi yêu cầu</label>
+                        <b><%=esc(x.getRequesterName())%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Người yêu cầu</label>
-                        <strong><%=item.getRequesterName()%></strong>
+                        <label>Email người gửi</label>
+                        <b><%=esc(x.getRequesterEmail())%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Email người yêu cầu</label>
-                        <strong><%=item.getRequesterEmail() == null
-                            ? "Chưa cập nhật" : item.getRequesterEmail()%></strong>
+                        <label>Thời điểm bắt đầu mượn</label>
+                        <b style="color: #2b6cb0;"><%=x.getStartTime() != null ? df.format(x.getStartTime()) : "-"%></b>
                     </div>
 
                     <div class="detail-item">
-                        <label>Thời gian bắt đầu</label>
-                        <strong><%=dateFormat.format(item.getStartTime())%></strong>
+                        <label>Thời điểm dự kiến kết thúc</label>
+                        <b style="color: #2b6cb0;"><%=x.getEndTime() != null ? df.format(x.getEndTime()) : "-"%></b>
                     </div>
 
-                    <div class="detail-item">
-                        <label>Thời gian kết thúc</label>
-                        <strong><%=dateFormat.format(item.getEndTime())%></strong>
+                    <div class="detail-item" style="grid-column: 1 / -1;">
+                        <label>Thời lượng đăng ký tác nghiệp</label>
+                        <b><%=durationHours%> giờ</b>
                     </div>
-
                 </div>
 
-                <div class="detail-actions">
+                <h3 style="margin: 28px 0 12px; color: #2d3748; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;">
+                    Thao tác xử lý nghiệp vụ theo quy trình
+                </h3>
 
-                    <a class="btn"
-                       href="<%=ctx%>/asset-requests">
-                        Quay lại danh sách
+                <div class="detail-actions" style="margin-top: 16px;">
+                    <a class="btn" href="<%=ctx%>/asset-requests?action=schedule&id=<%=x.getRequestId()%>">
+                        📅 Kiểm tra trùng lịch
                     </a>
 
-                    <a class="btn primary"
-                       href="<%=ctx%>/asset-requests?action=schedule&id=<%=item.getRequestId()%>">
-                        Kiểm tra lịch
-                    </a>
+                    <% if ("PENDING".equals(status)) { %>
+                        <!-- Nghiệp vụ Duyệt yêu cầu: kiểm tra xung đột và chuyển sang APPROVED -->
+                        <form method="post" action="<%=ctx%>/asset-requests" style="display:inline;"
+                              onsubmit="return confirm('Bạn có chắc chắn muốn PHÊ DUYỆT yêu cầu sử dụng tài sản này?');">
+                            <input type="hidden" name="id" value="<%=x.getRequestId()%>">
+                            <input type="hidden" name="action" value="approve">
+                            <button class="btn primary" type="submit">
+                                ✔ Phê duyệt yêu cầu
+                            </button>
+                        </form>
 
+                        <!-- Nghiệp vụ Từ chối yêu cầu: chuyển sang REJECTED -->
+                        <form method="post" action="<%=ctx%>/asset-requests" style="display:inline;"
+                              onsubmit="return confirm('Bạn có chắc chắn muốn TỪ CHỐI yêu cầu sử dụng tài sản này?');">
+                            <input type="hidden" name="id" value="<%=x.getRequestId()%>">
+                            <input type="hidden" name="action" value="reject">
+                            <button class="btn danger" type="submit">
+                                ✖ Từ chối yêu cầu
+                            </button>
+                        </form>
+
+                    <% } else if ("APPROVED".equals(status)) { %>
+                        <!-- Nghiệp vụ Bàn giao: Chuyển request -> CHECKED_OUT và asset -> CHECKED_OUT trong 1 transaction -->
+                        <form method="post" action="<%=ctx%>/asset-requests" style="display:inline;"
+                              onsubmit="return confirm('Xác nhận ĐÃ BÀN GIAO tài sản cho phóng viên tác nghiệp?');">
+                            <input type="hidden" name="id" value="<%=x.getRequestId()%>">
+                            <input type="hidden" name="action" value="checkout">
+                            <button class="btn primary" type="submit" style="background:#2b6cb0;">
+                                🚚 Xác nhận bàn giao tài sản
+                            </button>
+                        </form>
+
+                    <% } else if ("CHECKED_OUT".equals(status)) { %>
+                        <!-- Nghiệp vụ Nhận lại (Thu hồi): Chuyển request -> RETURNED và asset -> AVAILABLE hoặc MAINTENANCE -->
+                        <form method="post" action="<%=ctx%>/asset-requests" style="display:inline-flex; gap: 8px; align-items: center;"
+                              onsubmit="return confirm('Xác nhận ĐÃ THU HỒI / NHẬN LẠI tài sản từ phóng viên?');">
+                            <input type="hidden" name="id" value="<%=x.getRequestId()%>">
+                            <input type="hidden" name="action" value="return">
+
+                            <label style="font-weight: 600; font-size: 13px;">Tình trạng tài sản sau kiểm tra:</label>
+                            <select name="returnStatus" style="min-width: 220px; min-height: 38px;">
+                                <option value="AVAILABLE">Đạt yêu cầu - Đưa về Sẵn sàng (AVAILABLE)</option>
+                                <option value="MAINTENANCE">Cần sửa chữa - Đưa về Bảo trì (MAINTENANCE)</option>
+                            </select>
+
+                            <button class="btn primary" type="submit" style="background:#2f855a;">
+                                🔄 Xác nhận nhận lại (Thu hồi)
+                            </button>
+                        </form>
+                    <% } %>
                 </div>
 
+                <% if ("REJECTED".equals(status)) { %>
+                    <div class="notice error" style="margin-top: 18px;">
+                        🚫 Yêu cầu này đã bị từ chối. Không được phép bàn giao tài sản.
+                    </div>
+                <% } else if ("RETURNED".equals(status)) { %>
+                    <div class="notice success" style="margin-top: 18px;">
+                        ✅ Tài sản đã được nhận lại hoàn tất. Chu trình mượn - trả cho phiếu này đã kết thúc.
+                    </div>
+                <% } %>
             </section>
-
         </main>
-    </div>
+    </section>
 </div>
+
+<script src="<%=ctx%>/assets/js/asset-management.js"></script>
 </body>
 </html>

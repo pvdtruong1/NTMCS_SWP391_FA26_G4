@@ -12,6 +12,36 @@ import util.DBConnection;
 
 public class AssetDAO {
 
+    public static class PageResult {
+        private final List<Asset> assets;
+        private final int currentPage;
+        private final int totalPages;
+        private final int totalRecords;
+
+        public PageResult(List<Asset> assets, int currentPage, int totalPages, int totalRecords) {
+            this.assets = assets != null ? assets : new ArrayList<>();
+            this.currentPage = currentPage;
+            this.totalPages = totalPages;
+            this.totalRecords = totalRecords;
+        }
+
+        public List<Asset> getAssets() {
+            return assets;
+        }
+
+        public int getCurrentPage() {
+            return currentPage;
+        }
+
+        public int getTotalPages() {
+            return totalPages;
+        }
+
+        public int getTotalRecords() {
+            return totalRecords;
+        }
+    }
+
     public enum DeleteResult {
         DELETED,
         NOT_FOUND,
@@ -22,11 +52,10 @@ public class AssetDAO {
 
     private static final String SELECT_COLUMNS =
         "asset_id, asset_code, asset_name, asset_category, " +
-        "asset_status, serial_number, description, image_path";
+        "asset_status, serial_number, description";
 
     private Asset mapAsset(ResultSet rs) throws SQLException {
         Asset asset = new Asset();
-
         asset.setAssetId(rs.getInt("asset_id"));
         asset.setAssetCode(rs.getString("asset_code"));
         asset.setAssetName(rs.getString("asset_name"));
@@ -34,61 +63,189 @@ public class AssetDAO {
         asset.setAssetStatus(rs.getString("asset_status"));
         asset.setSerialNumber(rs.getString("serial_number"));
         asset.setDescription(rs.getString("description"));
-        asset.setImagePath(rs.getString("image_path"));
-
         return asset;
     }
 
     public List<Asset> getAllAssets() throws SQLException {
         List<Asset> assets = new ArrayList<>();
-
-        String sql = "SELECT " + SELECT_COLUMNS +
-                     " FROM dbo.Asset ORDER BY asset_id DESC";
+        String sql = "SELECT " + SELECT_COLUMNS + " FROM dbo.Asset ORDER BY asset_id DESC";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 assets.add(mapAsset(rs));
             }
         }
-
         return assets;
     }
 
-    public Asset getAssetById(int id) throws SQLException {
-        String sql = "SELECT " + SELECT_COLUMNS +
-                     " FROM dbo.Asset WHERE asset_id = ?";
+    public PageResult searchAssets(
+            String keyword,
+            String category,
+            String status,
+            int page,
+            int pageSize) throws SQLException {
+
+        int totalRecords = countAssets(keyword, category, status);
+        int safePageSize = Math.max(1, Math.min(100, pageSize));
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalRecords / safePageSize));
+        int safePage = Math.max(1, Math.min(page, totalPages));
+
+        List<Asset> assets = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+            "SELECT " + SELECT_COLUMNS + " FROM dbo.Asset WHERE 1=1 "
+        );
+        List<Object> params = new ArrayList<>();
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            sql.append(
+                " AND (asset_code LIKE ? OR asset_name LIKE ? " +
+                "OR serial_number LIKE ? OR description LIKE ?) "
+            );
+            String q = "%" + keyword.trim() + "%";
+            for (int i = 0; i < 4; i++) {
+                params.add(q);
+            }
+        }
+
+        if (category != null && !category.trim().isEmpty() && !"ALL".equalsIgnoreCase(category)) {
+            sql.append(" AND asset_category = ? ");
+            params.add(category.trim());
+        }
+
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status)) {
+            sql.append(" AND asset_status = ? ");
+            params.add(status.trim().toUpperCase());
+        }
+
+        sql.append(" ORDER BY asset_id DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+        params.add((safePage - 1) * safePageSize);
+        params.add(safePageSize);
 
         try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    assets.add(mapAsset(rs));
+                }
+            }
+        }
+
+        return new PageResult(assets, safePage, totalPages, totalRecords);
+    }
+
+    public int countAssets(
+            String keyword,
+            String category,
+            String status) throws SQLException {
+
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) FROM dbo.Asset WHERE 1=1 "
+        );
+        List<Object> params = new ArrayList<>();
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            sql.append(
+                " AND (asset_code LIKE ? OR asset_name LIKE ? " +
+                "OR serial_number LIKE ? OR description LIKE ?) "
+            );
+            String q = "%" + keyword.trim() + "%";
+            for (int i = 0; i < 4; i++) {
+                params.add(q);
+            }
+        }
+
+        if (category != null && !category.trim().isEmpty() && !"ALL".equalsIgnoreCase(category)) {
+            sql.append(" AND asset_category = ? ");
+            params.add(category.trim());
+        }
+
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status)) {
+            sql.append(" AND asset_status = ? ");
+            params.add(status.trim().toUpperCase());
+        }
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    public int countByStatus(String status) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM dbo.Asset WHERE asset_status = ?";
+        try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, status);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        return 0;
+    }
 
+    public int countAllAssets() throws SQLException {
+        String sql = "SELECT COUNT(*) FROM dbo.Asset";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+
+    public Asset getAssetById(int id) throws SQLException {
+        String sql = "SELECT " + SELECT_COLUMNS + " FROM dbo.Asset WHERE asset_id = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapAsset(rs);
                 }
             }
         }
-
         return null;
     }
 
-    public boolean isAssetCodeExists(String code, int excludeId)
-            throws SQLException {
-
-        String sql =
-            "SELECT COUNT(*) FROM dbo.Asset " +
-            "WHERE asset_code = ? AND asset_id <> ?";
-
+    public boolean isAssetCodeExists(String code, int excludeId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM dbo.Asset WHERE asset_code = ? AND asset_id <> ?";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-
             ps.setString(1, code);
             ps.setInt(2, excludeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
 
+    public boolean hasActiveRequest(int assetId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM dbo.Asset_Request "
+                   + "WHERE asset_id = ? AND status IN ('PENDING', 'APPROVED', 'CHECKED_OUT')";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, assetId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getInt(1) > 0;
             }
@@ -99,8 +256,8 @@ public class AssetDAO {
         String sql =
             "INSERT INTO dbo.Asset " +
             "(asset_code, asset_name, asset_category, asset_status, " +
-            "serial_number, description, image_path) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            "serial_number, description) " +
+            "VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -111,7 +268,6 @@ public class AssetDAO {
             ps.setString(4, asset.getAssetStatus());
             ps.setString(5, asset.getSerialNumber());
             ps.setString(6, asset.getDescription());
-            ps.setString(7, asset.getImagePath());
 
             return ps.executeUpdate() == 1;
         }
@@ -121,8 +277,7 @@ public class AssetDAO {
         String sql =
             "UPDATE dbo.Asset SET " +
             "asset_code = ?, asset_name = ?, asset_category = ?, " +
-            "asset_status = ?, serial_number = ?, description = ?, " +
-            "image_path = ? " +
+            "asset_status = ?, serial_number = ?, description = ? " +
             "WHERE asset_id = ?";
 
         try (Connection con = DBConnection.getConnection();
@@ -134,8 +289,7 @@ public class AssetDAO {
             ps.setString(4, asset.getAssetStatus());
             ps.setString(5, asset.getSerialNumber());
             ps.setString(6, asset.getDescription());
-            ps.setString(7, asset.getImagePath());
-            ps.setInt(8, asset.getAssetId());
+            ps.setInt(7, asset.getAssetId());
 
             return ps.executeUpdate() == 1;
         }
@@ -170,11 +324,6 @@ public class AssetDAO {
                     return DeleteResult.IN_USE;
                 }
 
-                /*
-                 * Giữ an toàn lịch sử mượn/trả.
-                 * Nếu bảng Asset_Request có bất kỳ bản ghi nào tham chiếu
-                 * đến tài sản này, không xóa tài sản.
-                 */
                 String requestSql =
                     "SELECT COUNT(*) FROM dbo.Asset_Request " +
                     "WITH (UPDLOCK, HOLDLOCK) WHERE asset_id = ?";
@@ -209,12 +358,12 @@ public class AssetDAO {
             } catch (SQLException ex) {
                 con.rollback();
 
-                // SQL Server: 547 = vi phạm ràng buộc khóa ngoại.
                 if (ex.getErrorCode() == 547) {
                     return DeleteResult.HAS_REQUEST_HISTORY;
                 }
 
                 throw ex;
+
             } finally {
                 con.setAutoCommit(true);
             }

@@ -1,199 +1,314 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
-<%@ page import="java.util.List,model.Asset" %>
+<%@ page import="java.util.List,java.util.ArrayList,java.net.URLEncoder,model.Asset" %>
+
 <%!
-    private String esc(String s) {
-        if (s == null) return "";
-        return s.replace("&","&amp;").replace("<","&lt;")
-                .replace(">","&gt;").replace("\"","&quot;")
-                .replace("'","&#39;");
+private String esc(String s) {
+    if (s == null) return "";
+    return s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;");
+}
+
+private String categoryLabel(String s) {
+    if ("CAMERA_EQUIPMENT".equals(s)) return "Thiết bị quay phim";
+    if ("PHOTO_EQUIPMENT".equals(s)) return "Thiết bị chụp ảnh";
+    if ("AUDIO_EQUIPMENT".equals(s)) return "Thiết bị âm thanh";
+    if ("ACCESSORIES".equals(s)) return "Phụ kiện tác nghiệp";
+    if ("IT_EQUIPMENT".equals(s)) return "Thiết bị công nghệ";
+    if ("VEHICLE".equals(s)) return "Phương tiện vận chuyển";
+    return s != null ? s : "Khác";
+}
+
+private String statusLabel(String s) {
+    if ("AVAILABLE".equals(s)) return "Sẵn sàng";
+    if ("CHECKED_OUT".equals(s)) return "Đang bàn giao";
+    if ("MAINTENANCE".equals(s)) return "Đang bảo trì";
+    return s != null ? s : "Không xác định";
+}
+
+private String statusBadgeClass(String s) {
+    if ("AVAILABLE".equals(s)) return "available";
+    if ("CHECKED_OUT".equals(s)) return "checked";
+    if ("MAINTENANCE".equals(s)) return "maintenance";
+    return "";
+}
+
+private int getIntAttr(Object val, int fallback) {
+    if (val instanceof Number) {
+        return ((Number) val).intValue();
     }
-    private String categoryLabel(String s) {
-        if ("CAMERA_EQUIPMENT".equals(s)) return "Thiết bị quay phim";
-        if ("PHOTO_EQUIPMENT".equals(s)) return "Thiết bị chụp ảnh";
-        if ("AUDIO_EQUIPMENT".equals(s)) return "Thiết bị âm thanh";
-        if ("ACCESSORIES".equals(s)) return "Phụ kiện tác nghiệp";
-        if ("IT_EQUIPMENT".equals(s)) return "Thiết bị công nghệ";
-        if ("VEHICLE".equals(s)) return "Phương tiện vận chuyển";
-        return "Chưa phân loại";
-    }
-    private String statusLabel(String s) {
-        if ("AVAILABLE".equals(s)) return "Sẵn sàng";
-        if ("CHECKED_OUT".equals(s)) return "Đang sử dụng";
-        if ("MAINTENANCE".equals(s)) return "Đang bảo trì";
-        return "Không xác định";
-    }
-    private String statusClass(String s) {
-        if ("AVAILABLE".equals(s)) return "available";
-        if ("CHECKED_OUT".equals(s)) return "checked";
-        if ("MAINTENANCE".equals(s)) return "maintenance";
-        return "";
-    }
+    return fallback;
+}
 %>
+
 <%
-    List<Asset> assets = (List<Asset>) request.getAttribute("assets");
-    if (assets == null) assets = new java.util.ArrayList<>();
+List<Asset> assets = (List<Asset>) request.getAttribute("assets");
+if (assets == null) {
+    assets = new ArrayList<>();
+}
 
-    String ctx = request.getContextPath();
-    String message = request.getParameter("message");
-    int available = 0, checkedOut = 0, maintenance = 0;
+String ctx = request.getContextPath();
+String msg = request.getParameter("message");
 
-    for (Asset a : assets) {
-        if ("AVAILABLE".equals(a.getAssetStatus())) available++;
-        if ("CHECKED_OUT".equals(a.getAssetStatus())) checkedOut++;
-        if ("MAINTENANCE".equals(a.getAssetStatus())) maintenance++;
-    }
+String keyword = (String) request.getAttribute("keyword");
+if (keyword == null) keyword = "";
+
+String category = (String) request.getAttribute("category");
+if (category == null) category = "";
+
+String status = (String) request.getAttribute("status");
+if (status == null) status = "";
+
+int total = getIntAttr(request.getAttribute("totalAssets"), 0);
+int available = getIntAttr(request.getAttribute("availableCount"), 0);
+int checked = getIntAttr(request.getAttribute("checkedOutCount"), 0);
+int maintenance = getIntAttr(request.getAttribute("maintenanceCount"), 0);
+
+int current = Math.max(1, getIntAttr(request.getAttribute("currentPage"), 1));
+int pages = Math.max(1, getIntAttr(request.getAttribute("totalPages"), 1));
+int records = getIntAttr(request.getAttribute("totalRecords"), 0);
+
+request.setAttribute("wf03Active", "assets");
+
+String qEnc = URLEncoder.encode(keyword, "UTF-8");
+String catEnc = URLEncoder.encode(category, "UTF-8");
+String statEnc = URLEncoder.encode(status, "UTF-8");
+String baseQuery = "keyword=" + qEnc + "&category=" + catEnc + "&status=" + statEnc;
 %>
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quản lý tài sản | NTMCS</title>
-<link rel="stylesheet" href="<%= ctx %>/assets/css/asset-management.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý danh sách tài sản | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 <body>
+
 <div class="app">
-<aside class="sidebar">
-  <div class="brand">
-    <div class="logo">N</div>
-    <div><strong>NTMCS</strong><small>Newsroom Topic Management</small></div>
-  </div>
-  <div class="nav-label">TÁC NGHIỆP</div>
-  <a class="nav-link active" href="<%= ctx %>/assets">▣ &nbsp; Quản lý tài sản</a>
-  <a class="nav-link" href="<%= ctx %>/assets?action=add">＋ &nbsp; Thêm tài sản</a>
-  <div class="side-foot">NTMCS · WF-03<br>Quản lý thiết bị và phương tiện</div>
-</aside>
+    <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
-<section class="main">
-<header class="topbar">
-  NTMCS &nbsp;/&nbsp; Tác nghiệp &nbsp;/&nbsp; <b>Quản lý tài sản</b>
-  <span>ASSET MANAGEMENT</span>
-</header>
+    <section class="main">
+        <header class="topbar">
+            <span>NTMCS / Hậu cần / <b>Quản lý tài sản</b></span>
+            <span>LOGISTICS COORDINATOR</span>
+        </header>
 
-<main>
-  <div class="head">
-    <div>
-      <div class="eyebrow">NTMCS / Manager Assets / RESOURCE MANAGEMENT</div>
-      <h1>Quản lý tài sản</h1>
-      <p>Quản lý thiết bị tác nghiệp, phụ kiện và phương tiện vận chuyển.</p>
-    </div>
-    <a class="btn primary" href="<%= ctx %>/assets?action=add">＋ Thêm tài sản</a>
-  </div>
+        <main>
+            <div class="head">
+                <div>
+                    <div class="eyebrow">WF-03 • QUẢN LÝ THIẾT BỊ VÀ PHƯƠNG TIỆN</div>
+                    <h1>Danh sách tài sản</h1>
+                    <p>Quản lý toàn bộ thiết bị quay phim, chụp ảnh, âm thanh, phụ kiện và phương tiện tác nghiệp.</p>
+                </div>
 
-  <% if ("added".equals(message)) { %>
-    <div class="notice success">Đã thêm tài sản thành công.</div>
-  <% } else if ("updated".equals(message)) { %>
-    <div class="notice success">Đã cập nhật tài sản thành công.</div>
-  <% } else if ("deleted".equals(message)) { %>
-    <div class="notice success">Đã xóa tài sản thành công.</div>
-  <% } else if ("inuse".equals(message)) { %>
-    <div class="notice error">Không thể xóa: thiết bị đang được sử dụng hoặc đã được đánh dấu CHECKED_OUT.</div>
-  <% } else if ("history".equals(message)) { %>
-    <div class="notice error">Không thể xóa: tài sản đang được tham chiếu bởi lịch sử yêu cầu mượn/trả. Hãy giữ lại bản ghi.</div>
-  <% } else if ("notfound".equals(message)) { %>
-    <div class="notice error">Không tìm thấy tài sản cần xóa; danh sách đã được tải lại.</div>
-  <% } else if ("deleteerror".equals(message)) { %>
-    <div class="notice error">Không thể xóa tài sản. Hãy kiểm tra dữ liệu liên quan.</div>
-  <% } %>
-
-  <div class="stats">
-    <div class="stat"><div class="stat-icon">▣</div><div><span>Tổng tài sản</span><strong><%= assets.size() %></strong><small>Tài sản được tải từ database</small></div></div>
-    <div class="stat"><div class="stat-icon">✓</div><div><span>Sẵn sàng</span><strong><%= available %></strong><small>AVAILABLE</small></div></div>
-    <div class="stat"><div class="stat-icon">↔</div><div><span>Đang sử dụng</span><strong><%= checkedOut %></strong><small>CHECKED_OUT</small></div></div>
-    <div class="stat"><div class="stat-icon">⚙</div><div><span>Đang bảo trì</span><strong><%= maintenance %></strong><small>MAINTENANCE</small></div></div>
-  </div>
-
-  <section class="card">
-    <div class="card-head">
-      <div><h2>Danh sách tài sản</h2><p>Tìm kiếm và lọc dữ liệu tài sản.</p></div>
-      <span class="muted"><%= assets.size() %> bản ghi</span>
-    </div>
-
-    <div class="filters">
-      <input type="search" id="searchInput" placeholder="Tìm mã, tên, serial hoặc mô tả...">
-      <select id="categoryFilter">
-        <option value="">Tất cả loại tài sản</option>
-        <option value="CAMERA_EQUIPMENT">Thiết bị quay phim</option>
-        <option value="PHOTO_EQUIPMENT">Thiết bị chụp ảnh</option>
-        <option value="AUDIO_EQUIPMENT">Thiết bị âm thanh</option>
-        <option value="ACCESSORIES">Phụ kiện tác nghiệp</option>
-        <option value="IT_EQUIPMENT">Thiết bị công nghệ</option>
-        <option value="VEHICLE">Phương tiện vận chuyển</option>
-      </select>
-      <select id="statusFilter">
-        <option value="">Tất cả trạng thái</option>
-        <option value="AVAILABLE">Sẵn sàng</option>
-        <option value="CHECKED_OUT">Đang sử dụng</option>
-        <option value="MAINTENANCE">Đang bảo trì</option>
-      </select>
-      <button class="btn" type="button" id="resetFilters">Đặt lại</button>
-    </div>
-
-    <div class="table-wrap">
-      <table id="assetTable">
-        <thead>
-          <tr>
-            <th>Ảnh</th><th>Tài sản</th><th>Loại tài sản</th>
-            <th>Serial</th><th>Trạng thái</th><th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-        <% if (assets.isEmpty()) { %>
-          <tr><td colspan="6">
-            <div class="empty">
-              <strong>Chưa có tài sản nào</strong>
-              Thêm tài sản để bắt đầu quản lý.
-              <br><a class="btn primary" href="<%= ctx %>/assets?action=add">＋ Thêm tài sản</a>
+                <div class="head-actions">
+                    <a class="btn primary" href="<%=ctx%>/assets?action=add">
+                        ➕ Thêm tài sản mới
+                    </a>
+                </div>
             </div>
-          </td></tr>
-        <% } else { for (Asset a : assets) {
-            String category = a.getAssetCategory();
-            String status = a.getAssetStatus();
-            String image = a.getImagePath();
-        %>
-          <tr data-category="<%= esc(category) %>" data-status="<%= esc(status) %>">
-            <td>
-              <% if (image != null && !image.isBlank()) { %>
-                <img class="asset-thumb" src="<%= ctx + esc(image) %>" alt="Ảnh <%= esc(a.getAssetName()) %>">
-              <% } else { %>
-                <div class="asset-thumb placeholder" aria-label="Chưa có ảnh">▣</div>
-              <% } %>
-            </td>
-            <td>
-              <strong><%= esc(a.getAssetName()) %></strong>
-              <span class="sub"><%= esc(a.getAssetCode()) %></span>
-            </td>
-            <td><span class="category"><%= categoryLabel(category) %></span></td>
-            <td><%= a.getSerialNumber() == null || a.getSerialNumber().isBlank()
-                    ? "—" : esc(a.getSerialNumber()) %></td>
-            <td><span class="badge <%= statusClass(status) %>"><%= statusLabel(status) %></span></td>
-            <td>
-              <div class="actions">
-                <a class="btn small" href="<%= ctx %>/assets?action=detail&id=<%= a.getAssetId() %>">Xem</a>
-                <a class="btn small" href="<%= ctx %>/assets?action=edit&id=<%= a.getAssetId() %>">Sửa</a>
-                <form method="post" action="<%= ctx %>/assets" class="delete-form">
-                  <input type="hidden" name="action" value="delete">
-                  <input type="hidden" name="id" value="<%= a.getAssetId() %>">
-                  <button class="btn small danger" type="submit"
-                    <%= "CHECKED_OUT".equals(status) ? "disabled title=\"Thiết bị đang sử dụng\"" : "" %>>
-                    Xóa
-                  </button>
+
+            <% if ("added".equals(msg)) { %>
+                <div class="notice success">✅ Đã thêm tài sản mới thành công.</div>
+            <% } else if ("updated".equals(msg)) { %>
+                <div class="notice success">✅ Đã cập nhật thông tin tài sản thành công.</div>
+            <% } else if ("deleted".equals(msg)) { %>
+                <div class="notice success">✅ Đã xóa tài sản khỏi hệ thống.</div>
+            <% } else if ("inuse".equals(msg)) { %>
+                <div class="notice error">❌ Không thể xóa tài sản đang ở trạng thái 'Đang bàn giao'.</div>
+            <% } else if ("history".equals(msg)) { %>
+                <div class="notice error">❌ Không thể xóa tài sản đã có lịch sử yêu cầu sử dụng trong hệ thống.</div>
+            <% } else if ("notfound".equals(msg)) { %>
+                <div class="notice error">❌ Không tìm thấy thông tin tài sản yêu cầu.</div>
+            <% } else if ("deleteerror".equals(msg)) { %>
+                <div class="notice error">❌ Thao tác xóa không thành công do ràng buộc toàn vẹn dữ liệu.</div>
+            <% } %>
+
+            <div class="stats">
+                <div class="stat">
+                    <span>Tổng số tài sản</span>
+                    <strong><%=total%></strong>
+                    <small>Trong toàn bộ kho</small>
+                </div>
+
+                <div class="stat">
+                    <span>Sẵn sàng điều phối</span>
+                    <strong style="color: #16804a;"><%=available%></strong>
+                    <small>Có thể cấp phát</small>
+                </div>
+
+                <div class="stat">
+                    <span>Đang bàn giao tác nghiệp</span>
+                    <strong style="color: #2861b2;"><%=checked%></strong>
+                    <small>Đang sử dụng thực tế</small>
+                </div>
+
+                <div class="stat">
+                    <span>Đang bảo trì</span>
+                    <strong style="color: #b65b21;"><%=maintenance%></strong>
+                    <small>Tạm ngừng cấp phát</small>
+                </div>
+            </div>
+
+            <section class="card">
+                <div class="card-head">
+                    <div>
+                        <h2>Tìm kiếm và Bộ lọc</h2>
+                        <p>Tìm kiếm theo mã tài sản, tên, serial hoặc mô tả kỹ thuật.</p>
+                    </div>
+                    <span class="count"><%=records%> kết quả phù hợp</span>
+                </div>
+
+                <form class="filters" method="get" action="<%=ctx%>/assets">
+                    <input type="text"
+                           name="keyword"
+                           value="<%=esc(keyword)%>"
+                           placeholder="Nhập mã, tên tài sản, serial hoặc mô tả...">
+
+                    <select name="category">
+                        <option value="">-- Tất cả loại tài sản --</option>
+                        <option value="CAMERA_EQUIPMENT" <%="CAMERA_EQUIPMENT".equals(category) ? "selected" : ""%>>Thiết bị quay phim</option>
+                        <option value="PHOTO_EQUIPMENT" <%="PHOTO_EQUIPMENT".equals(category) ? "selected" : ""%>>Thiết bị chụp ảnh</option>
+                        <option value="AUDIO_EQUIPMENT" <%="AUDIO_EQUIPMENT".equals(category) ? "selected" : ""%>>Thiết bị âm thanh</option>
+                        <option value="ACCESSORIES" <%="ACCESSORIES".equals(category) ? "selected" : ""%>>Phụ kiện tác nghiệp</option>
+                        <option value="IT_EQUIPMENT" <%="IT_EQUIPMENT".equals(category) ? "selected" : ""%>>Thiết bị công nghệ</option>
+                        <option value="VEHICLE" <%="VEHICLE".equals(category) ? "selected" : ""%>>Phương tiện vận chuyển</option>
+                    </select>
+
+                    <select name="status">
+                        <option value="">-- Tất cả trạng thái --</option>
+                        <option value="AVAILABLE" <%="AVAILABLE".equals(status) ? "selected" : ""%>>Sẵn sàng</option>
+                        <option value="CHECKED_OUT" <%="CHECKED_OUT".equals(status) ? "selected" : ""%>>Đang bàn giao</option>
+                        <option value="MAINTENANCE" <%="MAINTENANCE".equals(status) ? "selected" : ""%>>Đang bảo trì</option>
+                    </select>
+
+                    <button class="btn primary" type="submit">🔍 Tìm kiếm</button>
+                    <a class="btn" href="<%=ctx%>/assets">🔄 Đặt lại</a>
                 </form>
-              </div>
-            </td>
-          </tr>
-        <% } } %>
-        </tbody>
-      </table>
-    </div>
-    <div class="count">
-      <span id="resultCount">Đang hiển thị <%= assets.size() %> tài sản</span>
-      <span>Ảnh đại diện · 6 loại tài sản · 3 trạng thái</span>
-    </div>
-  </section>
-</main>
-</section>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Mã tài sản</th>
+                                <th>Tên tài sản</th>
+                                <th>Loại tài sản</th>
+                                <th style="width: 130px;">Trạng thái</th>
+                                <th>Serial / Biển số</th>
+                                <th>Mô tả</th>
+                                <th style="width: 220px; text-align: center;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (assets.isEmpty()) { %>
+                                <tr>
+                                    <td colspan="7" class="empty">
+                                        <b>Không tìm thấy tài sản nào phù hợp.</b>
+                                        <p>Vui lòng thử điều chỉnh lại từ khóa hoặc bộ lọc tìm kiếm.</p>
+                                    </td>
+                                </tr>
+                            <% } else {
+                                for (Asset a : assets) {
+                            %>
+                                <tr>
+                                    <td>
+                                        <strong><%=esc(a.getAssetCode())%></strong>
+                                    </td>
+                                    <td>
+                                        <b><%=esc(a.getAssetName())%></b>
+                                    </td>
+                                    <td>
+                                        <%=categoryLabel(a.getAssetCategory())%>
+                                    </td>
+                                    <td>
+                                        <span class="badge <%=statusBadgeClass(a.getAssetStatus())%>">
+                                            <%=statusLabel(a.getAssetStatus())%>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <%=a.getSerialNumber() != null && !a.getSerialNumber().isEmpty() ? esc(a.getSerialNumber()) : "<span style='color:#a0aec0;'>-</span>"%>
+                                    </td>
+                                    <td>
+                                        <small><%=a.getDescription() != null && !a.getDescription().isEmpty() ? esc(a.getDescription()) : "<span style='color:#a0aec0;'>-</span>"%></small>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons" style="justify-content: center;">
+                                            <a class="btn small"
+                                               href="<%=ctx%>/assets?action=detail&id=<%=a.getAssetId()%>"
+                                               title="Xem chi tiết tài sản">
+                                                👁 Xem
+                                            </a>
+
+                                            <a class="btn small"
+                                               href="<%=ctx%>/assets?action=edit&id=<%=a.getAssetId()%>"
+                                               title="Chỉnh sửa thông tin">
+                                                ✏ Sửa
+                                            </a>
+
+                                            <a class="btn small"
+                                               href="<%=ctx%>/asset-requests?action=history&assetId=<%=a.getAssetId()%>"
+                                               title="Xem lịch sử sử dụng">
+                                                📜 Lịch sử
+                                            </a>
+
+                                            <% if (!"CHECKED_OUT".equals(a.getAssetStatus())) { %>
+                                                <form class="delete-form" method="post" action="<%=ctx%>/assets">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<%=a.getAssetId()%>">
+                                                    <button class="btn small danger"
+                                                            type="submit"
+                                                            title="Xóa tài sản">
+                                                        🗑
+                                                    </button>
+                                                </form>
+                                            <% } else { %>
+                                                <button class="btn small"
+                                                        disabled
+                                                        title="Không thể xóa khi đang bàn giao"
+                                                        style="opacity: 0.4;">
+                                                    🔒
+                                                </button>
+                                            <% } %>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <%  }
+                               }
+                            %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <% if (pages > 1) { %>
+                    <div class="pagination">
+                        <% if (current > 1) { %>
+                            <a href="<%=ctx%>/assets?page=<%=current - 1%>&<%=baseQuery%>">« Trước</a>
+                        <% } %>
+
+                        <% for (int p = 1; p <= pages; p++) { %>
+                            <% if (p == current) { %>
+                                <span class="active"><%=p%></span>
+                            <% } else if (p == 1 || p == pages || Math.abs(p - current) <= 2) { %>
+                                <a href="<%=ctx%>/assets?page=<%=p%>&<%=baseQuery%>"><%=p%></a>
+                            <% } else if (p == current - 3 || p == current + 3) { %>
+                                <span style="border:none;">...</span>
+                            <% } %>
+                        <% } %>
+
+                        <% if (current < pages) { %>
+                            <a href="<%=ctx%>/assets?page=<%=current + 1%>&<%=baseQuery%>">Sau »</a>
+                        <% } %>
+                    </div>
+                <% } %>
+            </section>
+        </main>
+    </section>
 </div>
-<script src="<%= ctx %>/assets/js/asset-management.js"></script>
+
+<script src="<%=ctx%>/assets/js/asset-management.js"></script>
 </body>
 </html>

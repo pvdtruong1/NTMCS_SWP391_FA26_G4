@@ -1,8 +1,6 @@
 package controller;
 
 import dao.AssetRequestDAO;
-import model.AssetRequest;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -11,160 +9,197 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.List;
+
+import model.AssetRequest;
 
 @WebServlet(name = "AssetRequestServlet", urlPatterns = {"/asset-requests"})
 public class AssetRequestServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
+    private static final int PAGE_SIZE = 10;
+
+    private static final String VIEW = "/WEB-INF/views/asset-requests/";
+
+    private static final String[] VALID_STATUSES = {
+        "ALL", "PENDING", "APPROVED", "REJECTED",
+        "CHECKED_OUT", "RETURNED"
+    };
 
     private final AssetRequestDAO dao = new AssetRequestDAO();
 
-    private static final String VIEW_PATH =
-        "/WEB-INF/views/asset-requests/";
-
     @Override
     protected void doGet(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws ServletException, IOException {
 
-        request.setCharacterEncoding("UTF-8");
+        req.setCharacterEncoding("UTF-8");
+        resp.setCharacterEncoding("UTF-8");
 
-        String action = request.getParameter("action");
+        String action = trim(req.getParameter("action"));
 
         try {
-            if ("detail".equals(action)) {
-                showDetail(request, response);
-                return;
-            }
+            switch (action) {
+                case "detail":
+                    showDetail(req, resp);
+                    break;
 
-            if ("schedule".equals(action)) {
-                showSchedule(request, response);
-                return;
-            }
+                case "schedule":
+                    showSchedule(req, resp);
+                    break;
 
-            showList(request, response);
+                case "history":
+                    showHistory(req, resp);
+                    break;
+
+                default:
+                    showList(req, resp);
+                    break;
+            }
 
         } catch (IllegalArgumentException ex) {
-            response.sendError(400, ex.getMessage());
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                ex.getMessage()
+            );
 
         } catch (SQLException ex) {
-            log("Lỗi tải danh sách yêu cầu tài sản", ex);
-            response.sendError(
-                500,
-                "Không thể tải dữ liệu yêu cầu tài sản. Kiểm tra log Tomcat."
+            log("Asset Request GET failed", ex);
+
+            resp.sendError(
+                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                "Không thể tải dữ liệu yêu cầu tài sản. Hãy kiểm tra log của Tomcat."
             );
         }
     }
 
+    // =====================================================
+    // DANH SÁCH - SEARCH - FILTER - PAGINATION
+    // =====================================================
+
     private void showList(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws SQLException, ServletException, IOException {
 
-        String keyword = trim(request.getParameter("keyword"));
-        String status = trim(request.getParameter("status"));
-        String fromDate = trim(request.getParameter("fromDate"));
-        String toDate = trim(request.getParameter("toDate"));
+        String keyword = trim(req.getParameter("keyword"));
+        String status = trim(req.getParameter("status"));
+        String fromDate = trim(req.getParameter("fromDate"));
+        String toDate = trim(req.getParameter("toDate"));
 
-        if (status == null || status.isBlank()) {
+        if (status.isEmpty()) {
             status = "ALL";
+        }
+
+        if (!isValidStatus(status)) {
+            throw new IllegalArgumentException("Bộ lọc trạng thái không hợp lệ.");
         }
 
         validateDate(fromDate);
         validateDate(toDate);
 
-        if (fromDate != null && toDate != null
-                && LocalDate.parse(fromDate).isAfter(LocalDate.parse(toDate))) {
-            throw new IllegalArgumentException(
-                "Ngày bắt đầu không được sau ngày kết thúc."
-            );
+        if (!fromDate.isEmpty() && !toDate.isEmpty()) {
+            LocalDate from = LocalDate.parse(fromDate);
+            LocalDate to = LocalDate.parse(toDate);
+
+            if (from.isAfter(to)) {
+                throw new IllegalArgumentException("Từ ngày không được sau đến ngày.");
+            }
         }
 
-        int page = parsePage(request.getParameter("page"));
+        int page = positiveInt(req.getParameter("page"), 1);
 
-        int totalRecords = dao.countAll(
-            keyword, status, fromDate, toDate
-        );
+        int total = dao.countAll(keyword, status, fromDate, toDate);
 
-        int pageSize = 10;
-        int totalPages = Math.max(1, (int) Math.ceil(
-            totalRecords / (double) pageSize
-        ));
+        int totalPages = Math.max(1, (int) Math.ceil(total / (double) PAGE_SIZE));
 
         if (page > totalPages) {
             page = totalPages;
         }
 
-        List<AssetRequest> requests = dao.findAll(
-            keyword, status, fromDate, toDate, page
-        );
+        List<AssetRequest> rows = dao.findAll(keyword, status, fromDate, toDate, page);
 
-        request.setAttribute("requests", requests);
+        req.setAttribute("requests", rows);
+        req.setAttribute("keyword", keyword);
+        req.setAttribute("status", status);
+        req.setAttribute("fromDate", fromDate);
+        req.setAttribute("toDate", toDate);
 
-        request.setAttribute("keyword", keyword == null ? "" : keyword);
-        request.setAttribute("status", status);
-        request.setAttribute("fromDate", fromDate == null ? "" : fromDate);
-        request.setAttribute("toDate", toDate == null ? "" : toDate);
+        req.setAttribute("totalRecords", total);
+        req.setAttribute("currentPage", page);
+        req.setAttribute("totalPages", totalPages);
+        req.setAttribute("pageSize", PAGE_SIZE);
 
-        request.setAttribute("pendingCount", dao.countByStatus("PENDING"));
-        request.setAttribute("approvedCount", dao.countByStatus("APPROVED"));
-        request.setAttribute("rejectedCount", dao.countByStatus("REJECTED"));
+        req.setAttribute("pendingCount", dao.countByStatus("PENDING"));
+        req.setAttribute("approvedCount", dao.countByStatus("APPROVED"));
+        req.setAttribute("rejectedCount", dao.countByStatus("REJECTED"));
+        req.setAttribute("checkedOutCount", dao.countByStatus("CHECKED_OUT"));
+        req.setAttribute("returnedCount", dao.countByStatus("RETURNED"));
 
-        request.setAttribute("totalRecords", totalRecords);
-        request.setAttribute("currentPage", page);
-        request.setAttribute("totalPages", totalPages);
-
-        request.getRequestDispatcher(
-            VIEW_PATH + "asset-request-list.jsp"
-        ).forward(request, response);
+        forward(req, resp, "asset-request-list.jsp");
     }
+
+    // =====================================================
+    // CHI TIẾT YÊU CẦU
+    // =====================================================
 
     private void showDetail(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws SQLException, ServletException, IOException {
 
-        int id = parseId(request.getParameter("id"));
+        int id = positiveInt(req.getParameter("id"), -1);
 
-        if (id <= 0) {
-            response.sendError(400, "Mã yêu cầu không hợp lệ.");
+        if (id < 1) {
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                "ID yêu cầu không hợp lệ."
+            );
             return;
         }
 
         AssetRequest item = dao.findById(id);
 
         if (item == null) {
-            response.sendError(404, "Không tìm thấy yêu cầu tài sản.");
+            resp.sendError(
+                HttpServletResponse.SC_NOT_FOUND,
+                "Không tìm thấy yêu cầu tài sản."
+            );
             return;
         }
 
-        request.setAttribute("assetRequest", item);
-
-        request.getRequestDispatcher(
-            VIEW_PATH + "asset-request-detail.jsp"
-        ).forward(request, response);
+        req.setAttribute("assetRequest", item);
+        forward(req, resp, "asset-request-detail.jsp");
     }
 
+    // =====================================================
+    // KIỂM TRA LỊCH TRÙNG
+    // =====================================================
+
     private void showSchedule(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws SQLException, ServletException, IOException {
 
-        int id = parseId(request.getParameter("id"));
+        int id = positiveInt(req.getParameter("id"), -1);
 
-        if (id <= 0) {
-            response.sendError(400, "Mã yêu cầu không hợp lệ.");
+        if (id < 1) {
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                "ID yêu cầu không hợp lệ."
+            );
             return;
         }
 
         AssetRequest item = dao.findById(id);
 
         if (item == null) {
-            response.sendError(404, "Không tìm thấy yêu cầu tài sản.");
+            resp.sendError(
+                HttpServletResponse.SC_NOT_FOUND,
+                "Không tìm thấy yêu cầu tài sản."
+            );
             return;
         }
 
@@ -175,120 +210,214 @@ public class AssetRequestServlet extends HttpServlet {
             item.getRequestId()
         );
 
-        request.setAttribute("assetRequest", item);
-        request.setAttribute("conflicts", conflicts);
-        request.setAttribute("hasConflict", !conflicts.isEmpty());
+        boolean hasBlockingConflict = false;
+        for (AssetRequest c : conflicts) {
+            if ("APPROVED".equals(c.getStatus()) || "CHECKED_OUT".equals(c.getStatus())) {
+                hasBlockingConflict = true;
+                break;
+            }
+        }
 
-        request.getRequestDispatcher(
-            VIEW_PATH + "asset-request-schedule.jsp"
-        ).forward(request, response);
+        req.setAttribute("assetRequest", item);
+        req.setAttribute("conflicts", conflicts);
+        req.setAttribute("hasConflict", hasBlockingConflict);
+
+        forward(req, resp, "asset-request-schedule.jsp");
     }
+
+    // =====================================================
+    // LỊCH SỬ SỬ DỤNG
+    // =====================================================
+
+    private void showHistory(
+            HttpServletRequest req,
+            HttpServletResponse resp)
+            throws SQLException, ServletException, IOException {
+
+        int assetId = positiveInt(req.getParameter("assetId"), -1);
+
+        if (assetId < 1) {
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                "Mã tài sản không hợp lệ."
+            );
+            return;
+        }
+
+        List<AssetRequest> history = dao.findHistoryByAssetId(assetId);
+
+        req.setAttribute("history", history);
+        req.setAttribute("assetId", assetId);
+
+        forward(req, resp, "asset-history.jsp");
+    }
+
+    // =====================================================
+    // XỬ LÝ POST: APPROVE / REJECT / CHECKOUT / RETURN
+    // =====================================================
 
     @Override
     protected void doPost(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws ServletException, IOException {
 
-        request.setCharacterEncoding("UTF-8");
+        req.setCharacterEncoding("UTF-8");
+        resp.setCharacterEncoding("UTF-8");
 
-        String action = trim(request.getParameter("action"));
-        int id = parseId(request.getParameter("id"));
+        String action = trim(req.getParameter("action"));
+        int id = positiveInt(req.getParameter("id"), -1);
 
-        if (id <= 0) {
-            response.sendError(400, "Mã yêu cầu không hợp lệ.");
+        if (id < 1) {
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                "Mã yêu cầu không hợp lệ."
+            );
             return;
         }
 
         try {
             String result;
 
-            if ("approve".equals(action)) {
-                result = dao.approveRequest(id);
-
-            } else if ("reject".equals(action)) {
-                result = dao.rejectRequest(id);
-
-            } else {
-                response.sendError(400, "Thao tác không hợp lệ.");
-                return;
-            }
-
-            String message;
-
-            switch (result) {
-                case "APPROVED":
-                    message = "approved";
+            switch (action) {
+                case "approve":
+                    result = dao.approveRequest(id);
                     break;
 
-                case "REJECTED":
-                    message = "rejected";
+                case "reject":
+                    result = dao.rejectRequest(id);
                     break;
 
-                case "CONFLICT":
-                    message = "conflict";
+                case "checkout":
+                    result = dao.checkoutRequest(id);
                     break;
 
-                case "NOT_PENDING":
-                    message = "notpending";
-                    break;
+                case "return":
+                    String returnStatus = trim(req.getParameter("returnStatus"));
 
-                case "NOT_FOUND":
-                    message = "notfound";
+                    if (returnStatus.isEmpty()) {
+                        returnStatus = "AVAILABLE";
+                    }
+
+                    if (!"AVAILABLE".equals(returnStatus) && !"MAINTENANCE".equals(returnStatus)) {
+                        throw new IllegalArgumentException(
+                            "Trạng thái sau thu hồi không hợp lệ."
+                        );
+                    }
+
+                    result = dao.returnRequest(id, returnStatus);
                     break;
 
                 default:
-                    message = "error";
-                    break;
+                    resp.sendError(
+                        HttpServletResponse.SC_BAD_REQUEST,
+                        "Thao tác không hợp lệ."
+                    );
+                    return;
             }
 
-            response.sendRedirect(
-                request.getContextPath()
-                + "/asset-requests?message=" + message
+            String message = mapMessage(result);
+
+            resp.sendRedirect(
+                req.getContextPath() + "/asset-requests?message=" + message
+            );
+
+        } catch (IllegalArgumentException ex) {
+            resp.sendError(
+                HttpServletResponse.SC_BAD_REQUEST,
+                ex.getMessage()
             );
 
         } catch (SQLException ex) {
-            log("Lỗi duyệt/từ chối yêu cầu tài sản", ex);
+            log("Asset Request POST failed. action=" + action + ", requestId=" + id, ex);
 
-            response.sendRedirect(
-                request.getContextPath()
-                + "/asset-requests?message=error"
+            resp.sendRedirect(
+                req.getContextPath() + "/asset-requests?message=error"
             );
         }
     }
 
-    private int parseId(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ex) {
-            return -1;
+    // =====================================================
+    // CHUYỂN KẾT QUẢ DAO THÀNH MESSAGE TRÊN JSP
+    // =====================================================
+
+    private String mapMessage(String result) {
+        if (result == null) {
+            return "error";
+        }
+
+        switch (result) {
+            case "APPROVED":
+                return "approved";
+            case "REJECTED":
+                return "rejected";
+            case "CHECKED_OUT":
+                return "checkedout";
+            case "RETURNED":
+                return "returned";
+            case "CONFLICT":
+                return "conflict";
+            case "ASSET_MAINTENANCE":
+                return "maintenance";
+            case "ASSET_NOT_AVAILABLE":
+                return "unavailable";
+            case "NOT_PENDING":
+                return "notpending";
+            case "NOT_APPROVED":
+                return "notapproved";
+            case "NOT_CHECKED_OUT":
+                return "notcheckedout";
+            case "NOT_FOUND":
+                return "notfound";
+            default:
+                return "error";
         }
     }
 
-    private int parsePage(String value) {
-        try {
-            return Math.max(1, Integer.parseInt(value));
-        } catch (Exception ex) {
-            return 1;
-        }
-    }
+    // =====================================================
+    // VALIDATION / HELPER
+    // =====================================================
 
-    private String trim(String value) {
-        return value == null || value.isBlank()
-            ? null : value.trim();
+    private boolean isValidStatus(String value) {
+        for (String status : VALID_STATUSES) {
+            if (status.equalsIgnoreCase(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void validateDate(String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null || value.isEmpty()) {
             return;
         }
 
         try {
             LocalDate.parse(value);
         } catch (Exception ex) {
-            throw new IllegalArgumentException(
-                "Ngày lọc không đúng định dạng."
-            );
+            throw new IllegalArgumentException("Ngày lọc không đúng định dạng yyyy-MM-dd.");
         }
+    }
+
+    private int positiveInt(String value, int fallback) {
+        try {
+            int number = Integer.parseInt(value);
+            return number > 0 ? number : fallback;
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private void forward(
+            HttpServletRequest req,
+            HttpServletResponse resp,
+            String jsp)
+            throws ServletException, IOException {
+
+        req.getRequestDispatcher(VIEW + jsp).forward(req, resp);
     }
 }

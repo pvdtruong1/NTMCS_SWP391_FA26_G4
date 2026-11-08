@@ -1,8 +1,5 @@
 package dao;
 
-import model.AssetRequest;
-import util.DBConnection;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,43 +7,106 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import model.AssetRequest;
+import util.DBConnection;
 
 public class AssetRequestDAO {
 
     private static final int PAGE_SIZE = 10;
 
-    /*
-     * Các bảng và cột được sử dụng:
-     * Asset_Request: request_id, topic_id, asset_id,
-     *                 requester_user_id, start_time, end_time, status
-     * Topic: topic_id, topic_code, title
-     * Asset: asset_id, asset_name, asset_status
-     * User: user_id, full_name, email
-     */
-
     private static final String BASE_SELECT =
-        "SELECT " +
-        "ar.request_id, " +
-        "ar.topic_id, " +
-        "ar.asset_id, " +
-        "ar.requester_user_id, " +
-        "ar.start_time, " +
-        "ar.end_time, " +
-        "ar.status, " +
-        "t.topic_code AS topic_code, " +
-        "t.title AS topic_title, " +
-        "a.asset_name AS asset_name, " +
-        "a.asset_status AS asset_status, " +
-        "u.full_name AS requester_name, " +
-        "u.email AS requester_email " +
-        "FROM Asset_Request ar " +
-        "INNER JOIN Topic t ON ar.topic_id = t.topic_id " +
-        "INNER JOIN Asset a ON ar.asset_id = a.asset_id " +
-        "INNER JOIN [User] u ON ar.requester_user_id = u.user_id ";
+        "SELECT ar.request_id, ar.topic_id, ar.asset_id, ar.requester_user_id, "
+        + "ar.start_time, ar.end_time, ar.status, "
+        + "t.topic_code, t.title AS topic_title, "
+        + "a.asset_name, a.asset_code, a.asset_status, "
+        + "u.full_name AS requester_name, u.email AS requester_email "
+        + "FROM dbo.Asset_Request ar "
+        + "JOIN dbo.Topic t ON t.topic_id = ar.topic_id "
+        + "JOIN dbo.Asset a ON a.asset_id = ar.asset_id "
+        + "JOIN dbo.[User] u ON u.user_id = ar.requester_user_id ";
 
-    /*
-     * Lấy danh sách yêu cầu có tìm kiếm, lọc và phân trang.
-     */
+    private static final String SCHEDULE_STATUSES =
+        "'PENDING','APPROVED','CHECKED_OUT'";
+
+    private static final String BLOCKING_STATUSES =
+        "'APPROVED','CHECKED_OUT'";
+
+    private String buildWhere(
+            String keyword,
+            String status,
+            String fromDate,
+            String toDate,
+            List<Object> params) {
+
+        StringBuilder sql = new StringBuilder(" WHERE 1=1 ");
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            sql.append(
+                " AND (t.title LIKE ? OR t.topic_code LIKE ? "
+                + "OR a.asset_name LIKE ? OR a.asset_code LIKE ? "
+                + "OR u.full_name LIKE ? OR u.email LIKE ?) "
+            );
+
+            String value = "%" + keyword.trim() + "%";
+
+            for (int i = 0; i < 6; i++) {
+                params.add(value);
+            }
+        }
+
+        if (status != null
+                && !status.trim().isEmpty()
+                && !"ALL".equalsIgnoreCase(status)) {
+
+            sql.append(" AND ar.status = ? ");
+            params.add(status.trim().toUpperCase());
+        }
+
+        if (fromDate != null && !fromDate.trim().isEmpty()) {
+            sql.append(" AND ar.start_time >= ? ");
+            params.add(Timestamp.valueOf(fromDate.trim() + " 00:00:00"));
+        }
+
+        if (toDate != null && !toDate.trim().isEmpty()) {
+            sql.append(" AND ar.start_time < DATEADD(DAY, 1, ?) ");
+            params.add(Timestamp.valueOf(toDate.trim() + " 00:00:00"));
+        }
+
+        return sql.toString();
+    }
+
+    private void bind(PreparedStatement ps, List<Object> params)
+            throws SQLException {
+        for (int i = 0; i < params.size(); i++) {
+            ps.setObject(i + 1, params.get(i));
+        }
+    }
+
+    private AssetRequest map(ResultSet rs) throws SQLException {
+        AssetRequest item = new AssetRequest();
+
+        item.setRequestId(rs.getInt("request_id"));
+        item.setTopicId(rs.getInt("topic_id"));
+        item.setAssetId(rs.getInt("asset_id"));
+        item.setRequesterUserId(rs.getInt("requester_user_id"));
+
+        item.setStartTime(rs.getTimestamp("start_time"));
+        item.setEndTime(rs.getTimestamp("end_time"));
+        item.setStatus(rs.getString("status"));
+
+        item.setTopicCode(rs.getString("topic_code"));
+        item.setTopicTitle(rs.getString("topic_title"));
+
+        item.setAssetName(rs.getString("asset_name"));
+        item.setAssetCode(rs.getString("asset_code"));
+        item.setAssetStatus(rs.getString("asset_status"));
+
+        item.setRequesterName(rs.getString("requester_name"));
+        item.setRequesterEmail(rs.getString("requester_email"));
+
+        return item;
+    }
+
     public List<AssetRequest> findAll(
             String keyword,
             String status,
@@ -54,135 +114,51 @@ public class AssetRequestDAO {
             String toDate,
             int page) throws SQLException {
 
-        List<AssetRequest> list = new ArrayList<>();
-
-        StringBuilder sql = new StringBuilder(BASE_SELECT);
-        sql.append(" WHERE 1 = 1 ");
-
         List<Object> params = new ArrayList<>();
+        String where = buildWhere(keyword, status, fromDate, toDate, params);
 
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            sql.append(
-                " AND (" +
-                "t.title LIKE ? " +
-                "OR t.topic_code LIKE ? " +
-                "OR a.asset_name LIKE ? " +
-                "OR u.full_name LIKE ? " +
-                "OR u.email LIKE ?" +
-                ") "
-            );
+        String sql = BASE_SELECT + where
+                + " ORDER BY ar.request_id DESC "
+                + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
-            String search = "%" + keyword.trim() + "%";
-
-            for (int i = 0; i < 5; i++) {
-                params.add(search);
-            }
-        }
-
-        if (status != null
-                && !status.trim().isEmpty()
-                && !"ALL".equalsIgnoreCase(status)) {
-
-            sql.append(" AND ar.status = ? ");
-            params.add(status.trim().toUpperCase());
-        }
-
-        if (fromDate != null && !fromDate.trim().isEmpty()) {
-            sql.append(" AND ar.start_time >= ? ");
-            params.add(Timestamp.valueOf(fromDate.trim() + " 00:00:00"));
-        }
-
-        if (toDate != null && !toDate.trim().isEmpty()) {
-            sql.append(" AND ar.start_time < DATEADD(DAY, 1, ?) ");
-            params.add(java.sql.Date.valueOf(toDate.trim()));
-        }
-
-        sql.append(
-            " ORDER BY ar.request_id DESC " +
-            " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
-        );
-
-        int safePage = Math.max(page, 1);
-        int offset = (safePage - 1) * PAGE_SIZE;
-
-        params.add(offset);
-        params.add(PAGE_SIZE);
+        List<AssetRequest> result = new ArrayList<>();
 
         try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-            setParameters(ps, params);
+            bind(ps, params);
+            ps.setInt(params.size() + 1, (Math.max(1, page) - 1) * PAGE_SIZE);
+            ps.setInt(params.size() + 2, PAGE_SIZE);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    list.add(mapResult(rs));
+                    result.add(map(rs));
                 }
             }
         }
 
-        return list;
+        return result;
     }
 
-    /*
-     * Đếm tổng số yêu cầu theo điều kiện tìm kiếm và lọc.
-     */
     public int countAll(
             String keyword,
             String status,
             String fromDate,
             String toDate) throws SQLException {
 
-        StringBuilder sql = new StringBuilder(
-            "SELECT COUNT(*) " +
-            "FROM Asset_Request ar " +
-            "INNER JOIN Topic t ON ar.topic_id = t.topic_id " +
-            "INNER JOIN Asset a ON ar.asset_id = a.asset_id " +
-            "INNER JOIN [User] u ON ar.requester_user_id = u.user_id " +
-            "WHERE 1 = 1 "
-        );
-
         List<Object> params = new ArrayList<>();
+        String where = buildWhere(keyword, status, fromDate, toDate, params);
 
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            sql.append(
-                " AND (" +
-                "t.title LIKE ? " +
-                "OR t.topic_code LIKE ? " +
-                "OR a.asset_name LIKE ? " +
-                "OR u.full_name LIKE ? " +
-                "OR u.email LIKE ?" +
-                ") "
-            );
-
-            String search = "%" + keyword.trim() + "%";
-
-            for (int i = 0; i < 5; i++) {
-                params.add(search);
-            }
-        }
-
-        if (status != null
-                && !status.trim().isEmpty()
-                && !"ALL".equalsIgnoreCase(status)) {
-
-            sql.append(" AND ar.status = ? ");
-            params.add(status.trim().toUpperCase());
-        }
-
-        if (fromDate != null && !fromDate.trim().isEmpty()) {
-            sql.append(" AND ar.start_time >= ? ");
-            params.add(Timestamp.valueOf(fromDate.trim() + " 00:00:00"));
-        }
-
-        if (toDate != null && !toDate.trim().isEmpty()) {
-            sql.append(" AND ar.start_time < DATEADD(DAY, 1, ?) ");
-            params.add(java.sql.Date.valueOf(toDate.trim()));
-        }
+        String sql = "SELECT COUNT(*) FROM dbo.Asset_Request ar "
+                   + "JOIN dbo.Topic t ON t.topic_id = ar.topic_id "
+                   + "JOIN dbo.Asset a ON a.asset_id = ar.asset_id "
+                   + "JOIN dbo.[User] u ON u.user_id = ar.requester_user_id "
+                   + where;
 
         try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-            setParameters(ps, params);
+            bind(ps, params);
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -194,20 +170,13 @@ public class AssetRequestDAO {
         return 0;
     }
 
-    /*
-     * Đếm số yêu cầu theo từng trạng thái.
-     */
     public int countByStatus(String status) throws SQLException {
-
-        String sql =
-            "SELECT COUNT(*) " +
-            "FROM Asset_Request " +
-            "WHERE status = ?";
+        String sql = "SELECT COUNT(*) FROM dbo.Asset_Request WHERE status = ?";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
-            ps.setString(1, status);
+            ps.setString(1, status.trim().toUpperCase());
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -219,22 +188,17 @@ public class AssetRequestDAO {
         return 0;
     }
 
-    /*
-     * Lấy chi tiết một yêu cầu.
-     */
-    public AssetRequest findById(int requestId) throws SQLException {
-
-        String sql = BASE_SELECT +
-            " WHERE ar.request_id = ?";
+    public AssetRequest findById(int id) throws SQLException {
+        String sql = BASE_SELECT + " WHERE ar.request_id = ?";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
-            ps.setInt(1, requestId);
+            ps.setInt(1, id);
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return mapResult(rs);
+                    return map(rs);
                 }
             }
         }
@@ -242,307 +206,516 @@ public class AssetRequestDAO {
         return null;
     }
 
-    /*
-     * Kiểm tra các yêu cầu có thời gian sử dụng bị trùng.
-     *
-     * Các trạng thái chiếm lịch:
-     * PENDING, APPROVED, CHECKED_OUT
-     *
-     * Không chiếm lịch:
-     * REJECTED, RETURNED
-     */
     public List<AssetRequest> findConflicts(
             int assetId,
-            Timestamp startTime,
-            Timestamp endTime,
+            Timestamp start,
+            Timestamp end,
             int excludeRequestId) throws SQLException {
 
-        List<AssetRequest> conflicts = new ArrayList<>();
+        String sql = BASE_SELECT
+            + " WHERE ar.asset_id = ? "
+            + " AND ar.request_id <> ? "
+            + " AND ar.status IN (" + SCHEDULE_STATUSES + ") "
+            + " AND ar.start_time < ? "
+            + " AND ar.end_time > ? "
+            + " ORDER BY ar.start_time ASC";
 
-        String sql = BASE_SELECT +
-            " WHERE ar.asset_id = ? " +
-            " AND ar.request_id <> ? " +
-            " AND ar.status IN ('PENDING', 'APPROVED', 'CHECKED_OUT') " +
-            " AND ar.start_time < ? " +
-            " AND ar.end_time > ? " +
-            " ORDER BY ar.start_time ASC";
+        List<AssetRequest> result = new ArrayList<>();
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, assetId);
             ps.setInt(2, excludeRequestId);
-            ps.setTimestamp(3, endTime);
-            ps.setTimestamp(4, startTime);
+            ps.setTimestamp(3, end);
+            ps.setTimestamp(4, start);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    conflicts.add(mapResult(rs));
+                    result.add(map(rs));
                 }
             }
         }
 
-        return conflicts;
+        return result;
     }
 
-    /*
-     * Duyệt yêu cầu.
-     */
     public String approveRequest(int requestId) throws SQLException {
-        return updateDecision(requestId, "APPROVED");
+        return decide(requestId, "APPROVED");
     }
 
-    /*
-     * Từ chối yêu cầu.
-     */
     public String rejectRequest(int requestId) throws SQLException {
-        return updateDecision(requestId, "REJECTED");
+        return decide(requestId, "REJECTED");
     }
 
-    /*
-     * Cập nhật trạng thái và tạo thông báo trong cùng transaction.
-     *
-     * Chỉ cho phép xử lý yêu cầu đang PENDING.
-     */
-    private String updateDecision(
-            int requestId,
-            String decision) throws SQLException {
-
-        if (!"APPROVED".equals(decision)
-                && !"REJECTED".equals(decision)) {
-            throw new IllegalArgumentException(
-                "Trạng thái xử lý không hợp lệ."
-            );
-        }
-
-        String lockRequestSql =
-            "SELECT " +
-            "ar.request_id, ar.topic_id, ar.asset_id, " +
-            "ar.requester_user_id, ar.start_time, ar.end_time, ar.status, " +
-            "t.topic_code, t.title, a.asset_name, a.asset_status, " +
-            "u.full_name " +
-            "FROM Asset_Request ar WITH (UPDLOCK, HOLDLOCK) " +
-            "INNER JOIN Topic t ON ar.topic_id = t.topic_id " +
-            "INNER JOIN Asset a WITH (UPDLOCK, HOLDLOCK) " +
-            "ON ar.asset_id = a.asset_id " +
-            "INNER JOIN [User] u ON ar.requester_user_id = u.user_id " +
-            "WHERE ar.request_id = ?";
-
-        String conflictSql =
-            "SELECT COUNT(*) " +
-            "FROM Asset_Request WITH (UPDLOCK, HOLDLOCK) " +
-            "WHERE asset_id = ? " +
-            "AND request_id <> ? " +
-            "AND status IN ('PENDING', 'APPROVED', 'CHECKED_OUT') " +
-            "AND start_time < ? " +
-            "AND end_time > ?";
-
-        String updateSql =
-            "UPDATE Asset_Request " +
-            "SET status = ? " +
-            "WHERE request_id = ? AND status = 'PENDING'";
-
-        String notificationSql =
-            "INSERT INTO Notification " +
-            "(user_id, topic_id, message, is_read) " +
-            "VALUES (?, ?, ?, 0)";
+    private String decide(int requestId, String decision)
+            throws SQLException {
 
         try (Connection con = DBConnection.getConnection()) {
 
             boolean oldAutoCommit = con.getAutoCommit();
+            int oldIsolation = con.getTransactionIsolation();
 
             try {
+                con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
                 con.setAutoCommit(false);
 
-                int topicId;
-                int assetId;
-                int requesterId;
-                Timestamp startTime;
-                Timestamp endTime;
-                String currentStatus;
-                String topicCode;
-                String topicTitle;
-                String assetName;
-                String assetStatus;
+                RequestLock item = lockRequest(con, requestId);
 
-                // 1. Khóa và lấy thông tin yêu cầu.
-                try (PreparedStatement ps =
-                        con.prepareStatement(lockRequestSql)) {
-
-                    ps.setInt(1, requestId);
-
-                    try (ResultSet rs = ps.executeQuery()) {
-
-                        if (!rs.next()) {
-                            con.rollback();
-                            return "NOT_FOUND";
-                        }
-
-                        currentStatus = rs.getString("status");
-
-                        if (!"PENDING".equalsIgnoreCase(currentStatus)) {
-                            con.rollback();
-                            return "NOT_PENDING";
-                        }
-
-                        topicId = rs.getInt("topic_id");
-                        assetId = rs.getInt("asset_id");
-                        requesterId = rs.getInt("requester_user_id");
-                        startTime = rs.getTimestamp("start_time");
-                        endTime = rs.getTimestamp("end_time");
-                        topicCode = rs.getString("topic_code");
-                        topicTitle = rs.getString("title");
-                        assetName = rs.getString("asset_name");
-                        assetStatus = rs.getString("asset_status");
-                    }
+                if (item == null) {
+                    con.rollback();
+                    return "NOT_FOUND";
                 }
 
-                // 2. Nếu duyệt, kiểm tra tài sản và lịch bị trùng.
-                if ("APPROVED".equals(decision)) {
+                if (!"PENDING".equals(item.status)) {
+                    con.rollback();
+                    return "NOT_PENDING";
+                }
 
-                    if ("MAINTENANCE".equalsIgnoreCase(assetStatus)) {
+                if ("APPROVED".equals(decision)) {
+                    if ("MAINTENANCE".equals(item.assetStatus)) {
+                        con.rollback();
+                        return "ASSET_MAINTENANCE";
+                    }
+
+                    if (hasConflict(con, item.assetId, item.requestId, item.start, item.end)) {
                         con.rollback();
                         return "CONFLICT";
                     }
-
-                    try (PreparedStatement ps =
-                            con.prepareStatement(conflictSql)) {
-
-                        ps.setInt(1, assetId);
-                        ps.setInt(2, requestId);
-                        ps.setTimestamp(3, endTime);
-                        ps.setTimestamp(4, startTime);
-
-                        try (ResultSet rs = ps.executeQuery()) {
-                            if (rs.next() && rs.getInt(1) > 0) {
-                                con.rollback();
-                                return "CONFLICT";
-                            }
-                        }
-                    }
                 }
 
-                // 3. Cập nhật trạng thái.
-                int updated;
+                String updateSql =
+                    "UPDATE dbo.Asset_Request "
+                    + "SET status = ? "
+                    + "WHERE request_id = ? AND status = 'PENDING'";
 
-                try (PreparedStatement ps =
-                        con.prepareStatement(updateSql)) {
-
+                try (PreparedStatement ps = con.prepareStatement(updateSql)) {
                     ps.setString(1, decision);
                     ps.setInt(2, requestId);
 
-                    updated = ps.executeUpdate();
+                    if (ps.executeUpdate() != 1) {
+                        con.rollback();
+                        return "NOT_PENDING";
+                    }
                 }
 
-                if (updated != 1) {
-                    con.rollback();
-                    return "ERROR";
-                }
+                String message =
+                    "Yêu cầu #" + requestId
+                    + " sử dụng tài sản " + item.assetName
+                    + " cho đề tài " + item.topicTitle
+                    + ("APPROVED".equals(decision)
+                        ? " đã được phê duyệt."
+                        : " đã bị từ chối.");
 
-                // 4. Tạo thông báo cho người gửi yêu cầu.
-                String message;
+                insertNotification(con, item.requesterId, item.topicId, message);
 
-                if ("APPROVED".equals(decision)) {
-                    message =
-                        "Yêu cầu sử dụng tài sản " + assetName +
-                        " cho đề tài " + topicCode +
-                        " - " + topicTitle +
-                        " đã được phê duyệt.";
-                } else {
-                    message =
-                        "Yêu cầu sử dụng tài sản " + assetName +
-                        " cho đề tài " + topicCode +
-                        " - " + topicTitle +
-                        " đã bị từ chối.";
-                }
-
-                try (PreparedStatement ps =
-                        con.prepareStatement(notificationSql)) {
-
-                    ps.setInt(1, requesterId);
-                    ps.setInt(2, topicId);
-                    ps.setString(3, message);
-
-                    ps.executeUpdate();
-                }
-
-                // 5. Hoàn tất transaction.
                 con.commit();
                 return decision;
 
             } catch (SQLException | RuntimeException ex) {
-
                 try {
                     con.rollback();
                 } catch (SQLException rollbackEx) {
                     ex.addSuppressed(rollbackEx);
                 }
-
                 throw ex;
 
             } finally {
                 try {
                     con.setAutoCommit(oldAutoCommit);
-                } catch (SQLException ex) {
-                    // Không che mất lỗi SQL chính.
+                    con.setTransactionIsolation(oldIsolation);
+                } catch (SQLException ignored) {
                 }
             }
         }
     }
 
-    /*
-     * Ánh xạ dữ liệu SQL sang AssetRequest.
-     *
-     * Yêu cầu model AssetRequest có các setter tương ứng.
-     */
-    private AssetRequest mapResult(ResultSet rs) throws SQLException {
+    public String checkoutRequest(int requestId) throws SQLException {
 
-        AssetRequest request = new AssetRequest();
+        try (Connection con = DBConnection.getConnection()) {
 
-        request.setRequestId(rs.getInt("request_id"));
-        request.setTopicId(rs.getInt("topic_id"));
-        request.setAssetId(rs.getInt("asset_id"));
-        request.setRequesterUserId(rs.getInt("requester_user_id"));
+            boolean oldAutoCommit = con.getAutoCommit();
+            int oldIsolation = con.getTransactionIsolation();
 
-        request.setStartTime(rs.getTimestamp("start_time"));
-        request.setEndTime(rs.getTimestamp("end_time"));
-        request.setStatus(rs.getString("status"));
+            try {
+                con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+                con.setAutoCommit(false);
 
-        request.setTopicCode(rs.getString("topic_code"));
-        request.setTopicTitle(rs.getString("topic_title"));
+                RequestLock item = lockRequest(con, requestId);
 
-        request.setAssetName(rs.getString("asset_name"));
-        request.setAssetStatus(rs.getString("asset_status"));
+                if (item == null) {
+                    con.rollback();
+                    return "NOT_FOUND";
+                }
 
-        request.setRequesterName(rs.getString("requester_name"));
-        request.setRequesterEmail(rs.getString("requester_email"));
+                if (!"APPROVED".equals(item.status)) {
+                    con.rollback();
+                    return "NOT_APPROVED";
+                }
 
-        return request;
+                if (!"AVAILABLE".equals(item.assetStatus)) {
+                    con.rollback();
+                    return "ASSET_NOT_AVAILABLE";
+                }
+
+                if (hasOtherCheckedOut(con, item.assetId, requestId)) {
+                    con.rollback();
+                    return "ASSET_NOT_AVAILABLE";
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(
+                    "UPDATE dbo.Asset_Request "
+                    + "SET status = 'CHECKED_OUT' "
+                    + "WHERE request_id = ? AND status = 'APPROVED'")) {
+
+                    ps.setInt(1, requestId);
+
+                    if (ps.executeUpdate() != 1) {
+                        con.rollback();
+                        return "NOT_APPROVED";
+                    }
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(
+                    "UPDATE dbo.Asset "
+                    + "SET asset_status = 'CHECKED_OUT' "
+                    + "WHERE asset_id = ? AND asset_status = 'AVAILABLE'")) {
+
+                    ps.setInt(1, item.assetId);
+
+                    if (ps.executeUpdate() != 1) {
+                        con.rollback();
+                        return "ASSET_NOT_AVAILABLE";
+                    }
+                }
+
+                insertNotification(
+                    con,
+                    item.requesterId,
+                    item.topicId,
+                    "Tài sản " + item.assetName
+                    + " của yêu cầu #" + requestId
+                    + " đã được bàn giao."
+                );
+
+                con.commit();
+                return "CHECKED_OUT";
+
+            } catch (SQLException | RuntimeException ex) {
+                try {
+                    con.rollback();
+                } catch (SQLException rollbackEx) {
+                    ex.addSuppressed(rollbackEx);
+                }
+                throw ex;
+
+            } finally {
+                try {
+                    con.setAutoCommit(oldAutoCommit);
+                    con.setTransactionIsolation(oldIsolation);
+                } catch (SQLException ignored) {
+                }
+            }
+        }
     }
 
-    /*
-     * Gán danh sách tham số vào PreparedStatement.
-     */
-    private void setParameters(
-            PreparedStatement ps,
-            List<Object> params) throws SQLException {
+    public String returnRequest(int requestId) throws SQLException {
+        return returnRequest(requestId, "AVAILABLE");
+    }
 
-        for (int i = 0; i < params.size(); i++) {
+    public String returnRequest(
+            int requestId,
+            String finalAssetStatus) throws SQLException {
 
-            Object value = params.get(i);
+        if (!"AVAILABLE".equals(finalAssetStatus)
+                && !"MAINTENANCE".equals(finalAssetStatus)) {
+            throw new IllegalArgumentException(
+                "Trạng thái sau thu hồi không hợp lệ: " + finalAssetStatus
+            );
+        }
 
-            if (value instanceof Timestamp) {
-                ps.setTimestamp(i + 1, (Timestamp) value);
+        try (Connection con = DBConnection.getConnection()) {
 
-            } else if (value instanceof java.sql.Date) {
-                ps.setDate(i + 1, (java.sql.Date) value);
+            boolean oldAutoCommit = con.getAutoCommit();
+            int oldIsolation = con.getTransactionIsolation();
 
-            } else if (value instanceof Integer) {
-                ps.setInt(i + 1, (Integer) value);
+            try {
+                con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+                con.setAutoCommit(false);
 
-            } else {
-                ps.setObject(i + 1, value);
+                RequestLock item = lockRequest(con, requestId);
+
+                if (item == null) {
+                    con.rollback();
+                    return "NOT_FOUND";
+                }
+
+                if (!"CHECKED_OUT".equals(item.status)) {
+                    con.rollback();
+                    return "NOT_CHECKED_OUT";
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(
+                    "UPDATE dbo.Asset_Request "
+                    + "SET status = 'RETURNED' "
+                    + "WHERE request_id = ? AND status = 'CHECKED_OUT'")) {
+
+                    ps.setInt(1, requestId);
+
+                    if (ps.executeUpdate() != 1) {
+                        con.rollback();
+                        return "NOT_CHECKED_OUT";
+                    }
+                }
+
+                if (!hasOtherCheckedOut(con, item.assetId, requestId)) {
+                    try (PreparedStatement ps = con.prepareStatement(
+                        "UPDATE dbo.Asset "
+                        + "SET asset_status = ? "
+                        + "WHERE asset_id = ? AND asset_status = 'CHECKED_OUT'")) {
+
+                        ps.setString(1, finalAssetStatus);
+                        ps.setInt(2, item.assetId);
+                        ps.executeUpdate();
+                    }
+                }
+
+                insertNotification(
+                    con,
+                    item.requesterId,
+                    item.topicId,
+                    "Tài sản " + item.assetName
+                    + " của yêu cầu #" + requestId
+                    + " đã được thu hồi. Trạng thái sau kiểm tra: "
+                    + finalAssetStatus + "."
+                );
+
+                con.commit();
+                return "RETURNED";
+
+            } catch (SQLException | RuntimeException ex) {
+                try {
+                    con.rollback();
+                } catch (SQLException rollbackEx) {
+                    ex.addSuppressed(rollbackEx);
+                }
+                throw ex;
+
+            } finally {
+                try {
+                    con.setAutoCommit(oldAutoCommit);
+                    con.setTransactionIsolation(oldIsolation);
+                } catch (SQLException ignored) {
+                }
             }
+        }
+    }
+
+    public List<AssetRequest> findHistoryByAssetId(int assetId) throws SQLException {
+        String sql = BASE_SELECT
+            + " WHERE ar.asset_id = ? "
+            + " AND ar.status IN ('CHECKED_OUT','RETURNED') "
+            + " ORDER BY ar.start_time DESC, ar.request_id DESC";
+
+        List<AssetRequest> result = new ArrayList<>();
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, assetId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(map(rs));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public List<AssetRequest> findHistoryByAssetId(
+            int assetId, int page) throws SQLException {
+
+        String sql = BASE_SELECT
+            + " WHERE ar.asset_id = ? "
+            + " AND ar.status IN ('CHECKED_OUT','RETURNED') "
+            + " ORDER BY ar.start_time DESC, ar.request_id DESC "
+            + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+
+        List<AssetRequest> result = new ArrayList<>();
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, assetId);
+            ps.setInt(2, (Math.max(1, page) - 1) * PAGE_SIZE);
+            ps.setInt(3, PAGE_SIZE);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(map(rs));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public int countHistoryByAssetId(int assetId) throws SQLException {
+        String sql =
+            "SELECT COUNT(*) FROM dbo.Asset_Request "
+            + "WHERE asset_id = ? "
+            + "AND status IN ('CHECKED_OUT','RETURNED')";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, assetId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static class RequestLock {
+        int requestId;
+        int topicId;
+        int assetId;
+        int requesterId;
+
+        Timestamp start;
+        Timestamp end;
+
+        String status;
+        String assetStatus;
+        String assetName;
+        String topicTitle;
+    }
+
+    private RequestLock lockRequest(Connection con, int id)
+            throws SQLException {
+
+        String sql =
+            "SELECT ar.request_id, ar.topic_id, ar.asset_id, "
+            + "ar.requester_user_id, ar.start_time, ar.end_time, "
+            + "ar.status, a.asset_status, a.asset_name, t.title "
+            + "FROM dbo.Asset_Request ar WITH (UPDLOCK,HOLDLOCK) "
+            + "JOIN dbo.Asset a WITH (UPDLOCK,HOLDLOCK) "
+            + "ON a.asset_id = ar.asset_id "
+            + "JOIN dbo.Topic t ON t.topic_id = ar.topic_id "
+            + "WHERE ar.request_id = ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+
+            try (ResultSet rs = ps.executeQuery()) {
+
+                if (!rs.next()) {
+                    return null;
+                }
+
+                RequestLock item = new RequestLock();
+
+                item.requestId = rs.getInt("request_id");
+                item.topicId = rs.getInt("topic_id");
+                item.assetId = rs.getInt("asset_id");
+                item.requesterId = rs.getInt("requester_user_id");
+
+                item.start = rs.getTimestamp("start_time");
+                item.end = rs.getTimestamp("end_time");
+
+                item.status = rs.getString("status");
+                item.assetStatus = rs.getString("asset_status");
+                item.assetName = rs.getString("asset_name");
+                item.topicTitle = rs.getString("title");
+
+                return item;
+            }
+        }
+    }
+
+    private boolean hasConflict(
+            Connection con,
+            int assetId,
+            int excludeId,
+            Timestamp start,
+            Timestamp end) throws SQLException {
+
+        String sql =
+            "SELECT COUNT(*) "
+            + "FROM dbo.Asset_Request WITH (UPDLOCK,HOLDLOCK) "
+            + "WHERE asset_id = ? "
+            + "AND request_id <> ? "
+            + "AND status IN (" + BLOCKING_STATUSES + ") "
+            + "AND start_time < ? "
+            + "AND end_time > ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, assetId);
+            ps.setInt(2, excludeId);
+            ps.setTimestamp(3, end);
+            ps.setTimestamp(4, start);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasOtherCheckedOut(
+            Connection con,
+            int assetId,
+            int excludeId) throws SQLException {
+
+        String sql =
+            "SELECT COUNT(*) "
+            + "FROM dbo.Asset_Request WITH (UPDLOCK,HOLDLOCK) "
+            + "WHERE asset_id = ? "
+            + "AND request_id <> ? "
+            + "AND status = 'CHECKED_OUT'";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, assetId);
+            ps.setInt(2, excludeId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void insertNotification(
+            Connection con,
+            int userId,
+            int topicId,
+            String message) {
+
+        String sql =
+            "INSERT INTO dbo.Notification "
+            + "(user_id, topic_id, message, is_read) "
+            + "VALUES (?, ?, ?, 0)";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, topicId);
+            ps.setString(3, message);
+            ps.executeUpdate();
+        } catch (SQLException ignored) {
+            // Non-blocking notification: if notification table is missing or fails, business transaction completes
         }
     }
 

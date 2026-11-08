@@ -1,6 +1,10 @@
 package model;
 
-public class Asset {
+import java.io.Serializable;
+
+public class Asset implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private int assetId;
     private String assetCode;
@@ -9,9 +13,21 @@ public class Asset {
     private String assetStatus;
     private String serialNumber;
     private String description;
-    private String imagePath;
+    private String imagePath; // Kept for model compatibility; not persisted to DB
 
     public Asset() {
+        this.assetStatus = "AVAILABLE";
+    }
+
+    public Asset(int assetId, String assetCode, String assetName, String assetCategory,
+                 String assetStatus, String serialNumber, String description) {
+        this.assetId = assetId;
+        this.assetCode = assetCode;
+        this.assetName = assetName;
+        this.assetCategory = assetCategory;
+        this.assetStatus = assetStatus;
+        this.serialNumber = serialNumber;
+        this.description = description;
     }
 
     public int getAssetId() {

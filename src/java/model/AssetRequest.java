@@ -1,8 +1,11 @@
 package model;
 
+import java.io.Serializable;
 import java.sql.Timestamp;
 
-public class AssetRequest {
+public class AssetRequest implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private int requestId;
     private int topicId;
@@ -12,6 +15,7 @@ public class AssetRequest {
     private String topicTitle;
     private String topicCode;
     private String assetName;
+    private String assetCode;
     private String requesterName;
     private String requesterEmail;
     private String status;
@@ -19,6 +23,9 @@ public class AssetRequest {
 
     private Timestamp startTime;
     private Timestamp endTime;
+
+    public AssetRequest() {
+    }
 
     public int getRequestId() {
         return requestId;
@@ -76,6 +83,14 @@ public class AssetRequest {
         this.assetName = assetName;
     }
 
+    public String getAssetCode() {
+        return assetCode;
+    }
+
+    public void setAssetCode(String assetCode) {
+        this.assetCode = assetCode;
+    }
+
     public String getRequesterName() {
         return requesterName;
     }
@@ -100,6 +115,14 @@ public class AssetRequest {
         this.status = status;
     }
 
+    public String getAssetStatus() {
+        return assetStatus;
+    }
+
+    public void setAssetStatus(String assetStatus) {
+        this.assetStatus = assetStatus;
+    }
+
     public Timestamp getStartTime() {
         return startTime;
     }
@@ -115,12 +138,4 @@ public class AssetRequest {
     public void setEndTime(Timestamp endTime) {
         this.endTime = endTime;
     }
-    
-    public String getAssetStatus() {
-    return assetStatus;
-}
-
-public void setAssetStatus(String assetStatus) {
-    this.assetStatus = assetStatus;
-}
 }

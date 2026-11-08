@@ -2,515 +2,473 @@ package controller;
 
 import dao.AssetDAO;
 import dao.AssetDAO.DeleteResult;
-import model.Asset;
-import util.DBConnection;
+import dao.AssetDAO.PageResult;
 
 import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.Locale;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import model.Asset;
 
-@WebServlet("/assets")
-@MultipartConfig(
-    fileSizeThreshold = 1024 * 1024,
-    maxFileSize = 5 * 1024 * 1024,
-    maxRequestSize = 6 * 1024 * 1024
-)
+@WebServlet(name = "AssetServerlet", urlPatterns = {"/assets"})
 public class AssetServerlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
-    private final AssetDAO assetDAO = new AssetDAO();
+    private static final int PAGE_SIZE = 10;
 
-    private static final Set<String> CATEGORIES = Set.of(
-        "CAMERA_EQUIPMENT",
-        "PHOTO_EQUIPMENT",
-        "AUDIO_EQUIPMENT",
-        "ACCESSORIES",
-        "IT_EQUIPMENT",
-        "VEHICLE"
-    );
+    private static final String VIEW = "/WEB-INF/views/assets/";
 
-    private static final Set<String> STATUSES = Set.of(
-        "AVAILABLE",
-        "CHECKED_OUT",
-        "MAINTENANCE"
-    );
+    private static final Set<String> CATEGORIES =
+            new HashSet<>(Arrays.asList(
+                "CAMERA_EQUIPMENT",
+                "PHOTO_EQUIPMENT",
+                "AUDIO_EQUIPMENT",
+                "ACCESSORIES",
+                "IT_EQUIPMENT",
+                "VEHICLE"
+            ));
 
-    private static final Set<String> IMAGE_TYPES = Set.of(
-        "image/jpeg",
-        "image/png"
-    );
+    private static final Set<String> STATUSES =
+            new HashSet<>(Arrays.asList(
+                "AVAILABLE",
+                "CHECKED_OUT",
+                "MAINTENANCE"
+            ));
+
+    private final AssetDAO dao = new AssetDAO();
+
+    // =====================================================
+    // GET
+    // =====================================================
 
     @Override
     protected void doGet(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws ServletException, IOException {
 
-        request.setCharacterEncoding("UTF-8");
-        response.setCharacterEncoding("UTF-8");
+        req.setCharacterEncoding("UTF-8");
+        resp.setCharacterEncoding("UTF-8");
 
-        String action = request.getParameter("action");
+        String action = trim(req.getParameter("action"));
 
         try {
             if ("add".equals(action)) {
-                request.setAttribute("asset", new Asset());
-                forward(request, response, "asset-form.jsp");
+                Asset asset = new Asset();
+                asset.setAssetStatus("AVAILABLE");
+                req.setAttribute("asset", asset);
+                req.setAttribute("formMode", "add");
+                forward(req, resp, "asset-form.jsp");
                 return;
             }
 
             if ("edit".equals(action) || "detail".equals(action)) {
-                int id = parseId(request.getParameter("id"));
+                int id = positiveInt(req.getParameter("id"), -1);
 
-                if (id <= 0) {
-                    response.sendError(400, "ID tài sản không hợp lệ.");
+                if (id < 1) {
+                    resp.sendError(
+                        HttpServletResponse.SC_BAD_REQUEST,
+                        "ID tài sản không hợp lệ."
+                    );
                     return;
                 }
 
-                Asset asset = assetDAO.getAssetById(id);
+                Asset asset = dao.getAssetById(id);
 
                 if (asset == null) {
-                    response.sendError(404, "Không tìm thấy tài sản.");
+                    resp.sendError(
+                        HttpServletResponse.SC_NOT_FOUND,
+                        "Không tìm thấy tài sản."
+                    );
                     return;
                 }
 
-                request.setAttribute("asset", asset);
+                req.setAttribute("asset", asset);
 
                 if ("edit".equals(action)) {
-                    forward(request, response, "asset-form.jsp");
+                    req.setAttribute("formMode", "edit");
+                    forward(req, resp, "asset-form.jsp");
                 } else {
-                    forward(request, response, "asset-detail.jsp");
+                    forward(req, resp, "asset-detail.jsp");
                 }
                 return;
             }
 
-            request.setAttribute("assets", assetDAO.getAllAssets());
-            forward(request, response, "asset-list.jsp");
+            showList(req, resp);
 
         } catch (SQLException ex) {
-            log("Lỗi truy vấn quản lý tài sản", ex);
-            response.sendError(
-                500,
-                "Không thể tải dữ liệu tài sản. Hãy kiểm tra kết nối database."
+            log("Asset GET failed", ex);
+            resp.sendError(
+                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                "Không thể tải dữ liệu tài sản. Chi tiết lỗi đã được ghi vào log server."
             );
         }
     }
+
+    // =====================================================
+    // DANH SÁCH TÀI SẢN
+    // =====================================================
+
+    private void showList(
+            HttpServletRequest req,
+            HttpServletResponse resp)
+            throws SQLException, ServletException, IOException {
+
+        String keyword = trim(req.getParameter("keyword"));
+        String category = trim(req.getParameter("category"));
+        String status = trim(req.getParameter("status"));
+
+        if (!category.isEmpty() && !CATEGORIES.contains(category)) {
+            category = "";
+        }
+
+        if (!status.isEmpty() && !STATUSES.contains(status)) {
+            status = "";
+        }
+
+        int page = positiveInt(req.getParameter("page"), 1);
+
+        PageResult result = dao.searchAssets(
+            keyword,
+            category,
+            status,
+            page,
+            PAGE_SIZE
+        );
+
+        int totalAll = dao.countAllAssets();
+        int availableCount = dao.countByStatus("AVAILABLE");
+        int checkedOutCount = dao.countByStatus("CHECKED_OUT");
+        int maintenanceCount = dao.countByStatus("MAINTENANCE");
+
+        req.setAttribute("assets", result.getAssets());
+        req.setAttribute("pageResult", result);
+
+        req.setAttribute("keyword", keyword);
+        req.setAttribute("category", category);
+        req.setAttribute("status", status);
+        req.setAttribute("selectedCategory", category);
+        req.setAttribute("selectedStatus", status);
+
+        req.setAttribute("currentPage", result.getCurrentPage());
+        req.setAttribute("totalPages", result.getTotalPages());
+        req.setAttribute("totalRecords", result.getTotalRecords());
+
+        req.setAttribute("totalAssets", totalAll);
+        req.setAttribute("availableCount", availableCount);
+        req.setAttribute("checkedOutCount", checkedOutCount);
+        req.setAttribute("maintenanceCount", maintenanceCount);
+
+        req.setAttribute("availableAssets", availableCount);
+        req.setAttribute("checkedOutAssets", checkedOutCount);
+        req.setAttribute("maintenanceAssets", maintenanceCount);
+
+        forward(req, resp, "asset-list.jsp");
+    }
+
+    // =====================================================
+    // POST
+    // =====================================================
 
     @Override
     protected void doPost(
-            HttpServletRequest request,
-            HttpServletResponse response)
+            HttpServletRequest req,
+            HttpServletResponse resp)
             throws ServletException, IOException {
 
-        request.setCharacterEncoding("UTF-8");
-        response.setCharacterEncoding("UTF-8");
+        req.setCharacterEncoding("UTF-8");
+        resp.setCharacterEncoding("UTF-8");
 
-        String action = request.getParameter("action");
+        String action = trim(req.getParameter("action"));
 
         try {
-            if ("delete".equals(action)) {
-                deleteAsset(request, response);
-                return;
+            switch (action) {
+                case "insert":
+                    save(req, resp, false);
+                    return;
+
+                case "update":
+                    save(req, resp, true);
+                    return;
+
+                case "delete":
+                    delete(req, resp);
+                    return;
+
+                default:
+                    resp.sendError(
+                        HttpServletResponse.SC_BAD_REQUEST,
+                        "Thao tác không hợp lệ."
+                    );
             }
 
-            if ("insert".equals(action)) {
-                saveAsset(request, response, false);
-                return;
-            }
-
-            if ("update".equals(action)) {
-                saveAsset(request, response, true);
-                return;
-            }
-
-            response.sendError(400, "Thao tác không hợp lệ.");
+        } catch (IllegalArgumentException ex) {
+            showFormError(req, resp, action, ex.getMessage());
 
         } catch (SQLException ex) {
-            log("Lỗi xử lý quản lý tài sản", ex);
+            log("Asset POST failed. action=" + action, ex);
 
-            if (isDuplicateKey(ex)) {
-                try {
-                    showFormError(
-                            request, response,
-                            "Mã tài sản đã tồn tại. Hãy nhập mã khác.",
-                            "update".equals(action)
-                    );
-                } catch (SQLException ex1) {
-                    Logger.getLogger(AssetServerlet.class.getName()).log(Level.SEVERE, null, ex1);
-                }
-                return;
+            if (isDuplicateKey(ex)
+                    && ("insert".equals(action) || "update".equals(action))) {
+                showFormError(
+                    req,
+                    resp,
+                    action,
+                    "Mã tài sản đã tồn tại. Vui lòng nhập mã khác."
+                );
+            } else {
+                resp.sendError(
+                    HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Không thể xử lý dữ liệu tài sản. Hãy xem log của máy chủ."
+                );
             }
-
-            response.sendError(
-                500,
-                "Không thể lưu dữ liệu. Hãy kiểm tra database và log của Tomcat."
-            );
         }
     }
 
-    private void saveAsset(
-            HttpServletRequest request,
-            HttpServletResponse response,
+    // =====================================================
+    // INSERT / UPDATE
+    // =====================================================
+
+    private void save(
+            HttpServletRequest req,
+            HttpServletResponse resp,
             boolean editing)
             throws SQLException, ServletException, IOException {
 
-        int id = editing ? parseId(request.getParameter("id")) : 0;
+        int id = editing ? positiveInt(req.getParameter("id"), -1) : 0;
 
-        if (editing && id <= 0) {
-            response.sendError(400, "ID tài sản không hợp lệ.");
-            return;
+        if (editing && id < 1) {
+            throw new IllegalArgumentException("ID tài sản không hợp lệ.");
         }
 
-        Asset asset = new Asset();
+        Asset asset = readForm(req);
+        asset.setAssetId(id);
 
+        Asset existing = editing ? dao.getAssetById(id) : null;
+        if (editing && existing == null) {
+            throw new IllegalArgumentException("Tài sản cần cập nhật không tồn tại.");
+        }
+
+        validate(asset, editing, existing);
+
+        boolean saved;
         if (editing) {
-            Asset existing = assetDAO.getAssetById(id);
-
-            if (existing == null) {
-                response.sendError(404, "Không tìm thấy tài sản.");
-                return;
-            }
-
-            asset = existing;
-            asset.setAssetId(id);
+            saved = dao.updateAsset(asset);
+        } else {
+            saved = dao.insertAsset(asset);
         }
 
-        String code = trim(request.getParameter("assetCode"));
-        String name = trim(request.getParameter("assetName"));
-        String category = trim(request.getParameter("assetCategory"));
-        String status = trim(request.getParameter("assetStatus"));
-        String serial = trim(request.getParameter("serialNumber"));
-        String description = trim(request.getParameter("description"));
-
-        asset.setAssetCode(code);
-        asset.setAssetName(name);
-        asset.setAssetCategory(category);
-        asset.setAssetStatus(status);
-        asset.setSerialNumber(emptyToNull(serial));
-        asset.setDescription(emptyToNull(description));
-
-        String validationError = validate(asset);
-
-        if (validationError != null) {
-            request.setAttribute("asset", asset);
-            request.setAttribute("error", validationError);
-            forward(request, response, "asset-form.jsp");
-            return;
+        if (!saved) {
+            throw new SQLException("Không thể lưu dữ liệu tài sản.");
         }
 
-        if (assetDAO.isAssetCodeExists(code, editing ? id : 0)) {
-            request.setAttribute("asset", asset);
-            request.setAttribute("error", "Mã tài sản đã tồn tại.");
-            forward(request, response, "asset-form.jsp");
-            return;
-        }
-
-        String oldImage = asset.getImagePath();
-        String uploadedImage = null;
-
-        Part imagePart = request.getPart("imageFile");
-
-        if (imagePart != null && imagePart.getSize() > 0) {
-            try {
-                uploadedImage = saveImage(imagePart);
-                asset.setImagePath(uploadedImage);
-            } catch (IllegalArgumentException ex) {
-                request.setAttribute("asset", asset);
-                request.setAttribute("error", ex.getMessage());
-                forward(request, response, "asset-form.jsp");
-                return;
-            }
-        }
-
-        boolean success;
-
-        try {
-            success = editing
-                ? assetDAO.updateAsset(asset)
-                : assetDAO.insertAsset(asset);
-        } catch (SQLException ex) {
-            deleteUploadedImage(uploadedImage);
-            throw ex;
-        }
-
-        if (!success) {
-            deleteUploadedImage(uploadedImage);
-            request.setAttribute("asset", asset);
-            request.setAttribute("error", "Không thể lưu tài sản. Hãy thử lại.");
-            forward(request, response, "asset-form.jsp");
-            return;
-        }
-
-        // Chỉ xóa ảnh cũ sau khi ảnh mới và dữ liệu đã lưu thành công.
-        if (uploadedImage != null && oldImage != null
-                && !oldImage.equals(uploadedImage)) {
-            deleteUploadedImage(oldImage);
-        }
-
-        response.sendRedirect(
-            request.getContextPath() + "/assets?message="
-            + (editing ? "updated" : "added")
-        );
+        redirect(req, resp, editing ? "updated" : "added");
     }
 
-    private void deleteAsset(
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws SQLException, IOException {
-
-        int id = parseId(request.getParameter("id"));
-
-        if (id <= 0) {
-            response.sendError(400, "ID tài sản không hợp lệ.");
-            return;
-        }
-
-        DeleteResult result = assetDAO.deleteAsset(id);
-
-        switch (result) {
-            case DELETED:
-                response.sendRedirect(
-                    request.getContextPath() + "/assets?message=deleted"
-                );
-                break;
-
-            case NOT_FOUND:
-                response.sendRedirect(
-                    request.getContextPath() + "/assets?message=notfound"
-                );
-                break;
-
-            case IN_USE:
-                response.sendRedirect(
-                    request.getContextPath() + "/assets?message=inuse"
-                );
-                break;
-
-            case HAS_REQUEST_HISTORY:
-                response.sendRedirect(
-                    request.getContextPath() + "/assets?message=history"
-                );
-                break;
-
-            default:
-                response.sendRedirect(
-                    request.getContextPath() + "/assets?message=deleteerror"
-                );
-                break;
-        }
+    private Asset readForm(HttpServletRequest req) {
+        Asset asset = new Asset();
+        asset.setAssetCode(emptyToNull(req.getParameter("assetCode")));
+        asset.setAssetName(trim(req.getParameter("assetName")));
+        asset.setAssetCategory(trim(req.getParameter("assetCategory")));
+        asset.setAssetStatus(trim(req.getParameter("assetStatus")));
+        asset.setSerialNumber(emptyToNull(req.getParameter("serialNumber")));
+        asset.setDescription(emptyToNull(req.getParameter("description")));
+        return asset;
     }
 
-    private String validate(Asset asset) {
+    private void validate(
+            Asset asset,
+            boolean editing,
+            Asset existing) throws SQLException {
+
         String code = asset.getAssetCode();
         String name = asset.getAssetName();
         String category = asset.getAssetCategory();
         String status = asset.getAssetStatus();
-        String serial = asset.getSerialNumber();
-        String description = asset.getDescription();
 
-        if (code == null || code.isBlank()) {
-            return "Mã tài sản không được để trống.";
-        }
-        if (code.length() > 100) {
-            return "Mã tài sản không được vượt quá 100 ký tự.";
-        }
-        if (!code.matches("[\\p{L}\\p{N}][\\p{L}\\p{N}_./-]*")) {
-            return "Mã tài sản chỉ được chứa chữ, số, dấu gạch ngang, gạch dưới, dấu chấm hoặc dấu /.";
+        if (code == null || code.trim().isEmpty()) {
+            throw new IllegalArgumentException("Mã tài sản không được để trống.");
         }
 
-        if (name == null || name.isBlank()) {
-            return "Tên tài sản không được để trống.";
-        }
-        if (name.length() > 200) {
-            return "Tên tài sản không được vượt quá 200 ký tự.";
-        }
-        if (name.chars().anyMatch(Character::isISOControl)) {
-            return "Tên tài sản chứa ký tự điều khiển không hợp lệ.";
+        if (code.length() > 30) {
+            throw new IllegalArgumentException("Mã tài sản tối đa 30 ký tự.");
         }
 
-        if (category == null || !CATEGORIES.contains(category)) {
-            return "Hãy chọn một loại tài sản trong danh mục được cung cấp.";
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên tài sản không được để trống.");
         }
 
-        if (status == null || !STATUSES.contains(status)) {
-            return "Trạng thái tài sản không hợp lệ.";
+        if (name.length() > 150) {
+            throw new IllegalArgumentException("Tên tài sản tối đa 150 ký tự.");
         }
 
-        if (serial != null && serial.length() > 150) {
-            return "Số serial không được vượt quá 150 ký tự.";
-        }
-        if (serial != null && serial.chars().anyMatch(Character::isISOControl)) {
-            return "Số serial chứa ký tự không hợp lệ.";
+        if (category == null || category.trim().isEmpty() || !CATEGORIES.contains(category)) {
+            throw new IllegalArgumentException("Vui lòng chọn loại tài sản hợp lệ.");
         }
 
-        if (description != null && description.length() > 2000) {
-            return "Mô tả không được vượt quá 2.000 ký tự.";
+        if (status == null || status.trim().isEmpty() || !STATUSES.contains(status)) {
+            asset.setAssetStatus("AVAILABLE");
+            status = "AVAILABLE";
         }
 
-        return null;
+        int id = asset.getAssetId();
+        if (dao.isAssetCodeExists(asset.getAssetCode(), id)) {
+            throw new IllegalArgumentException("Mã tài sản đã tồn tại.");
+        }
+
+        // Không cho phép tạo mới hoặc tự chuyển trạng thái sang CHECKED_OUT bằng form
+        if ("CHECKED_OUT".equals(status)
+                && (!editing
+                || existing == null
+                || !"CHECKED_OUT".equals(existing.getAssetStatus()))) {
+
+            throw new IllegalArgumentException(
+                "Trạng thái 'Đang bàn giao' chỉ được cập nhật khi thực hiện bàn giao yêu cầu."
+            );
+        }
+
+        // Nếu đang sửa mà tài sản đang có yêu cầu PENDING/APPROVED/CHECKED_OUT thì không được chuyển sang MAINTENANCE
+        if (editing
+                && "MAINTENANCE".equals(status)
+                && !"MAINTENANCE".equals(existing.getAssetStatus())
+                && dao.hasActiveRequest(id)) {
+
+            throw new IllegalArgumentException(
+                "Không thể chuyển sang bảo trì khi tài sản đang có yêu cầu chờ duyệt, đã duyệt hoặc đang bàn giao."
+            );
+        }
+
+        if (asset.getSerialNumber() != null && asset.getSerialNumber().length() > 100) {
+            throw new IllegalArgumentException("Số serial tối đa 100 ký tự.");
+        }
+
+        if (asset.getDescription() != null && asset.getDescription().length() > 500) {
+            throw new IllegalArgumentException("Mô tả tối đa 500 ký tự.");
+        }
     }
 
-    private String saveImage(Part part)
-            throws IOException {
+    // =====================================================
+    // DELETE
+    // =====================================================
 
-        String contentType = part.getContentType();
+    private void delete(
+            HttpServletRequest req,
+            HttpServletResponse resp)
+            throws SQLException, IOException {
 
-        if (contentType == null
-                || !IMAGE_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException(
-                "Ảnh chỉ chấp nhận định dạng JPG hoặc PNG."
-            );
-        }
+        int id = positiveInt(req.getParameter("id"), -1);
 
-        if (part.getSize() > 5L * 1024 * 1024) {
-            throw new IllegalArgumentException(
-                "Dung lượng ảnh không được vượt quá 5 MB."
-            );
-        }
-
-        BufferedImage image;
-
-        try (InputStream input = part.getInputStream()) {
-            image = ImageIO.read(input);
-        }
-
-        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
-            throw new IllegalArgumentException(
-                "Tệp tải lên không phải ảnh JPG/PNG hợp lệ."
-            );
-        }
-
-        String extension = "image/png".equalsIgnoreCase(contentType)
-            ? ".png" : ".jpg";
-
-        String fileName = UUID.randomUUID().toString() + extension;
-
-        String realPath = getServletContext().getRealPath("/uploads/assets");
-
-        if (realPath == null) {
-            throw new IllegalArgumentException(
-                "Tomcat không xác định được thư mục lưu ảnh. " +
-                "Hãy triển khai ứng dụng dưới dạng thư mục đã giải nén."
-            );
-        }
-
-        File directory = new File(realPath);
-
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw new IOException("Không tạo được thư mục lưu ảnh.");
-        }
-
-        File destination = new File(directory, fileName);
-        part.write(destination.getAbsolutePath());
-
-        return "/uploads/assets/" + fileName;
-    }
-
-    private void deleteUploadedImage(String imagePath) {
-        if (imagePath == null || !imagePath.startsWith("/uploads/assets/")) {
+        if (id < 1) {
+            redirect(req, resp, "notfound");
             return;
         }
 
-        String fileName = imagePath.substring("/uploads/assets/".length());
+        DeleteResult result = dao.deleteAsset(id);
 
-        // Chỉ xóa tên file đơn, không cho phép đường dẫn thư mục.
-        if (fileName.contains("/") || fileName.contains("\\")
-                || fileName.contains("..")) {
-            return;
-        }
-
-        String realPath = getServletContext().getRealPath("/uploads/assets");
-
-        if (realPath != null) {
-            try {
-                Files.deleteIfExists(Path.of(realPath, fileName));
-            } catch (IOException ex) {
-                log("Không xóa được ảnh cũ: " + fileName, ex);
-            }
+        switch (result) {
+            case DELETED:
+                redirect(req, resp, "deleted");
+                break;
+            case NOT_FOUND:
+                redirect(req, resp, "notfound");
+                break;
+            case IN_USE:
+                redirect(req, resp, "inuse");
+                break;
+            case HAS_REQUEST_HISTORY:
+                redirect(req, resp, "history");
+                break;
+            default:
+                redirect(req, resp, "deleteerror");
+                break;
         }
     }
+
+    // =====================================================
+    // HIỂN THỊ LỖI FORM
+    // =====================================================
 
     private void showFormError(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            String error,
-            boolean editing)
-            throws SQLException, ServletException, IOException {
+            HttpServletRequest req,
+            HttpServletResponse resp,
+            String action,
+            String message)
+            throws ServletException, IOException {
 
-        Asset asset = new Asset();
+        boolean editing = "update".equals(action);
+        Asset asset = readForm(req);
 
         if (editing) {
-            int id = parseId(request.getParameter("id"));
-            asset = assetDAO.getAssetById(id);
-
-            if (asset == null) {
-                response.sendError(404, "Không tìm thấy tài sản.");
-                return;
-            }
+            asset.setAssetId(positiveInt(req.getParameter("id"), -1));
         }
 
-        request.setAttribute("asset", asset);
-        request.setAttribute("error", error);
-        forward(request, response, "asset-form.jsp");
+        req.setAttribute("asset", asset);
+        req.setAttribute("formMode", editing ? "edit" : "add");
+        req.setAttribute("error", message);
+
+        forward(req, resp, "asset-form.jsp");
     }
 
-    private boolean isDuplicateKey(SQLException ex) {
-        SQLException current = ex;
+    // =====================================================
+    // HELPER
+    // =====================================================
 
-        while (current != null) {
-            if (current.getErrorCode() == 2601
-                    || current.getErrorCode() == 2627) {
+    private boolean isDuplicateKey(SQLException ex) {
+        for (SQLException e = ex; e != null; e = e.getNextException()) {
+            if (e.getErrorCode() == 2601 || e.getErrorCode() == 2627) {
                 return true;
             }
-            current = current.getNextException();
         }
-
         return false;
     }
 
-    private int parseId(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ex) {
-            return -1;
-        }
-    }
+    private void redirect(
+            HttpServletRequest req,
+            HttpServletResponse resp,
+            String message) throws IOException {
 
-    private String trim(String value) {
-        return value == null ? null : value.trim();
-    }
-
-    private String emptyToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
+        resp.sendRedirect(
+            req.getContextPath() + "/assets?message=" + message
+        );
     }
 
     private void forward(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            String jsp)
+            HttpServletRequest req,
+            HttpServletResponse resp,
+            String file)
             throws ServletException, IOException {
 
-        request.getRequestDispatcher(
-            "/WEB-INF/views/assets/" + jsp
-        ).forward(request, response);
+        req.getRequestDispatcher(VIEW + file).forward(req, resp);
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String emptyToNull(String value) {
+        String valueTrimmed = trim(value);
+        return valueTrimmed.isEmpty() ? null : valueTrimmed;
+    }
+
+    private int positiveInt(String value, int fallback) {
+        try {
+            int number = Integer.parseInt(value);
+            return number > 0 ? number : fallback;
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private boolean safeEquals(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 }

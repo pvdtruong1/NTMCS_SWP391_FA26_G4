@@ -10,14 +10,16 @@ public class Asset implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private int assetId;
-    private String assetName;
-    private String assetStatus;
     private String assetCode;
+    private String assetName;
     private String assetCategory;
+    private String assetStatus = "AVAILABLE";
     private String serialNumber;
     private String description;
+    private String imagePath; // View helper field
 
     public Asset() {
+        this.assetStatus = "AVAILABLE";
     }
 
     public Asset(int assetId, String assetName, String assetStatus, String assetCode, 
@@ -85,5 +87,13 @@ public class Asset implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 }

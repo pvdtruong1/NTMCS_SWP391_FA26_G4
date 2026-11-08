@@ -49,6 +49,18 @@
             </div>
         </c:if>
 
+        <c:if test="${(sessionScope.loggedUser != null and (sessionScope.loggedUser.roleId == 1 or sessionScope.loggedUser.roleId == 2 or sessionScope.loggedUser.roleId == 3 or sessionScope.loggedUser.roleId == 5)) or (sessionScope.user != null and (sessionScope.user.roleId == 1 or sessionScope.user.roleId == 2 or sessionScope.user.roleId == 3 or sessionScope.user.roleId == 5)) or (not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE') or sessionScope.permissions.contains('ASSET_MANAGE')))}">
+            <div class="nav-group">
+                <div class="nav-label">HẬU CẦN &amp; THIẾT BỊ (WF-03)</div>
+                <a href="${base}/assets" class="nav-item ${param.active == 'assets' ? 'active' : ''}">
+                    <i>📦</i> Danh sách trang thiết bị
+                </a>
+                <a href="${base}/asset-requests" class="nav-item ${param.active == 'asset-requests' ? 'active' : ''}">
+                    <i>📋</i> Quản lý mượn &amp; Điều phối
+                </a>
+            </div>
+        </c:if>
+
         <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('TOPIC_EVALUATE'))}">
             <div class="nav-group">
                 <div class="nav-label">HIỆN TRƯỜNG &amp; ĐIỀU PHỐI (WF-04)</div>

@@ -20,10 +20,14 @@ public class AssetRequest implements Serializable {
     private String status;
 
     // View-helper fields (Mapped via JOINs)
+    private String topicTitle;
+    private String topicCode;
     private String assetName;
     private String assetCategory;
     private String assetCode;
+    private String assetStatus;
     private String requesterName;
+    private String requesterEmail;
 
     public AssetRequest() {
     }
@@ -95,6 +99,22 @@ public class AssetRequest implements Serializable {
         this.status = status;
     }
 
+    public String getTopicTitle() {
+        return topicTitle;
+    }
+
+    public void setTopicTitle(String topicTitle) {
+        this.topicTitle = topicTitle;
+    }
+
+    public String getTopicCode() {
+        return topicCode;
+    }
+
+    public void setTopicCode(String topicCode) {
+        this.topicCode = topicCode;
+    }
+
     public String getAssetName() {
         return assetName;
     }
@@ -119,11 +139,27 @@ public class AssetRequest implements Serializable {
         this.assetCode = assetCode;
     }
 
+    public String getAssetStatus() {
+        return assetStatus;
+    }
+
+    public void setAssetStatus(String assetStatus) {
+        this.assetStatus = assetStatus;
+    }
+
     public String getRequesterName() {
         return requesterName;
     }
 
     public void setRequesterName(String requesterName) {
         this.requesterName = requesterName;
+    }
+
+    public String getRequesterEmail() {
+        return requesterEmail;
+    }
+
+    public void setRequesterEmail(String requesterEmail) {
+        this.requesterEmail = requesterEmail;
     }
 }

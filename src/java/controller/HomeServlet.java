@@ -84,6 +84,10 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"Nhật ký phát thanh & Ping nhắc việc", "/fieldwork/audit"});
             screens.add(new String[]{"Cấu hình SLA hiện trường", "/fieldwork/sla"});
         }
+        if (user.getRoleId() == 1 || user.getRoleId() == 2 || user.getRoleId() == 3 || user.getRoleId() == 5 || codes.contains("FIELDWORK_TRACK") || codes.contains("TOPIC_EVALUATE") || codes.contains("ASSET_MANAGE")) {
+            screens.add(new String[]{"Quản lý danh mục trang thiết bị (Asset Inventory)", "/assets"});
+            screens.add(new String[]{"Điều phối & Bàn giao thiết bị tác nghiệp (Asset Requests)", "/asset-requests"});
+        }
         if (codes.contains("TOPIC_PITCH") || codes.contains("FIELDWORK_TRACK")) {
             screens.add(new String[]{"Việc hiện trường của tôi", "/fieldwork/todo"});
         }

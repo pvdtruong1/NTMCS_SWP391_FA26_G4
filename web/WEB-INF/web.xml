@@ -130,6 +130,25 @@
         <url-pattern>/editorial/deliverable-review</url-pattern>
     </servlet-mapping>
 
+    <!-- WF-03: Logistics & Asset Servlets -->
+    <servlet>
+        <servlet-name>AssetServlet</servlet-name>
+        <servlet-class>controller.AssetServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AssetServlet</servlet-name>
+        <url-pattern>/assets</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>AssetRequestServlet</servlet-name>
+        <servlet-class>controller.AssetRequestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AssetRequestServlet</servlet-name>
+        <url-pattern>/asset-requests</url-pattern>
+    </servlet-mapping>
+
     <!-- WF-03 / WF-04: Fieldwork Servlets -->
     <servlet>
         <servlet-name>FieldworkServlet</servlet-name>

@@ -43,7 +43,7 @@
                 <div>
                     <strong style="display: block; font-size: 14px; margin-bottom: 2px;">Quy định thẩm quyền đề xuất tác nghiệp:</strong>
                     <span style="font-size: 13px; color: #374151;">
-                        Chỉ những đề tài đã chính thức được <strong>Phê duyệt (APPROVED)</strong> bởi Ban Biên tập mới đủ điều kiện xin cấp phát tài sản thiết bị, gia hạn Deadline hoặc đề xuất điều chỉnh nhân sự nhóm.
+                        Chỉ những đề tài đã chính thức được <strong>Phê duyệt (APPROVED)</strong> hoặc <strong>Đang tác nghiệp (IN_PROGRESS)</strong> bởi Ban Biên tập mới đủ điều kiện xin cấp phát tài sản thiết bị, gia hạn Deadline hoặc đề xuất điều chỉnh nhân sự nhóm.
                     </span>
                 </div>
             </div>
@@ -58,7 +58,7 @@
                         <small style="color: var(--muted);">Chỉ hiển thị các đề tài đang trong giai đoạn tác nghiệp thực địa (${approvedTopics != null ? approvedTopics.size() : 0} đề tài)</small>
                     </div>
                     <span class="badge b-approved">
-                        Trạng thái: APPROVED
+                        Trạng thái: APPROVED &amp; IN_PROGRESS
                     </span>
                 </div>
 
@@ -101,9 +101,17 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge b-approved">
-                                            ✓ ${t.status}
-                                        </span>
+                                        <c:choose>
+                                            <c:when test="${t.status eq 'APPROVED'}">
+                                                <span class="badge b-approved">✓ APPROVED</span>
+                                            </c:when>
+                                            <c:when test="${t.status eq 'IN_PROGRESS'}">
+                                                <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">⚡ IN_PROGRESS</span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="badge"><c:out value="${t.status}"/></span>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </td>
                                     <td style="text-align: right;">
                                         <a href="${base}/reporter/requests?topicId=${t.topicId}" class="btn primary sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
@@ -118,7 +126,7 @@
                                     <td colspan="6" style="text-align: center; padding: 48px 20px; color: var(--muted);">
                                         <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
                                         <div style="font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 4px;">
-                                            Hiện chưa có đề tài nào của bạn ở trạng thái ĐÃ DUYỆT (APPROVED)
+                                            Hiện chưa có đề tài nào của bạn ở trạng thái ĐÃ DUYỆT (APPROVED) hoặc ĐANG TÁC NGHIỆP (IN_PROGRESS)
                                         </div>
                                         <p style="margin: 0 0 16px 0; font-size: 13px;">
                                             Các đề tài đang là bản nháp (DRAFT) hoặc chờ thẩm định (SUBMITTED) cần được Ban Biên tập phê duyệt trước khi lập phiếu xin tài sản hay nhân sự.

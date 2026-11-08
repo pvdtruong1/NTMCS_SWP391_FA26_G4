@@ -34,7 +34,7 @@ public class TopicRequestDAO extends DBContext {
                    + "JOIN Desk d ON c.desk_id = d.desk_id "
                    + "JOIN [User] u ON t.author_user_id = u.user_id "
                    + "WHERE t.author_user_id = ? "
-                   + "  AND t.status = 'APPROVED' "
+                   + "  AND t.status IN ('APPROVED', 'IN_PROGRESS') "
                    + "ORDER BY t.topic_id DESC";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

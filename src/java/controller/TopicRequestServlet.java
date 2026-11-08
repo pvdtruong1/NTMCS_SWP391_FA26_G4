@@ -56,7 +56,7 @@ public class TopicRequestServlet extends HttpServlet {
 
         // 1. Nếu KHÔNG có topicId -> Hiển thị danh sách các đề tài của phóng viên đã APPROVED
         if (topicIdStr == null || topicIdStr.trim().isEmpty()) {
-            List<Topic> approvedTopics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), "APPROVED", null);
+            List<Topic> approvedTopics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), "APPROVED,IN_PROGRESS", null);
             request.setAttribute("approvedTopics", approvedTopics);
             request.getRequestDispatcher("/WEB-INF/views/reporter/topic-requests-list.jsp").forward(request, response);
             return;
@@ -72,7 +72,7 @@ public class TopicRequestServlet extends HttpServlet {
             }
 
             // Kiểm tra trạng thái duyệt của đề tài (chỉ duy nhất APPROVED đang trong giai đoạn tác nghiệp)
-            boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus());
+            boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
             List<Asset> availableAssets = assetDAO.getAvailableAssets();
             List<User> allUsers = userDAO.getAll();
@@ -128,7 +128,7 @@ public class TopicRequestServlet extends HttpServlet {
             return;
         }
 
-        boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus());
+        boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
         // CHỈ ĐỀ TÀI ĐƯỢC DUYỆT (APPROVED) MỚI ĐƯỢC XIN MƯỢN TÀI SẢN HOẶC ĐỔI NHÂN SỰ
         if (("ASSET_REQUEST".equalsIgnoreCase(requestType) || "MEMBER_REQUEST".equalsIgnoreCase(requestType)) && !isApproved) {

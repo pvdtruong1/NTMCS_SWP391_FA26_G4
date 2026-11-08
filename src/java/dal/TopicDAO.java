@@ -1646,8 +1646,19 @@ public class TopicDAO extends DBContext {
         sql.append("WHERE t.author_user_id = ? ");
 
         boolean hasStatus = (statusFilter != null && !statusFilter.trim().isEmpty() && !"ALL".equalsIgnoreCase(statusFilter));
+        String[] statusList = null;
         if (hasStatus) {
-            sql.append("  AND t.status = ? ");
+            if (statusFilter.contains(",")) {
+                statusList = statusFilter.split(",");
+                StringBuilder inClause = new StringBuilder("  AND t.status IN (");
+                for (int i = 0; i < statusList.length; i++) {
+                    inClause.append(i == 0 ? " ?" : ", ?");
+                }
+                inClause.append(") ");
+                sql.append(inClause);
+            } else {
+                sql.append("  AND t.status = ? ");
+            }
         }
 
         boolean hasKeyword = (searchKeyword != null && !searchKeyword.trim().isEmpty());
@@ -1664,7 +1675,13 @@ public class TopicDAO extends DBContext {
                 ps.setInt(idx++, userId);
 
                 if (hasStatus) {
-                    ps.setString(idx++, statusFilter.trim());
+                    if (statusList != null) {
+                        for (String s : statusList) {
+                            ps.setString(idx++, s.trim());
+                        }
+                    } else {
+                        ps.setString(idx++, statusFilter.trim());
+                    }
                 }
 
                 if (hasKeyword) {

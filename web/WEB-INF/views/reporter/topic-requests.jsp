@@ -165,7 +165,7 @@
                 <div style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
                     <span style="font-size: 20px;">⚠️</span>
                     <div>
-                        <strong>Không đủ điều kiện:</strong> Chỉ những đề tài đã được phê duyệt chính thức (APPROVED) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự nhóm.
+                        <strong>Không đủ điều kiện:</strong> Chỉ những đề tài đã được phê duyệt chính thức (APPROVED) hoặc đang tác nghiệp (IN_PROGRESS) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự nhóm.
                     </div>
                 </div>
             </c:if>
@@ -198,6 +198,11 @@
                             <c:when test="${topic.status eq 'APPROVED'}">
                                 <span class="badge b-approved" style="font-size: 12px; padding: 6px 12px;">
                                     ✓ ĐÃ DUYỆT (APPROVED)
+                                </span>
+                            </c:when>
+                            <c:when test="${topic.status eq 'IN_PROGRESS'}">
+                                <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 12px; padding: 6px 12px;">
+                                    ⚡ ĐANG TÁC NGHIỆP (IN_PROGRESS)
                                 </span>
                             </c:when>
                             <c:otherwise>
@@ -269,7 +274,7 @@
                                     <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
                                     <h4 style="margin: 0 0 6px; font-size: 15px;">Chức năng mượn tài sản đang bị khóa</h4>
                                     <p style="margin: 0; color: var(--muted); font-size: 13px;">
-                                        Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp.
+                                        Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) hoặc đang tác nghiệp (<strong>IN_PROGRESS</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp.
                                     </p>
                                 </div>
                             </c:when>
@@ -374,7 +379,7 @@
                                     <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
                                     <h4 style="margin: 0 0 6px; font-size: 15px;">Chức năng thay đổi nhân sự đang bị khóa</h4>
                                     <p style="margin: 0; color: var(--muted); font-size: 13px;">
-                                        Đề tài này chưa được duyệt (trạng thái: <strong>${topic.status}</strong>). Chỉ những đề tài đã duyệt chính thức mới có quyền gửi đề xuất thêm hoặc rút nhân sự.
+                                        Đề tài này chưa đủ điều kiện (trạng thái: <strong>${topic.status}</strong>). Chỉ những đề tài đã duyệt chính thức (<strong>APPROVED</strong>) hoặc đang tác nghiệp (<strong>IN_PROGRESS</strong>) mới có quyền gửi đề xuất thêm hoặc rút nhân sự.
                                     </p>
                                 </div>
                             </c:when>

@@ -56,7 +56,7 @@ public class TopicRequestServlet extends HttpServlet {
 
         // 1. Nếu KHÔNG có topicId -> Hiển thị danh sách các đề tài của phóng viên đã APPROVED
         if (topicIdStr == null || topicIdStr.trim().isEmpty()) {
-            List<Topic> approvedTopics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), "APPROVED,IN_PROGRESS", null);
+            List<Topic> approvedTopics = requestDAO.getApprovedTopicsForReporter(loggedUser.getUserId());
             request.setAttribute("approvedTopics", approvedTopics);
             request.getRequestDispatcher("/WEB-INF/views/reporter/topic-requests-list.jsp").forward(request, response);
             return;
@@ -150,6 +150,28 @@ public class TopicRequestServlet extends HttpServlet {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
                 Timestamp startTime = Timestamp.valueOf(LocalDateTime.parse(startTimeStr, formatter));
                 Timestamp endTime = Timestamp.valueOf(LocalDateTime.parse(endTimeStr, formatter));
+
+                // 1.1 Kiểm tra thứ tự thời gian: Giờ trả phải sau giờ mượn
+                if (!endTime.after(startTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidTime&type=asset");
+                    return;
+                }
+
+                // 1.2 Kiểm tra thời gian bắt đầu không được ở quá khứ (cho phép linh động 5 phút)
+                Timestamp nowThreshold = new Timestamp(System.currentTimeMillis() - 5 * 60 * 1000L);
+                if (startTime.before(nowThreshold)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=pastTime&type=asset");
+                    return;
+                }
+
+                // 1.3 Kiểm tra xung đột lịch với các yêu cầu đã duyệt hoặc đang chờ duyệt của tài sản này
+                if (requestDAO.hasAssetScheduleConflict(assetId, startTime, endTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=conflict&type=asset");
+                    return;
+                }
 
                 AssetRequest req = new AssetRequest();
                 req.setTopicId(topicId);

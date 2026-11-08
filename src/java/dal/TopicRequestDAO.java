@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -69,6 +70,27 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 1. ASSET REQUEST (Xin mượn tài sản)
     // ==========================================
+    public boolean hasAssetScheduleConflict(int assetId, Timestamp startTime, Timestamp endTime) {
+        String sql = "SELECT COUNT(*) FROM Asset_Request "
+                   + "WHERE asset_id = ? "
+                   + "  AND status IN ('APPROVED', 'PENDING') "
+                   + "  AND start_time < ? AND end_time > ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, assetId);
+            ps.setTimestamp(2, endTime);
+            ps.setTimestamp(3, startTime);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to check asset schedule conflict for asset " + assetId, e);
+        }
+        return false;
+    }
+
     public boolean insertAssetRequest(AssetRequest req) {
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
                    + "VALUES (?, ?, ?, ?, ?, 'PENDING')";

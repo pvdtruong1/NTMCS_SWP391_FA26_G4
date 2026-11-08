@@ -179,6 +179,33 @@
                 </div>
             </c:if>
 
+            <c:if test="${param.status eq 'invalidTime'}">
+                <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <strong>Thời gian không hợp lệ:</strong> Thời điểm kết thúc mượn thiết bị phải sau thời điểm bắt đầu mượn.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'pastTime'}">
+                <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <strong>Thời gian không hợp lệ:</strong> Thời gian bắt đầu mượn không được ở thời điểm trong quá khứ.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'conflict'}">
+                <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size: 20px;">🚫</span>
+                    <div>
+                        <strong>Xung đột lịch mượn:</strong> Thiết bị này đã có người đăng ký mượn trong khoảng thời gian bạn đã chọn. Vui lòng chọn thiết bị khác hoặc khung giờ khác.
+                    </div>
+                </div>
+            </c:if>
+
             <!-- KHỐI TÓM TẮT ĐỀ TÀI (METADATA) -->
             <div class="card" style="margin-bottom: 24px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 16px;">
@@ -641,6 +668,26 @@
         const hash = window.location.hash.replace('#', '');
         if (hash && ['asset', 'deadline', 'member', 'history'].includes(hash)) {
             switchRequestTab(hash);
+        }
+
+        // Khởi tạo giới hạn thời gian thực tế cho form mượn thiết bị
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        if (startTimeInput && endTimeInput) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            const nowISO = now.toISOString().slice(0, 16);
+            startTimeInput.min = nowISO;
+            endTimeInput.min = nowISO;
+
+            startTimeInput.addEventListener('change', function() {
+                if (startTimeInput.value) {
+                    endTimeInput.min = startTimeInput.value;
+                    if (endTimeInput.value && endTimeInput.value <= startTimeInput.value) {
+                        endTimeInput.value = '';
+                    }
+                }
+            });
         }
     });
 </script>

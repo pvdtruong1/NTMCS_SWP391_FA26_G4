@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="${base}/css/style.css">
     </head>
     <body style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); padding: 20px;">
-        <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px 32px; max-width: 460px; width: 100%;">
+        <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px 32px; max-width: 480px; width: 100%;">
             <div style="width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, #5574ef, #2b49b9); color: #fff; font-size: 26px; font-weight: 900; display: grid; place-items: center; margin: 0 auto 16px;">N</div>
             <h2 style="text-align: center; margin: 0 0 6px; font-size: 22px;">Đăng Nhập NTMCS</h2>
             <p style="text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 20px;">Tòa Soạn Hội Tụ — Quản Lý &amp; Điều Phối Đề Tài</p>
@@ -39,14 +39,20 @@
                     <a href="javascript:void(0)" onclick="fill('cuong.admin@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
                         🛡️ <b>Cường</b> (Quản trị hệ thống - WF-05): <code>cuong.admin@newsroom.vn</code>
                     </a>
-                    <a href="javascript:void(0)" onclick="fill('truong.editor@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
-                        🏛️ <b>Trường</b> (Trưởng ban Biên tập - WF-02): <code>truong.editor@newsroom.vn</code>
-                    </a>
                     <a href="javascript:void(0)" onclick="fill('tbt.exec@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
                         👑 <b>Tổng Biên Tập</b> (Thẩm định tối cao): <code>tbt.exec@newsroom.vn</code>
                     </a>
+                    <a href="javascript:void(0)" onclick="fill('truong.editor@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
+                        🏛️ <b>Trường</b> (Trưởng ban Biên tập - WF-02): <code>truong.editor@newsroom.vn</code>
+                    </a>
                     <a href="javascript:void(0)" onclick="fill('hung.reporter@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
-                        ✍️ <b>Hùng</b> (Phóng viên - WF-01): <code>hung.reporter@newsroom.vn</code>
+                        ✍️ <b>Hưng</b> (Phóng viên - WF-01): <code>hung.reporter@newsroom.vn</code>
+                    </a>
+                    <a href="javascript:void(0)" onclick="fill('loc.logistics@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
+                        📦 <b>Lộc</b> (Điều phối Hậu cần - WF-03): <code>loc.logistics@newsroom.vn</code>
+                    </a>
+                    <a href="javascript:void(0)" onclick="fill('dat.fieldwork@newsroom.vn','123')" style="color: var(--primary); text-decoration: none;">
+                        📌 <b>Đạt</b> (Điều phối Hiện trường - WF-04): <code>dat.fieldwork@newsroom.vn</code>
                     </a>
                 </div>
             </div>

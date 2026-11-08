@@ -40,12 +40,17 @@ public class HomeServlet extends HttpServlet {
             return;
         }
 
-        if (user.getRoleId() == 2 || user.getRoleId() == 3 || codes.contains("TOPIC_EVALUATE") || "DESK_EDITOR".equalsIgnoreCase(user.getRoleName())) {
+        if (user.getRoleId() == 2 || user.getRoleId() == 3 || codes.contains("TOPIC_EVALUATE") || "DESK_EDITOR".equalsIgnoreCase(user.getRoleName()) || "EXECUTIVE_EDITOR".equalsIgnoreCase(user.getRoleName())) {
             response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
             return;
         }
 
-        if (user.getRoleId() == 6 || codes.contains("QUOTA_MANAGE") || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
+        if (user.getRoleId() == 5 || "FIELDWORK_COORDINATOR".equalsIgnoreCase(user.getRoleName()) || (codes.contains("FIELDWORK_TRACK") && !codes.contains("TOPIC_EVALUATE"))) {
+            response.sendRedirect(request.getContextPath() + "/fieldwork/kanban");
+            return;
+        }
+
+        if (user.getRoleId() == 6 || user.getRoleId() == 7 || codes.contains("QUOTA_MANAGE") || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName()) || "BUSINESS_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
             response.sendRedirect(request.getContextPath() + "/dashboard");
             return;
         }

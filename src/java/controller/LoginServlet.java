@@ -71,14 +71,19 @@ public class LoginServlet extends HttpServlet {
 
     private void redirectToRoleWorkspace(HttpServletRequest request, HttpServletResponse response, User user)
             throws IOException {
-        if (user.getRoleId() == 1 || "REPORTER".equalsIgnoreCase(user.getRoleName())) {
+        String roleName = user.getRoleName() != null ? user.getRoleName().toUpperCase() : "";
+        int roleId = user.getRoleId();
+
+        if (roleId == 1 || "REPORTER".equals(roleName)) {
             response.sendRedirect(request.getContextPath() + "/reporter/dashboard");
-        } else if (user.getRoleId() == 2 || user.getRoleId() == 3 || "DESK_EDITOR".equalsIgnoreCase(user.getRoleName())) {
+        } else if (roleId == 2 || roleId == 3 || "DESK_EDITOR".equals(roleName) || "EXECUTIVE_EDITOR".equals(roleName)) {
             response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
-        } else if (user.getRoleId() == 6 || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
+        } else if (roleId == 5 || "FIELDWORK_COORDINATOR".equals(roleName)) {
+            response.sendRedirect(request.getContextPath() + "/fieldwork/kanban");
+        } else if (roleId == 6 || roleId == 7 || "SYSTEM_ADMINISTRATOR".equals(roleName) || "BUSINESS_ADMINISTRATOR".equals(roleName)) {
             response.sendRedirect(request.getContextPath() + "/dashboard");
         } else {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
+            response.sendRedirect(request.getContextPath() + "/home");
         }
     }
 }

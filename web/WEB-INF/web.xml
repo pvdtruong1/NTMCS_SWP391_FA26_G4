@@ -144,6 +144,25 @@
         <url-pattern>/fieldwork/sla</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>FieldworkDeliverableServlet</servlet-name>
+        <servlet-class>controller.fieldwork.FieldworkDeliverableServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FieldworkDeliverableServlet</servlet-name>
+        <url-pattern>/fieldwork/deliverables/submit</url-pattern>
+    </servlet-mapping>
+
+    <!-- Upload & File Serving Servlet -->
+    <servlet>
+        <servlet-name>UploadServlet</servlet-name>
+        <servlet-class>controller.UploadServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>UploadServlet</servlet-name>
+        <url-pattern>/uploads/*</url-pattern>
+    </servlet-mapping>
+
     <!-- WF-05: Management & Governance Servlets -->
     <servlet>
         <servlet-name>UserServlet</servlet-name>

@@ -225,8 +225,13 @@
                                                             Dung lượng: <fmt:formatNumber value="${sub.fileSizeBytes / 1024}" maxFractionDigits="1" /> KB
                                                         </small>
                                                     </div>
-                                                    <div>
-                                                        <a href="${base}/${sub.storedFilePath}" download="<c:out value='${sub.originalFileName}' />"
+                                                    <c:set var="deliverableFileUrl" value="${sub.storedFilePath.startsWith('/') ? (base += sub.storedFilePath) : (base += '/' += sub.storedFilePath)}" />
+                                                    <div style="display:flex; align-items:center; gap:8px;">
+                                                        <a href="${deliverableFileUrl}" target="_blank" rel="noopener noreferrer"
+                                                           class="btn" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:13px; background:var(--surface2);">
+                                                            <span>↗</span> Mở Tab Mới
+                                                        </a>
+                                                        <a href="${deliverableFileUrl}" download="<c:out value='${sub.originalFileName}' />"
                                                            class="btn primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:13px;">
                                                             <span>📥</span> Tải Bản Thảo Về Máy
                                                         </a>
@@ -235,8 +240,8 @@
 
                                                 <!-- PDF Native Embed Preview if PDF -->
                                                 <c:if test="${fn:endsWith(fn:toLowerCase(sub.originalFileName), '.pdf')}">
-                                                    <div style="margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
-                                                        <iframe src="${base}/${sub.storedFilePath}" width="100%" height="520px" style="border:none;"></iframe>
+                                                    <div style="margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #525659;">
+                                                        <iframe src="${deliverableFileUrl}" width="100%" height="600px" style="border:none; display:block;"></iframe>
                                                     </div>
                                                 </c:if>
                                             </c:when>

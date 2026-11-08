@@ -15,11 +15,8 @@ import util.PasswordUtil;
 
 /**
  * Login screen.
- *   GET  /login -> login form (or straight to /home if already logged in)
- *   POST /login -> check email + password, start the session, go to /home
- * The session keeps two things:
- *   "loggedUser"  = the model.User who logged in
- *   "permissions" = the permission codes of that user's role (used by the menu)
+ *   GET  /login -> login form (or straight to role workspace if already logged in)
+ *   POST /login -> check email + password, start the session, redirect to role workspace
  */
 @WebServlet(name = "LoginServlet", urlPatterns = {"/login", ""})
 public class LoginServlet extends HttpServlet {
@@ -33,8 +30,9 @@ public class LoginServlet extends HttpServlet {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response.setHeader("Pragma", "no-cache");
         response.setDateHeader("Expires", 0);
-        if (AuthUtil.getLoggedUser(request) != null) {
-            response.sendRedirect(request.getContextPath() + "/home");
+        User user = AuthUtil.getLoggedUser(request);
+        if (user != null) {
+            redirectToRoleWorkspace(request, response, user);
             return;
         }
         request.getRequestDispatcher("/WEB-INF/views/login.jsp").forward(request, response);
@@ -68,6 +66,19 @@ public class LoginServlet extends HttpServlet {
         session.setAttribute("loggedUser", user);
         session.setAttribute("user", user);
         session.setAttribute("permissions", permissionDAO.getCodesByRole(user.getRoleId()));
-        response.sendRedirect(request.getContextPath() + "/home");
+        redirectToRoleWorkspace(request, response, user);
+    }
+
+    private void redirectToRoleWorkspace(HttpServletRequest request, HttpServletResponse response, User user)
+            throws IOException {
+        if (user.getRoleId() == 1 || "REPORTER".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/reporter/dashboard");
+        } else if (user.getRoleId() == 2 || user.getRoleId() == 3 || "DESK_EDITOR".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
+        } else if (user.getRoleId() == 6 || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/dashboard");
+        } else {
+            response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
+        }
     }
 }

@@ -15,8 +15,7 @@ import util.AuthUtil;
 
 /**
  * Home screen. Every logged-in user lands here after login.
- * It shows a link to each screen that the user's role is allowed to open.
- * A role with no screens yet sees a short message instead of an error.
+ * Redirects users directly to their designated workspace dashboards.
  */
 @WebServlet(name = "HomeServlet", urlPatterns = {"/home"})
 public class HomeServlet extends HttpServlet {
@@ -36,8 +35,18 @@ public class HomeServlet extends HttpServlet {
         Set<String> codes = permissionDAO.getCodesByRole(user.getRoleId());
         request.getSession().setAttribute("permissions", codes);
 
-        if ("REPORTER".equalsIgnoreCase(user.getRoleName())) {
+        if ("REPORTER".equalsIgnoreCase(user.getRoleName()) || user.getRoleId() == 1) {
             response.sendRedirect(request.getContextPath() + "/reporter/dashboard");
+            return;
+        }
+
+        if (user.getRoleId() == 2 || user.getRoleId() == 3 || codes.contains("TOPIC_EVALUATE") || "DESK_EDITOR".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
+            return;
+        }
+
+        if (user.getRoleId() == 6 || codes.contains("QUOTA_MANAGE") || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
+            response.sendRedirect(request.getContextPath() + "/dashboard");
             return;
         }
 

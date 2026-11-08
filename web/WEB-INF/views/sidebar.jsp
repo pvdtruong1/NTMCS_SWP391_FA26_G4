@@ -10,13 +10,6 @@
         </div>
     </div>
     <nav>
-        <div class="nav-group">
-            <div class="nav-label">TỔNG QUAN</div>
-            <a href="${base}/home" class="nav-item ${param.active == 'home' ? 'active' : ''}">
-                <i>🏠</i> Trang chủ điều hành
-            </a>
-        </div>
-
         <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_PITCH')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ PHÓNG VIÊN (WF-01)</div>

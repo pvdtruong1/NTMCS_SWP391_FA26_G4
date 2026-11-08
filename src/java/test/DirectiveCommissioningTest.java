@@ -10,16 +10,19 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Automated Test Suite for UC: Assign Lead Reporter (SCR-2.5: Reporter Dispatch & Workload Desk).
  * Verifies workload matrix querying, atomic commissioning transaction, lead reporter assignment,
  * topic_code minting, status guards, and notification generation.
+ * Automatically cleans up all temporary test fixtures on completion to prevent DB pollution.
  */
 public class DirectiveCommissioningTest {
 
     private static final TopicDAO topicDAO = new TopicDAO();
+    private static final List<Integer> createdTopicIds = new ArrayList<>();
     private static int passedTests = 0;
     private static int totalTests = 0;
 
@@ -41,10 +44,36 @@ public class DirectiveCommissioningTest {
             System.err.println("[FATAL] Unexpected error during test execution: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            cleanUpCreatedTopics();
             System.out.println("==================================================================");
             System.out.printf("TEST RESULTS: %d/%d TESTS PASSED (%.1f%%)\n",
                     passedTests, totalTests, (totalTests > 0 ? (passedTests * 100.0 / totalTests) : 0));
             System.out.println("==================================================================");
+        }
+    }
+
+    private static void cleanUpCreatedTopics() {
+        if (createdTopicIds.isEmpty()) return;
+        try (Connection conn = topicDAO.getConnection()) {
+            conn.setAutoCommit(false);
+            for (int tid : createdTopicIds) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM Notification WHERE topic_id = ?;")) {
+                    ps.setInt(1, tid);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM Topic_Member WHERE topic_id = ?;")) {
+                    ps.setInt(1, tid);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM Topic WHERE topic_id = ?;")) {
+                    ps.setInt(1, tid);
+                    ps.executeUpdate();
+                }
+            }
+            conn.commit();
+            System.out.println("[CLEANUP] Successfully purged temporary test topics: " + createdTopicIds);
+        } catch (SQLException e) {
+            System.err.println("[CLEANUP ERROR] Failed to clean test topics: " + e.getMessage());
         }
     }
 
@@ -88,6 +117,7 @@ public class DirectiveCommissioningTest {
         draft.setDeadline(Date.valueOf(LocalDate.now().plusDays(7)));
 
         int draftTopicId = topicDAO.createDirectiveTopicDraft(draft);
+        createdTopicIds.add(draftTopicId);
         assertTrue("Test 2a: Draft directive topic created with ID > 0", draftTopicId > 0, "Generated ID <= 0");
 
         // 2. Commission to reporter Hưng (user_id = 2)
@@ -168,6 +198,7 @@ public class DirectiveCommissioningTest {
         draft.setAuthorUserId(1);
         draft.setDeadline(Date.valueOf(LocalDate.now().plusDays(5)));
         int draftTopicId = topicDAO.createDirectiveTopicDraft(draft);
+        createdTopicIds.add(draftTopicId);
 
         boolean exceptionThrown = false;
         try {
@@ -197,6 +228,7 @@ public class DirectiveCommissioningTest {
         draft.setAuthorUserId(1);
         draft.setDeadline(Date.valueOf(LocalDate.now().plusDays(3)));
         int draftTopicId = topicDAO.createDirectiveTopicDraft(draft);
+        createdTopicIds.add(draftTopicId);
 
         String notes = "Liên hệ Đài Khí tượng Thủy văn khu vực Nam Bộ.";
         topicDAO.commissionDirectiveTopic(draftTopicId, 2, 1, notes);
@@ -235,12 +267,14 @@ public class DirectiveCommissioningTest {
         draftA.setCategoryId(1);
         draftA.setAuthorUserId(1);
         int idA = topicDAO.createDirectiveTopicDraft(draftA);
+        createdTopicIds.add(idA);
 
         Topic draftB = new Topic();
         draftB.setTitle("Đề tài thử nghiệm mã định danh B");
         draftB.setCategoryId(1);
         draftB.setAuthorUserId(1);
         int idB = topicDAO.createDirectiveTopicDraft(draftB);
+        createdTopicIds.add(idB);
 
         String codeA = topicDAO.commissionDirectiveTopic(idA, 2, 1, "Test A");
         String codeB = topicDAO.commissionDirectiveTopic(idB, 2, 1, "Test B");

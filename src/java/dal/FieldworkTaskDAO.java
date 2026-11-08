@@ -156,17 +156,7 @@ public class FieldworkTaskDAO extends DBContext {
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, status);
             statement.setInt(2, taskId);
-            boolean updated = statement.executeUpdate() > 0;
-            if (updated && "IN_PROGRESS".equals(status)) {
-                String syncTopicSql = "UPDATE Topic SET status = 'IN_PROGRESS' "
-                                    + "WHERE topic_id = (SELECT topic_id FROM Fieldwork_Task WHERE task_id = ?) "
-                                    + "  AND status = 'APPROVED';";
-                try (PreparedStatement syncPs = connection.prepareStatement(syncTopicSql)) {
-                    syncPs.setInt(1, taskId);
-                    syncPs.executeUpdate();
-                }
-            }
-            return updated;
+            return statement.executeUpdate() > 0;
         }
     }
 

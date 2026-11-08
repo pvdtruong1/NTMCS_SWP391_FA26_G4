@@ -42,21 +42,6 @@ public class EditorialDashboardServlet extends HttpServlet {
             throws ServletException, IOException {
         HttpSession session = request.getSession();
 
-        // Support quick role switch in dev mode: ?as=tbt or ?as=editor
-        String asParam = request.getParameter("as");
-        if ("tbt".equalsIgnoreCase(asParam)) {
-            User tbtUser = new User(6, "Tổng Biên Tập", "tbt.exec@newsroom.vn", "123", 3, true, null);
-            tbtUser.setRoleName("EXECUTIVE_EDITOR");
-            session.setAttribute("user", tbtUser);
-            session.setAttribute("loggedUser", tbtUser);
-        } else if ("editor".equalsIgnoreCase(asParam)) {
-            User editorUser = new User(1, "Trường", "truong.editor@newsroom.vn", "123", 2, true, 1);
-            editorUser.setRoleName("DESK_EDITOR");
-            editorUser.setDeskName("Ban Thời sự - Chính trị");
-            session.setAttribute("user", editorUser);
-            session.setAttribute("loggedUser", editorUser);
-        }
-
         // RBAC check: Must be authenticated
         User currentUser = AuthUtil.getLoggedUser(request);
         if (currentUser == null) {

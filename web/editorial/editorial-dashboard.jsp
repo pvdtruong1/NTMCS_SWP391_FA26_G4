@@ -151,11 +151,6 @@
                             </select>
                         </form>
                     </c:if>
-                    <div style="font-size: 11px; color: var(--muted); background: var(--surface2); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);">
-                        Giả lập: 
-                        <a href="${pageContext.request.contextPath}/editorial/dashboard?as=editor" style="font-weight:600; color:var(--primary); text-decoration:none;">BTV Trường</a> | 
-                        <a href="${pageContext.request.contextPath}/editorial/dashboard?as=tbt" style="font-weight:600; color:var(--primary); text-decoration:none;">TBT Cấp Cao</a>
-                    </div>
                 </div>
             </div>
 

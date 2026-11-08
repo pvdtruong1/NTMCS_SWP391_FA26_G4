@@ -42,7 +42,7 @@
                 <div style="font-size: 22px; line-height: 1;">ℹ️</div>
                 <div style="font-size: 13.5px; line-height: 1.5;">
                     <strong style="display: block; margin-bottom: 2px; color: #1e3a8a;">Quy định thẩm quyền đề xuất:</strong>
-                    <span>Chỉ những đề tài đã chính thức được <strong>Phê duyệt (APPROVED)</strong> bởi Ban Biên tập mới đủ điều kiện xin cấp phát tài sản thiết bị, gia hạn hạn nộp bài hoặc xin điều chỉnh nhân sự nhóm.</span>
+                    <span>Chỉ những đề tài đã chính thức được <strong>Phê duyệt (APPROVED)</strong> hoặc đang trong giai đoạn <strong>Triển khai tác nghiệp (IN_PROGRESS)</strong> mới đủ điều kiện xin cấp phát tài sản thiết bị, gia hạn hạn nộp bài hoặc xin điều chỉnh nhân sự nhóm.</span>
                 </div>
             </div>
 
@@ -59,7 +59,7 @@
                     </div>
                     <div>
                         <span class="badge b-approved">
-                            ✓ Trạng thái: APPROVED
+                            ✓ APPROVED &amp; IN_PROGRESS
                         </span>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
                                         </strong>
                                     </td>
                                     <td>
-                                        <span class="badge b-approved">${t.status}</span>
+                                        <span class="badge b-${t.status.toLowerCase()}">${t.status}</span>
                                     </td>
                                     <td style="text-align: right;">
                                         <a href="${base}/reporter/requests?topicId=${t.topicId}" class="btn primary sm" style="display: inline-flex; align-items: center; gap: 5px;">
@@ -124,7 +124,7 @@
                                         <div style="color: var(--muted);">
                                             <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
                                             <p style="font-size: 14px; font-weight: 700; margin: 0 0 6px; color: var(--text);">
-                                                Hiện chưa có đề tài nào của bạn ở trạng thái ĐÃ DUYỆT (APPROVED).
+                                                Hiện chưa có đề tài nào của bạn ở trạng thái ĐÃ DUYỆT (APPROVED) hoặc ĐANG TÁC NGHIỆP (IN_PROGRESS).
                                             </p>
                                             <small style="color: var(--muted); display: block; max-width: 480px; margin: 0 auto 16px;">
                                                 Các đề tài đang là bản nháp (DRAFT) hoặc đang chờ thẩm định (SUBMITTED) cần được Ban Biên tập duyệt trước khi xin cấp tài sản hay nhân sự.

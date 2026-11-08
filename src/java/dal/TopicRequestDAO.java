@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -22,7 +23,8 @@ public class TopicRequestDAO extends DBContext {
     private static final Logger LOGGER = Logger.getLogger(TopicRequestDAO.class.getName());
 
     /**
-     * Lấy danh sách các đề tài của chính phóng viên (author_user_id) đã được duyệt (status = 'APPROVED')
+     * Lấy danh sách các đề tài của phóng viên đã được duyệt hoặc đang tác nghiệp (APPROVED, IN_PROGRESS)
+     * đủ điều kiện để xin hỗ trợ tài sản, gia hạn deadline hoặc thay đổi nhân sự.
      */
     public List<Topic> getApprovedTopicsForReporter(int userId) {
         List<Topic> list = new ArrayList<>();
@@ -34,7 +36,7 @@ public class TopicRequestDAO extends DBContext {
                    + "JOIN Desk d ON c.desk_id = d.desk_id "
                    + "JOIN [User] u ON t.author_user_id = u.user_id "
                    + "WHERE t.author_user_id = ? "
-                   + "  AND t.status = 'APPROVED' "
+                   + "  AND t.status IN ('APPROVED', 'IN_PROGRESS') "
                    + "ORDER BY t.topic_id DESC";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -69,6 +71,31 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 1. ASSET REQUEST (Xin mượn tài sản)
     // ==========================================
+    /**
+     * Kiểm tra xem thiết bị (assetId) có bị trùng lịch trong khoảng [startTime, endTime]
+     * với các yêu cầu đang chờ duyệt (PENDING) hoặc đã được duyệt (APPROVED) hay không.
+     */
+    public boolean hasAssetScheduleConflict(int assetId, Timestamp startTime, Timestamp endTime) {
+        String sql = "SELECT COUNT(*) FROM Asset_Request "
+                   + "WHERE asset_id = ? "
+                   + "  AND status IN ('APPROVED', 'PENDING') "
+                   + "  AND start_time < ? AND end_time > ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, assetId);
+            ps.setTimestamp(2, endTime);
+            ps.setTimestamp(3, startTime);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to check asset schedule conflict for asset " + assetId, e);
+        }
+        return false;
+    }
+
     public boolean insertAssetRequest(AssetRequest req) {
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
                    + "VALUES (?, ?, ?, ?, ?, 'PENDING')";

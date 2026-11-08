@@ -54,9 +54,9 @@ public class TopicRequestServlet extends HttpServlet {
 
         String topicIdStr = request.getParameter("topicId");
 
-        // 1. Nếu KHÔNG có topicId -> Hiển thị danh sách các đề tài của phóng viên đã APPROVED
+        // 1. Nếu KHÔNG có topicId -> Hiển thị danh sách các đề tài của phóng viên đã APPROVED hoặc IN_PROGRESS
         if (topicIdStr == null || topicIdStr.trim().isEmpty()) {
-            List<Topic> approvedTopics = topicDAO.getTopicsByReporter(loggedUser.getUserId(), "APPROVED", null);
+            List<Topic> approvedTopics = requestDAO.getApprovedTopicsForReporter(loggedUser.getUserId());
             request.setAttribute("approvedTopics", approvedTopics);
             request.getRequestDispatcher("/WEB-INF/views/reporter/topic-requests-list.jsp").forward(request, response);
             return;
@@ -71,8 +71,8 @@ public class TopicRequestServlet extends HttpServlet {
                 return;
             }
 
-            // Kiểm tra trạng thái duyệt của đề tài (chỉ duy nhất APPROVED đang trong giai đoạn tác nghiệp)
-            boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus());
+            // Kiểm tra trạng thái đề tài: Cho phép đề tài đã APPROVED hoặc đang triển khai IN_PROGRESS
+            boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
             List<Asset> availableAssets = assetDAO.getAvailableAssets();
             List<User> allUsers = userDAO.getAll();
@@ -128,10 +128,10 @@ public class TopicRequestServlet extends HttpServlet {
             return;
         }
 
-        boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus());
+        boolean isEligible = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
-        // CHỈ ĐỀ TÀI ĐƯỢC DUYỆT (APPROVED) MỚI ĐƯỢC XIN MƯỢN TÀI SẢN HOẶC ĐỔI NHÂN SỰ
-        if (("ASSET_REQUEST".equalsIgnoreCase(requestType) || "MEMBER_REQUEST".equalsIgnoreCase(requestType)) && !isApproved) {
+        // CHỈ ĐỀ TÀI ĐƯỢC DUYỆT (APPROVED) HOẶC ĐANG TÁC NGHIỆP (IN_PROGRESS) MỚI ĐƯỢC XIN MƯỢN TÀI SẢN HOẶC ĐỔI NHÂN SỰ
+        if (("ASSET_REQUEST".equalsIgnoreCase(requestType) || "MEMBER_REQUEST".equalsIgnoreCase(requestType)) && !isEligible) {
             response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId 
                     + "&status=notApproved");
             return;
@@ -150,6 +150,28 @@ public class TopicRequestServlet extends HttpServlet {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
                 Timestamp startTime = Timestamp.valueOf(LocalDateTime.parse(startTimeStr, formatter));
                 Timestamp endTime = Timestamp.valueOf(LocalDateTime.parse(endTimeStr, formatter));
+
+                // 1.1 Kiểm tra thứ tự thời gian: Giờ trả phải sau giờ mượn
+                if (!endTime.after(startTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidTime&type=asset");
+                    return;
+                }
+
+                // 1.2 Kiểm tra thời gian bắt đầu không được ở quá khứ (cho phép linh động 5 phút)
+                Timestamp nowThreshold = new Timestamp(System.currentTimeMillis() - 5 * 60 * 1000L);
+                if (startTime.before(nowThreshold)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=pastTime&type=asset");
+                    return;
+                }
+
+                // 1.3 Kiểm tra xung đột lịch với các yêu cầu đã duyệt hoặc đang chờ duyệt của tài sản này
+                if (requestDAO.hasAssetScheduleConflict(assetId, startTime, endTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=conflict&type=asset");
+                    return;
+                }
 
                 AssetRequest req = new AssetRequest();
                 req.setTopicId(topicId);

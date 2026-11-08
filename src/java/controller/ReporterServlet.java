@@ -1,6 +1,9 @@
 package controller;
 
+import dal.AssetDAO;
 import dal.CategoryDAO;
+import dal.TopicRequestDAO;
+import dal.UserDAO;
 import dal.NotificationDAO;
 import dal.TopicDAO;
 import jakarta.servlet.ServletException;
@@ -10,6 +13,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -19,7 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import model.Asset;
+import model.AssetRequest;
 import model.Category;
+import model.RequestDeadlineExtension;
 import model.Notification;
 import model.Topic;
 import model.TopicEstimate;
@@ -68,6 +78,8 @@ public class ReporterServlet extends HttpServlet {
             handleQuickSubmit(request, response, loggedUser);
         } else if ("/notifications".equals(path)) {
             handleGetNotifications(request, response, loggedUser);
+        } else if ("/requests".equals(path)) {
+            showRequests(request, response, loggedUser);
         } else if ("/reset".equals(path)) {
             response.sendRedirect(request.getContextPath() + "/reporter/dashboard?message=resetDisabled");
         } else {
@@ -99,6 +111,10 @@ public class ReporterServlet extends HttpServlet {
         }
         if ("/notifications".equals(path)) {
             handlePostNotifications(request, response, loggedUser);
+            return;
+        }
+        if ("/requests".equals(path)) {
+            handleRequestsPost(request, response, loggedUser);
             return;
         }
         if ("/reset".equals(path)) {
@@ -722,6 +738,170 @@ public class ReporterServlet extends HttpServlet {
             int unread = notifDAO.countUnreadByUserId(userId);
             response.getWriter().write("{\"success\":true,\"unreadCount\":" + unread + "}");
         }
+    }
+
+    private void showRequests(HttpServletRequest request, HttpServletResponse response, User loggedUser)
+            throws ServletException, IOException {
+        String topicIdStr = request.getParameter("topicId");
+        TopicRequestDAO requestDAO = new TopicRequestDAO();
+
+        // 1. Không có topicId -> Hiển thị danh sách đề tài APPROVED / IN_PROGRESS
+        if (topicIdStr == null || topicIdStr.trim().isEmpty()) {
+            List<Topic> approvedTopics = requestDAO.getApprovedTopicsForReporter(loggedUser.getUserId());
+            request.setAttribute("approvedTopics", approvedTopics);
+            request.getRequestDispatcher("/WEB-INF/views/reporter/topic-requests-list.jsp").forward(request, response);
+            return;
+        }
+
+        // 2. Có topicId -> Mở form đề xuất chi tiết
+        try {
+            int topicId = Integer.parseInt(topicIdStr.trim());
+            Topic topic = null;
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                topic = topicDAO.getTopicById(topicId);
+            }
+            if (topic == null) {
+                response.sendRedirect(request.getContextPath() + "/reporter/requests?error=topicNotFound");
+                return;
+            }
+
+            boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
+
+            AssetDAO assetDAO = new AssetDAO();
+            UserDAO userDAO = new UserDAO();
+            List<Asset> availableAssets = assetDAO.getAvailableAssets();
+            List<User> allUsers = userDAO.getAll();
+            List<TopicMember> currentMembers = null;
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                currentMembers = topicDAO.findMembersByTopicId(topicId);
+            }
+            List<AssetRequest> assetRequests = requestDAO.getAssetRequestsByTopic(topicId);
+            List<RequestDeadlineExtension> deadlineRequests = requestDAO.getDeadlineRequestsByTopic(topicId);
+            List<String> memberNotifications = requestDAO.getMemberChangeNotificationsByTopic(topicId);
+
+            request.setAttribute("topic", topic);
+            request.setAttribute("isApproved", isApproved);
+            request.setAttribute("availableAssets", availableAssets);
+            request.setAttribute("allUsers", allUsers);
+            request.setAttribute("currentMembers", currentMembers);
+            request.setAttribute("assetRequests", assetRequests);
+            request.setAttribute("deadlineRequests", deadlineRequests);
+            request.setAttribute("memberNotifications", memberNotifications);
+
+            request.getRequestDispatcher("/WEB-INF/views/reporter/topic-requests.jsp").forward(request, response);
+
+        } catch (NumberFormatException e) {
+            LOGGER.log(Level.WARNING, "Invalid topicId param: " + topicIdStr, e);
+            response.sendRedirect(request.getContextPath() + "/reporter/requests");
+        }
+    }
+
+    private void handleRequestsPost(HttpServletRequest request, HttpServletResponse response, User loggedUser)
+            throws ServletException, IOException {
+        String requestType = request.getParameter("requestType");
+        String topicIdStr = request.getParameter("topicId");
+        int topicId = 0;
+        try {
+            topicId = Integer.parseInt(topicIdStr != null ? topicIdStr.trim() : "0");
+        } catch (NumberFormatException ignored) {}
+
+        if (topicId <= 0) {
+            response.sendRedirect(request.getContextPath() + "/reporter/requests");
+            return;
+        }
+
+        Topic topic = null;
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            topic = topicDAO.getTopicById(topicId);
+        }
+        if (topic == null) {
+            response.sendRedirect(request.getContextPath() + "/reporter/requests?error=topicNotFound");
+            return;
+        }
+
+        boolean isEligible = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
+
+        if (("ASSET_REQUEST".equalsIgnoreCase(requestType) || "MEMBER_REQUEST".equalsIgnoreCase(requestType)) && !isEligible) {
+            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId 
+                    + "&status=notApproved");
+            return;
+        }
+
+        boolean success = false;
+        String type = "";
+        TopicRequestDAO requestDAO = new TopicRequestDAO();
+
+        try {
+            if ("ASSET_REQUEST".equalsIgnoreCase(requestType)) {
+                int assetId = Integer.parseInt(request.getParameter("assetId"));
+                String startTimeStr = request.getParameter("startTime");
+                String endTimeStr = request.getParameter("endTime");
+
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+                Timestamp startTime = Timestamp.valueOf(LocalDateTime.parse(startTimeStr, formatter));
+                Timestamp endTime = Timestamp.valueOf(LocalDateTime.parse(endTimeStr, formatter));
+
+                if (!endTime.after(startTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidTime&type=asset");
+                    return;
+                }
+
+                Timestamp nowThreshold = new Timestamp(System.currentTimeMillis() - 5 * 60 * 1000L);
+                if (startTime.before(nowThreshold)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=pastTime&type=asset");
+                    return;
+                }
+
+                if (requestDAO.hasAssetScheduleConflict(assetId, startTime, endTime)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=conflict&type=asset");
+                    return;
+                }
+
+                AssetRequest req = new AssetRequest();
+                req.setTopicId(topicId);
+                req.setAssetId(assetId);
+                req.setRequesterUserId(loggedUser.getUserId());
+                req.setStartTime(startTime);
+                req.setEndTime(endTime);
+
+                success = requestDAO.insertAssetRequest(req);
+                type = "asset";
+
+            } else if ("DEADLINE_REQUEST".equalsIgnoreCase(requestType)) {
+                String requestedDeadlineStr = request.getParameter("requestedDeadline");
+                String reason = request.getParameter("reason");
+                Date requestedDeadline = Date.valueOf(requestedDeadlineStr);
+                Date currentDeadline = (topic.getDeadline() != null) ? topic.getDeadline() : new Date(System.currentTimeMillis());
+
+                RequestDeadlineExtension req = new RequestDeadlineExtension();
+                req.setTopicId(topicId);
+                req.setRequestedByUserId(loggedUser.getUserId());
+                req.setCurrentDeadline(currentDeadline);
+                req.setRequestedDeadline(requestedDeadline);
+                req.setReason(reason != null ? reason.trim() : "");
+
+                success = requestDAO.insertDeadlineExtensionRequest(req);
+                type = "deadline";
+
+            } else if ("MEMBER_REQUEST".equalsIgnoreCase(requestType)) {
+                int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
+                String actionType = request.getParameter("actionType");
+                String reason = request.getParameter("reason");
+
+                success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
+                type = "member";
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error processing Topic request: " + requestType, e);
+            success = false;
+        }
+
+        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                + "&status=" + (success ? "success" : "failed")
+                + "&type=" + type);
     }
 
     private String escapeJson(String s) {

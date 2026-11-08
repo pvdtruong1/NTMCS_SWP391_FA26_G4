@@ -183,11 +183,38 @@
                 </div>
             </c:if>
 
+            <c:if test="${param.status eq 'conflict'}">
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <strong>Trùng lịch sử dụng thiết bị!</strong> Tài sản này đã có phóng viên khác đặt lịch mượn (đang chờ duyệt hoặc đã duyệt) trong khoảng thời gian bạn vừa chọn. Vui lòng chọn khung giờ khác hoặc đổi sang thiết bị tương đương.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'invalidTime'}">
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">✕</span>
+                    <div>
+                        <strong>Khoảng thời gian không hợp lệ!</strong> Thời gian dự kiến hoàn trả thiết bị phải sau thời gian bắt đầu mượn.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'pastTime'}">
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">✕</span>
+                    <div>
+                        <strong>Thời gian không hợp lệ!</strong> Thời gian bắt đầu mượn thiết bị không thể đặt ở quá khứ.
+                    </div>
+                </div>
+            </c:if>
+
             <c:if test="${param.status eq 'notApproved'}">
                 <div style="background: #fff4dd; color: #9a6200; border: 1px solid #fce8b2; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 18px;">⚠️</span>
                     <div>
-                        <strong>Không đủ điều kiện!</strong> Chỉ những đề tài đã được phê duyệt chính thức (APPROVED) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự.
+                        <strong>Không đủ điều kiện!</strong> Chỉ những đề tài đã được phê duyệt (APPROVED) hoặc đang tác nghiệp (IN_PROGRESS) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự.
                     </div>
                 </div>
             </c:if>
@@ -227,6 +254,11 @@
                             <c:when test="${topic.status eq 'APPROVED'}">
                                 <span class="badge b-approved" style="font-size: 12px; padding: 6px 14px;">
                                     ✓ ĐÃ DUYỆT (APPROVED)
+                                </span>
+                            </c:when>
+                            <c:when test="${topic.status eq 'IN_PROGRESS'}">
+                                <span class="badge b-in_progress" style="font-size: 12px; padding: 6px 14px;">
+                                    ⚡ ĐANG TÁC NGHIỆP (IN_PROGRESS)
                                 </span>
                             </c:when>
                             <c:otherwise>
@@ -296,7 +328,7 @@
                                     <i>🔒</i>
                                     <h4 style="font-size: 16px; margin: 0 0 6px; font-weight: 700;">Chức năng mượn tài sản đang bị khóa</h4>
                                     <p style="color: var(--muted); font-size: 13px; max-width: 500px; margin: 0 auto;">
-                                        Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp thực địa.
+                                        Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt (<strong>APPROVED</strong>) hoặc đang tác nghiệp (<strong>IN_PROGRESS</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp thực địa.
                                     </p>
                                 </div>
                             </c:when>
@@ -397,7 +429,7 @@
                                     <i>🔒</i>
                                     <h4 style="font-size: 16px; margin: 0 0 6px; font-weight: 700;">Chức năng thay đổi nhân sự đang bị khóa</h4>
                                     <p style="color: var(--muted); font-size: 13px; max-width: 500px; margin: 0 auto;">
-                                        Đề tài này chưa được duyệt (trạng thái: <strong>${topic.status}</strong>). Chỉ những đề tài đã duyệt chính thức (<strong>APPROVED</strong>) mới có quyền gửi đề xuất thêm hoặc rút bớt nhân sự nhóm.
+                                        Đề tài này hiện đang ở trạng thái: <strong>${topic.status}</strong>. Chỉ những đề tài đã duyệt (<strong>APPROVED</strong>) hoặc đang tác nghiệp (<strong>IN_PROGRESS</strong>) mới có quyền gửi đề xuất thêm hoặc rút bớt nhân sự nhóm.
                                     </p>
                                 </div>
                             </c:when>
@@ -639,6 +671,27 @@
             addSelect.removeAttribute('required');
         }
     }
+    // Khởi tạo giới hạn thời gian thực cho form mượn thiết bị
+    document.addEventListener('DOMContentLoaded', function() {
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        if (startTimeInput && endTimeInput) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            const nowISO = now.toISOString().slice(0, 16);
+            startTimeInput.min = nowISO;
+            endTimeInput.min = nowISO;
+
+            startTimeInput.addEventListener('change', function() {
+                if (startTimeInput.value) {
+                    endTimeInput.min = startTimeInput.value;
+                    if (endTimeInput.value && endTimeInput.value <= startTimeInput.value) {
+                        endTimeInput.value = '';
+                    }
+                }
+            });
+        }
+    });
 </script>
 </body>
 </html>

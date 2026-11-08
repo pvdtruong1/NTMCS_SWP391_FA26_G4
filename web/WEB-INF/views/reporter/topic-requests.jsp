@@ -2,6 +2,29 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
 <c:set var="base" value="${pageContext.request.contextPath}" />
+<%
+    // Đảm bảo danh sách thông báo đề xuất nhân sự của đề tài luôn được lấy mới nhất từ bảng Notification
+    java.util.List<String> notifs = (java.util.List<String>) request.getAttribute("memberNotifications");
+    if (notifs == null || notifs.isEmpty()) {
+        notifs = new java.util.ArrayList<String>();
+        try {
+            model.Topic tObj = (model.Topic) request.getAttribute("topic");
+            if (tObj != null) {
+                try (java.sql.Connection conn = new dal.DBContext().getConnection();
+                     java.sql.PreparedStatement ps = conn.prepareStatement(
+                        "SELECT message FROM Notification WHERE topic_id = ? AND (message LIKE '[[]ĐỀ XUẤT NHÂN SỰ]%' OR message LIKE N'%ĐỀ XUẤT NHÂN SỰ%') ORDER BY notification_id DESC")) {
+                    ps.setInt(1, tObj.getTopicId());
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            notifs.add(rs.getString("message"));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        request.setAttribute("memberNotifications", notifs);
+    }
+%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -38,7 +61,7 @@
 
     <div class="main p-4">
         <!-- Breadcrumb & Top Bar -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <div>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-1">
@@ -51,8 +74,25 @@
                     <i class="bi bi-file-earmark-diff me-2"></i>Phiếu Đề Xuất & Xin Hỗ Trợ
                 </h3>
             </div>
-            <div>
-                <a href="${base}/reporter/requests" class="btn btn-outline-secondary me-2">
+            <div class="d-flex align-items-center gap-2">
+                <!-- Notification Bell Button -->
+                <div class="position-relative">
+                    <button class="btn btn-outline-secondary position-relative" type="button" title="Thông báo hệ thống" onclick="toggleReqNotifDropdown()">
+                        <i class="bi bi-bell-fill text-warning"></i>
+                        <span id="reqNotifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <div id="reqNotifDropdown" class="position-absolute end-0 mt-2 bg-white rounded-3 shadow border" style="display:none; width:340px; z-index:1050; overflow:hidden;">
+                        <div class="p-2 px-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+                            <span class="fw-bold small text-dark"><i class="bi bi-bell me-1"></i>Thông báo của bạn</span>
+                            <button type="button" class="btn btn-link btn-sm text-decoration-none p-0" onclick="markAllReqNotifsRead()">Đã đọc hết</button>
+                        </div>
+                        <div id="reqNotifList" class="p-2" style="max-height:300px; overflow-y:auto;">
+                            <div class="text-center text-muted py-3 small">Đang tải thông báo...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="${base}/reporter/requests" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Danh sách đề tài đã duyệt
                 </a>
                 <a href="${base}/reporter/detail?id=${topic.topicId}" class="btn btn-outline-primary">
@@ -68,7 +108,7 @@
                 <strong>Thành công!</strong>
                 <c:choose>
                     <c:when test="${param.type eq 'asset'}">
-                        Yêu cầu mượn tài sản đã được tạo thành công và đang chuyển cho Quản lý tài sản (Asset Manager) duyệt.
+                        Yêu cầu mượn tài sản đã được tạo thành công và đang chuyển cho Quản lý tài sản duyệt.
                     </c:when>
                     <c:when test="${param.type eq 'deadline'}">
                         Đơn xin gia hạn Deadline đã được chuyển tới Thư ký tòa soạn (Desk Editor) xem xét.
@@ -100,80 +140,88 @@
             </div>
         </c:if>
 
-        <!-- Cảnh báo nếu đề tài chưa APPROVED -->
-        <c:if test="${not isApproved}">
-            <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center mb-4 p-3" role="alert">
-                <i class="bi bi-exclamation-octagon-fill fs-2 me-3 text-warning"></i>
-                <div>
-                    <strong class="d-block mb-1">Đề tài hiện đang ở trạng thái: <span class="badge bg-warning text-dark">${topic.status}</span></strong>
-                    <span>Chỉ những đề tài đã được Ban Biên tập phê duyệt (APPROVED) mới có khả năng mượn tài sản hoặc thêm/bớt nhân sự. Chức năng xin mượn tài sản và đổi nhân sự hiện đang bị khóa đối với đề tài này.</span>
+        <!-- THÔNG TIN TÓM TẮT ĐỀ TÀI -->
+        <div class="card border-0 shadow-sm mb-4 topic-summary-card">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                    <div>
+                        <span class="badge bg-secondary mb-2"><c:out value="${topic.topicCode != null ? topic.topicCode : ('#' += topic.topicId)}"/></span>
+                        <h4 class="fw-bold text-dark mb-1"><c:out value="${topic.title}"/></h4>
+                        <div class="text-muted"><c:out value="${topic.angle}"/></div>
+                    </div>
+                    <div>
+                        <c:choose>
+                            <c:when test="${topic.status eq 'APPROVED'}">
+                                <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-check-circle me-1"></i> ĐÃ DUYỆT (APPROVED)</span>
+                            </c:when>
+                            <c:otherwise>
+                                <span class="badge bg-secondary fs-6 px-3 py-2"><c:out value="${topic.status}"/></span>
+                            </c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
-            </div>
-        </c:if>
 
-        <!-- Thẻ tóm tắt thông tin đề tài -->
-        <div class="card topic-summary-card border-0 shadow-sm mb-4">
-            <div class="card-body p-3">
-                <div class="row g-3 align-items-center">
-                    <div class="col-md-5">
-                        <small class="text-muted d-block">Tên đề tài</small>
-                        <h5 class="fw-bold text-dark mb-0"><c:out value="${topic.title}"/></h5>
+                <div class="row g-3 pt-2 border-top">
+                    <div class="col-md-3 col-6">
+                        <small class="text-muted d-block">Chuyên mục / Ban</small>
+                        <strong class="text-dark"><c:out value="${topic.categoryName}"/> (<c:out value="${topic.deskName}"/>)</strong>
                     </div>
-                    <div class="col-md-2">
-                        <small class="text-muted d-block">Mã đề tài</small>
-                        <span class="badge bg-secondary fs-6"><c:out value="${topic.topicCode != null ? topic.topicCode : ('#' += topic.topicId)}"/></span>
+                    <div class="col-md-3 col-6">
+                        <small class="text-muted d-block">Thể loại / Độ ưu tiên</small>
+                        <strong class="text-dark"><c:out value="${topic.genre}"/> &middot; <span class="badge bg-light text-dark border"><c:out value="${topic.priority}"/></span></strong>
                     </div>
-                    <div class="col-md-2">
-                        <small class="text-muted d-block">Hạn nộp hiện tại</small>
-                        <strong class="text-danger fs-6"><i class="bi bi-calendar-check me-1"></i><c:out value="${topic.deadline}"/></strong>
+                    <div class="col-md-3 col-6">
+                        <small class="text-muted d-block">Hạn nộp hiện tại (Deadline)</small>
+                        <strong class="text-danger"><i class="bi bi-calendar-event me-1"></i><c:out value="${topic.deadline}"/></strong>
                     </div>
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">Trạng thái hiện tại</small>
-                        <span class="badge ${isApproved ? 'bg-success' : 'bg-primary'} fs-6"><c:out value="${topic.status}"/></span>
+                    <div class="col-md-3 col-6">
+                        <small class="text-muted d-block">Số thành viên nhóm</small>
+                        <strong class="text-dark"><i class="bi bi-people me-1"></i><c:out value="${not empty currentMembers ? currentMembers.size() : 0}"/> người</strong>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- KHU VỰC TABS CHỨC NĂNG -->
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-bottom-0 pt-3">
-                <ul class="nav nav-pills card-header-pills" id="requestTab" role="tablist">
+        <!-- TABS GIAO DIỆN 3 LOẠI REQUEST + LỊCH SỬ -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3 px-4">
+                <ul class="nav nav-pills card-header-pills" id="requestTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active fw-semibold" id="asset-tab" data-bs-toggle="tab" data-bs-target="#asset-pane" type="button" role="tab">
-                            <i class="bi bi-camera me-1"></i> 1. Xin mượn tài sản 
-                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill text-muted ms-1" title="Khóa"></i></c:if>
+                        <button class="nav-link active fw-semibold" id="asset-tab" data-bs-toggle="pill" data-bs-target="#asset-pane" type="button" role="tab">
+                            <i class="bi bi-box-seam me-1"></i> 1. Mượn trang thiết bị / Tài sản
+                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill ms-1 text-muted" title="Cần trạng thái APPROVED"></i></c:if>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-semibold" id="deadline-tab" data-bs-toggle="tab" data-bs-target="#deadline-pane" type="button" role="tab">
-                            <i class="bi bi-calendar-plus me-1"></i> 2. Xin gia hạn Deadline
+                        <button class="nav-link fw-semibold" id="deadline-tab" data-bs-toggle="pill" data-bs-target="#deadline-pane" type="button" role="tab">
+                            <i class="bi bi-clock-history me-1"></i> 2. Xin gia hạn Deadline
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-semibold" id="member-tab" data-bs-toggle="tab" data-bs-target="#member-pane" type="button" role="tab">
-                            <i class="bi bi-people me-1"></i> 3. Đổi nhân sự Đề tài 
-                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill text-muted ms-1" title="Khóa"></i></c:if>
+                        <button class="nav-link fw-semibold" id="member-tab" data-bs-toggle="pill" data-bs-target="#member-pane" type="button" role="tab">
+                            <i class="bi bi-person-gear me-1"></i> 3. Đề xuất nhân sự
+                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill ms-1 text-muted" title="Cần trạng thái APPROVED"></i></c:if>
                         </button>
                     </li>
                     <li class="nav-item ms-auto" role="presentation">
-                        <button class="nav-link text-secondary fw-semibold" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
-                            <i class="bi bi-clock-history me-1"></i> Lịch sử đề xuất
+                        <button class="nav-link fw-semibold text-secondary" id="history-tab" data-bs-toggle="pill" data-bs-target="#history-pane" type="button" role="tab">
+                            <i class="bi bi-list-check me-1"></i> Lịch sử đề xuất
+                            <span class="badge bg-secondary ms-1">${assetRequests.size() + deadlineRequests.size() + memberNotifications.size()}</span>
                         </button>
                     </li>
                 </ul>
             </div>
 
             <div class="card-body p-4">
-                <div class="tab-content" id="requestTabContent">
+                <div class="tab-content" id="requestTabsContent">
 
-                    <!-- ================= TAB 1: XIN MƯỢN TÀI SẢN ================= -->
+                    <!-- ================= TAB 1: MƯỢN TÀI SẢN ================= -->
                     <div class="tab-pane fade show active" id="asset-pane" role="tabpanel">
                         <div class="row justify-content-center">
                             <div class="col-lg-8">
                                 <div class="border-bottom pb-3 mb-4">
-                                    <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-box-seam me-2"></i>Đăng ký mượn trang thiết bị / tài sản tác nghiệp</h5>
-                                    <small class="text-muted">Chỉ dành cho đề tài đã duyệt. Chọn tài sản khả dụng trong kho và thời gian sử dụng.</small>
+                                    <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-camera-reels me-2"></i>Đề xuất xin cấp phát / mượn thiết bị tác nghiệp</h5>
+                                    <small class="text-muted">Chỉ áp dụng cho các đề tài đã được duyệt chính thức. Tài sản mượn từ kho thiết bị của tòa soạn.</small>
                                 </div>
 
                                 <c:choose>
@@ -181,7 +229,7 @@
                                         <div class="card bg-light border-0 p-4 text-center my-3">
                                             <i class="bi bi-lock-fill fs-1 text-secondary mb-2"></i>
                                             <h6 class="fw-bold text-dark">Chức năng mượn tài sản đang bị khóa</h6>
-                                            <p class="text-muted small mb-0">Đề tài này chưa được duyệt (trạng thái: <strong>${topic.status}</strong>). Phóng viên chỉ có thể xin cấp tài sản khi đề tài chính thức được chuyển sang trạng thái <strong>APPROVED</strong>.</p>
+                                            <p class="text-muted small mb-0">Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp thực địa.</p>
                                         </div>
                                     </c:when>
 
@@ -191,31 +239,32 @@
                                             <input type="hidden" name="topicId" value="${topic.topicId}">
 
                                             <div class="mb-3">
-                                                <label for="assetId" class="form-label fw-semibold">Chọn tài sản muốn mượn <span class="text-danger">*</span></label>
-                                                <select class="form-select form-select-lg fs-6" id="assetId" name="assetId" required>
-                                                    <option value="">-- Chọn thiết bị / phương tiện (Camera, Flycam, Xe ô tô...) --</option>
-                                                    <c:forEach var="asset" items="${availableAssets}">
-                                                        <option value="${asset.assetId}">
-                                                            [${asset.assetCategory}] ${asset.assetName} (Mã: ${asset.assetCode} - S/N: ${asset.serialNumber})
+                                                <label for="assetId" class="form-label fw-semibold">Chọn tài sản / thiết bị cần mượn <span class="text-danger">*</span></label>
+                                                <select class="form-select" id="assetId" name="assetId" required>
+                                                    <option value="">-- Chọn tài sản khả dụng từ kho --</option>
+                                                    <c:forEach var="a" items="${availableAssets}">
+                                                        <option value="${a.assetId}">
+                                                            [${a.assetCategory}] ${a.assetName} (${a.assetCode}) - Serial: ${a.serialNumber != null ? a.serialNumber : 'N/A'}
                                                         </option>
                                                     </c:forEach>
                                                 </select>
+                                                <div class="form-text">Chỉ các tài sản đang ở trạng thái khả dụng (AVAILABLE) mới được hiển thị.</div>
                                             </div>
 
                                             <div class="row g-3 mb-4">
                                                 <div class="col-md-6">
-                                                    <label for="startTime" class="form-label fw-semibold">Thời gian mượn (Bắt đầu) <span class="text-danger">*</span></label>
+                                                    <label for="startTime" class="form-label fw-semibold">Thời gian bắt đầu mượn <span class="text-danger">*</span></label>
                                                     <input type="datetime-local" class="form-control" id="startTime" name="startTime" required>
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label for="endTime" class="form-label fw-semibold">Thời gian trả dự kiến <span class="text-danger">*</span></label>
+                                                    <label for="endTime" class="form-label fw-semibold">Thời gian dự kiến hoàn trả <span class="text-danger">*</span></label>
                                                     <input type="datetime-local" class="form-control" id="endTime" name="endTime" required>
                                                 </div>
                                             </div>
 
                                             <div class="text-end">
                                                 <button type="submit" class="btn btn-primary px-4 py-2">
-                                                    <i class="bi bi-send-fill me-1"></i> Gửi yêu cầu mượn tài sản
+                                                    <i class="bi bi-send me-1"></i> Gửi yêu cầu mượn thiết bị
                                                 </button>
                                             </div>
                                         </form>
@@ -225,40 +274,39 @@
                         </div>
                     </div>
 
-                    <!-- ================= TAB 2: XIN GIA HẠN DEADLINE ================= -->
+                    <!-- ================= TAB 2: GIA HẠN DEADLINE ================= -->
                     <div class="tab-pane fade" id="deadline-pane" role="tabpanel">
                         <div class="row justify-content-center">
                             <div class="col-lg-8">
                                 <div class="border-bottom pb-3 mb-4">
-                                    <h5 class="fw-bold mb-1 text-warning text-dark"><i class="bi bi-hourglass-split me-2"></i>Đơn xin lùi hạn nộp bài (Deadline Extension)</h5>
-                                    <small class="text-muted">Gửi yêu cầu gia hạn tới Thư ký tòa soạn (Desk Editor) kèm lý do giải trình cụ thể.</small>
+                                    <h5 class="fw-bold mb-1 text-warning text-dark"><i class="bi bi-hourglass-split me-2"></i>Xin gia hạn hạn nộp bài (Deadline)</h5>
+                                    <small class="text-muted">Đơn xin gia hạn sẽ được chuyển trực tiếp tới Thư ký tòa soạn (Desk Editor) xem xét phê duyệt.</small>
                                 </div>
 
                                 <form action="${base}/reporter/requests" method="POST">
                                     <input type="hidden" name="requestType" value="DEADLINE_REQUEST">
                                     <input type="hidden" name="topicId" value="${topic.topicId}">
 
-                                    <div class="mb-3 p-3 bg-light rounded border d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <span class="text-muted d-block small">Thời hạn nộp hiện tại:</span>
-                                            <h5 class="text-danger fw-bold mb-0">${topic.deadline}</h5>
-                                        </div>
-                                        <i class="bi bi-clock-history fs-2 text-muted"></i>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Hạn nộp hiện tại của đề tài</label>
+                                        <input type="text" class="form-control bg-light" value="${topic.deadline}" readonly>
+                                        <div class="form-text">Hạn nộp đã được ấn định khi đề tài khởi tạo/duyệt.</div>
                                     </div>
 
                                     <div class="mb-3">
-                                        <label for="requestedDeadline" class="form-label fw-semibold">Thời hạn mới mong muốn xin gia hạn <span class="text-danger">*</span></label>
-                                        <input type="date" class="form-control" id="requestedDeadline" name="requestedDeadline" required>
+                                        <label for="requestedDeadline" class="form-label fw-semibold">Hạn nộp mới mong muốn <span class="text-danger">*</span></label>
+                                        <input type="date" class="form-control" id="requestedDeadline" name="requestedDeadline" required min="${topic.deadline}">
+                                        <div class="form-text">Hạn mới phải sau hạn nộp hiện tại.</div>
                                     </div>
 
                                     <div class="mb-4">
                                         <label for="deadlineReason" class="form-label fw-semibold">Lý do xin gia hạn <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" id="deadlineReason" name="reason" rows="4" placeholder="Giải trình nguyên nhân cần thêm thời gian (VD: Nhân vật phỏng vấn bận đột xuất, đang chờ xác minh nguồn số liệu hiện trường...)" required></textarea>
+                                        <textarea class="form-control" id="deadlineReason" name="reason" rows="4" placeholder="Giải trình cụ thể lý do khách quan/chủ quan cần kéo dài thời gian tác nghiệp..." required></textarea>
                                     </div>
 
                                     <div class="text-end">
-                                        <button type="submit" class="btn btn-warning text-dark px-4 py-2 fw-semibold">
-                                            <i class="bi bi-send-check-fill me-1"></i> Gửi đơn xin gia hạn
+                                        <button type="submit" class="btn btn-warning px-4 py-2 text-dark fw-semibold">
+                                            <i class="bi bi-calendar-plus me-1"></i> Gửi đơn xin gia hạn
                                         </button>
                                     </div>
                                 </form>
@@ -266,7 +314,7 @@
                         </div>
                     </div>
 
-                    <!-- ================= TAB 3: XIN THAY ĐỔI NHÂN SỰ ================= -->
+                    <!-- ================= TAB 3: ĐỀ XUẤT NHÂN SỰ ================= -->
                     <div class="tab-pane fade" id="member-pane" role="tabpanel">
                         <div class="row justify-content-center">
                             <div class="col-lg-8">
@@ -337,6 +385,29 @@
                                                 </button>
                                             </div>
                                         </form>
+
+                                        <!-- HIỂN THỊ CÁC THÔNG BÁO / ĐỀ XUẤT NHÂN SỰ ĐÃ GỬI TRỰC TIẾP TẠI TAB NÀY -->
+                                        <div class="mt-5 border-top pt-4">
+                                            <h6 class="fw-bold text-dark mb-3">
+                                                <i class="bi bi-bell-fill text-success me-1"></i> Các đề xuất nhân sự đã gửi cho đề tài này (${not empty memberNotifications ? memberNotifications.size() : 0})
+                                            </h6>
+                                            <div class="list-group">
+                                                <c:forEach var="msg" items="${memberNotifications}">
+                                                    <div class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-3 bg-light">
+                                                        <span class="badge bg-success mt-1"><i class="bi bi-send-check"></i> Đã gửi</span>
+                                                        <div class="flex-grow-1">
+                                                            <div class="text-dark fw-medium"><c:out value="${msg}"/></div>
+                                                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Đã tạo thông báo gửi tới Ban biên tập & lưu vết hệ thống</small>
+                                                        </div>
+                                                    </div>
+                                                </c:forEach>
+                                                <c:if test="${empty memberNotifications}">
+                                                    <div class="text-center text-muted py-3 border rounded bg-white small">
+                                                        Chưa có đề xuất thay đổi nhân sự nào cho đề tài này.
+                                                    </div>
+                                                </c:if>
+                                            </div>
+                                        </div>
                                     </c:otherwise>
                                 </c:choose>
                             </div>
@@ -421,12 +492,16 @@
                             </table>
                         </div>
 
-                        <!-- 3. Đề xuất đổi nhân sự -->
-                        <h6 class="fw-bold mt-4 text-success"><i class="bi bi-people me-1"></i> 3. Đề xuất thay đổi nhân sự nhóm</h6>
+                        <!-- 3. Đề xuất đổi nhân sự (TỪ BẢNG NOTIFICATION) -->
+                        <h6 class="fw-bold mt-4 text-success"><i class="bi bi-people me-1"></i> 3. Đề xuất thay đổi nhân sự nhóm (${not empty memberNotifications ? memberNotifications.size() : 0})</h6>
                         <div class="list-group">
                             <c:forEach var="msg" items="${memberNotifications}">
-                                <div class="list-group-item list-group-item-action">
-                                    <i class="bi bi-info-circle-fill text-info me-2"></i> <c:out value="${msg}"/>
+                                <div class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-3 bg-light">
+                                    <span class="badge bg-success mt-1"><i class="bi bi-send-check"></i> Đã gửi</span>
+                                    <div class="flex-grow-1">
+                                        <div class="text-dark fw-medium"><c:out value="${msg}"/></div>
+                                        <small class="text-muted"><i class="bi bi-bell me-1"></i>Thông báo đã gửi tới Ban Biên Tập (Desk Editor)</small>
+                                    </div>
                                 </div>
                             </c:forEach>
                             <c:if test="${empty memberNotifications}">
@@ -466,6 +541,79 @@
             addSelect.removeAttribute('required');
         }
     }
+
+    // Topbar Notification Bell Script
+    function toggleReqNotifDropdown() {
+        const dd = document.getElementById('reqNotifDropdown');
+        if (!dd) return;
+        const isShown = dd.style.display === 'block';
+        dd.style.display = isShown ? 'none' : 'block';
+        if (!isShown) {
+            loadReqNotifs();
+        }
+    }
+
+    function loadReqNotifs() {
+        fetch('${base}/api-notifications.jsp')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('reqNotifBadge');
+                const list = document.getElementById('reqNotifList');
+                if (badge) {
+                    if (data.unreadCount > 0) {
+                        badge.innerText = data.unreadCount > 99 ? '99+' : data.unreadCount;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+                if (list) {
+                    if (!data.notifications || data.notifications.length === 0) {
+                        list.innerHTML = '<div class="text-center text-muted py-3 small">Chưa có thông báo nào.</div>';
+                    } else {
+                        list.innerHTML = data.notifications.map(n => {
+                            const isUnread = !n.isRead;
+                            const topicLink = n.topicId ? ('${base}/reporter/requests?topicId=' + n.topicId) : '#';
+                            return '<div class="p-2 mb-1 rounded border-bottom ' + (isUnread ? 'bg-light border-primary' : 'bg-white') + '" style="font-size:12px;">'
+                                 + '<div class="d-flex justify-content-between align-items-start gap-1">'
+                                 + '<span class="' + (isUnread ? 'fw-bold text-dark' : 'text-muted') + '">' + escapeHtml(n.message) + '</span>'
+                                 + (isUnread ? '<span class="badge bg-primary" style="font-size:8px;">Mới</span>' : '')
+                                 + '</div>'
+                                 + (n.topicId ? '<div class="mt-1"><a href="' + topicLink + '" class="small text-decoration-none">Xem đề tài &rarr;</a></div>' : '')
+                                 + '</div>';
+                        }).join('');
+                    }
+                }
+            })
+            .catch(err => {
+                const list = document.getElementById('reqNotifList');
+                if (list) list.innerHTML = '<div class="text-center text-danger py-2 small">Lỗi tải thông báo</div>';
+            });
+    }
+
+    function markAllReqNotifsRead() {
+        fetch('${base}/api-notifications.jsp?action=markAllRead', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => {
+                const badge = document.getElementById('reqNotifBadge');
+                if (badge) badge.style.display = 'none';
+                loadReqNotifs();
+            });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadReqNotifs);
+    document.addEventListener('click', function(e) {
+        const btn = document.querySelector('[onclick="toggleReqNotifDropdown()"]');
+        const dd = document.getElementById('reqNotifDropdown');
+        if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
+            dd.style.display = 'none';
+        }
+    });
 </script>
 </body>
 </html>

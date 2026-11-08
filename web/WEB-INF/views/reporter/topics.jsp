@@ -71,7 +71,6 @@
                     <option value="SUBMITTED" ${status eq 'SUBMITTED' ? 'selected' : ''}>Đã nộp duyệt (SUBMITTED)</option>
                     <option value="REVISION_REQUESTED" ${status eq 'REVISION_REQUESTED' ? 'selected' : ''}>Yêu cầu chỉnh sửa (REVISION_REQUESTED)</option>
                     <option value="APPROVED" ${status eq 'APPROVED' ? 'selected' : ''}>Đã phê duyệt (APPROVED)</option>
-                    <option value="IN_PROGRESS" ${status eq 'IN_PROGRESS' ? 'selected' : ''}>Đang tác nghiệp (IN_PROGRESS)</option>
                     <option value="ACCEPTED_READY_FOR_CMS" ${status eq 'ACCEPTED_READY_FOR_CMS' ? 'selected' : ''}>Sẵn sàng CMS (ACCEPTED)</option>
                     <option value="REJECTED" ${status eq 'REJECTED' ? 'selected' : ''}>Bị từ chối (REJECTED)</option>
                 </select>

@@ -227,12 +227,26 @@ public class TopicRequestDAO extends DBContext {
             String msg = "[ĐỀ XUẤT NHÂN SỰ] Phóng viên đề xuất " + actionText + " nhân sự: " 
                        + targetName + " cho đề tài. Lý do: " + reason;
 
+            // Gửi thông báo cho Desk Editor / Ban Biên Tập
             try (PreparedStatement psNoti = conn.prepareStatement(sqlInsertNoti)) {
                 psNoti.setInt(1, editorId);
                 psNoti.setInt(2, topicId);
                 psNoti.setString(3, msg);
-                return psNoti.executeUpdate() > 0;
+                psNoti.executeUpdate();
             }
+
+            // Đồng thời lưu 1 bản ghi thông báo xác nhận cho chính phóng viên
+            if (requesterId != editorId) {
+                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] Bạn đã gửi đề xuất " + actionText + " nhân sự: " 
+                                   + targetName + " cho đề tài #" + topicId + ". Lý do: " + reason;
+                try (PreparedStatement psNoti2 = conn.prepareStatement(sqlInsertNoti)) {
+                    psNoti2.setInt(1, requesterId);
+                    psNoti2.setInt(2, topicId);
+                    psNoti2.setString(3, reporterMsg);
+                    psNoti2.executeUpdate();
+                }
+            }
+            return true;
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Failed to send member change notification", e);
             return false;
@@ -242,7 +256,7 @@ public class TopicRequestDAO extends DBContext {
     public List<String> getMemberChangeNotificationsByTopic(int topicId) {
         List<String> list = new ArrayList<>();
         String sql = "SELECT message FROM Notification "
-                   + "WHERE topic_id = ? AND message LIKE '[ĐỀ XUẤT NHÂN SỰ]%' "
+                   + "WHERE topic_id = ? AND (message LIKE '[[]ĐỀ XUẤT NHÂN SỰ]%' OR message LIKE N'%ĐỀ XUẤT NHÂN SỰ%') "
                    + "ORDER BY notification_id DESC";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

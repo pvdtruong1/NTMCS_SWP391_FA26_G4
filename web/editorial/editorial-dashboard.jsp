@@ -318,12 +318,12 @@
                 <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <h2 style="font-size: 16px; margin:0; display:flex; align-items:center; gap:8px;">
-                            <span>📦</span> Bàn Nghiệm Thu Sản Phẩm & Bàn Giao Xuất Bản CMS
+                            <span>📦</span> Hàng Đợi Chờ Thẩm Định Nghiệm Thu Bản Thảo (DELIVERED)
                         </h2>
                         <small style="color:var(--muted);">Kiểm tra chốt chặn tài sản (RULE-01) và chất lượng bài viết trước khi cấp Token chuyển giao</small>
                     </div>
                     <span class="badge ${deliverables.size() > 0 ? 'badge-primary' : 'badge-secondary'}">
-                        ${deliverables.size()} đề tài DELIVERED
+                        ${deliverables.size()} đề tài chờ nghiệm thu
                     </span>
                 </div>
 
@@ -413,11 +413,11 @@
                 <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <h2 style="font-size: 16px; margin:0; display:flex; align-items:center; gap:8px;">
-                            <span>🔐</span> Nhật Ký Đề Tài Đã Bàn Giao CMS (HMAC-SHA256 Token Ledger)
+                            <span>🔐</span> Danh Sách Đề Tài Đã Nghiệm Thu & Sẵn Sàng Bàn Giao CMS (ACCEPTED_READY_FOR_CMS)
                         </h2>
                         <small style="color:var(--muted);">Bằng chứng mật mã bất biến được lưu trữ trong Audit Log (Zero DB Mutation - RULE-02)</small>
                     </div>
-                    <span class="badge badge-success">${recentHandovers.size()} đề tài đã cấp Token</span>
+                    <span class="badge badge-success">${recentHandovers.size()} đề tài READY_FOR_CMS</span>
                 </div>
 
                 <c:choose>

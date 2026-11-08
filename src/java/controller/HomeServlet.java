@@ -59,7 +59,6 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"System audit log", "/audit-log"});
         }
         if (codes.contains("TOPIC_EVALUATE")) {
-            screens.add(new String[]{"Dashboard Điều phối & Nghiệm thu CMS (SCR-2.1)", "/editorial/dashboard"});
             screens.add(new String[]{"Hàng chờ thẩm định đề tài (Pending Queue)", "/editorial/pending-queue"});
             screens.add(new String[]{"Kho lưu trữ ý tưởng & Đề tài đình chỉ (Idea Archive)", "/editorial/idea-archive"});
             screens.add(new String[]{"Đặt hàng & Giao quyền đề tài chỉ đạo (Directive Topic)", "/editorial/directive-creation"});

@@ -65,15 +65,6 @@
     </servlet-mapping>
 
     <!-- WF-02: Editorial Servlets -->
-    <servlet>
-        <servlet-name>EditorialDashboardServlet</servlet-name>
-        <servlet-class>controller.editorial.EditorialDashboardServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>EditorialDashboardServlet</servlet-name>
-        <url-pattern>/editorial/dashboard</url-pattern>
-        <url-pattern>/editorial/editorial-dashboard</url-pattern>
-    </servlet-mapping>
 
     <servlet>
         <servlet-name>PendingQueueServlet</servlet-name>

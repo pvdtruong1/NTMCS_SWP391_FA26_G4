@@ -49,7 +49,7 @@ public class DeliverableReviewServlet extends HttpServlet {
 
         String topicIdParam = request.getParameter("topicId");
         if (topicIdParam == null || topicIdParam.trim().isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=missing_topic_id");
+            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=missing_topic_id");
             return;
         }
 
@@ -57,14 +57,14 @@ public class DeliverableReviewServlet extends HttpServlet {
         try {
             topicId = Integer.parseInt(topicIdParam.trim());
         } catch (NumberFormatException ex) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=invalid_topic_id");
+            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_topic_id");
             return;
         }
 
         // 1. Fetch Topic Deliverable Details & RULE-01 Guard Status
         TopicDeliverableDTO deliverable = topicDAO.getTopicDeliverableDetail(topicId);
         if (deliverable == null) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=topic_not_found");
+            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=topic_not_found");
             return;
         }
 
@@ -110,7 +110,7 @@ public class DeliverableReviewServlet extends HttpServlet {
         String action = request.getParameter("action");
         String topicIdParam = request.getParameter("topicId");
         if (topicIdParam == null || topicIdParam.trim().isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=missing_topic_id");
+            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=missing_topic_id");
             return;
         }
 
@@ -118,7 +118,7 @@ public class DeliverableReviewServlet extends HttpServlet {
         try {
             topicId = Integer.parseInt(topicIdParam.trim());
         } catch (NumberFormatException ex) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=invalid_topic_id");
+            response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=invalid_topic_id");
             return;
         }
 
@@ -126,7 +126,7 @@ public class DeliverableReviewServlet extends HttpServlet {
             String note = request.getParameter("acceptanceNote");
             try {
                 String token = topicDAO.acceptTopicAndMintCmsToken(topicId, editorId, note, null);
-                response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=accepted&code=" + topicId
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?msg=accepted&code=" + topicId
                         + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
             } catch (IllegalStateException | IllegalArgumentException ex) {
                 LOGGER.log(Level.WARNING, "Acceptance validation failed for topic #" + topicId + ": " + ex.getMessage());
@@ -141,7 +141,7 @@ public class DeliverableReviewServlet extends HttpServlet {
             String feedback = request.getParameter("revisionFeedback");
             try {
                 topicDAO.requestDeliverableRevision(topicId, editorId, feedback);
-                response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=revision_requested&code=" + topicId);
+                response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?msg=revision_requested&code=" + topicId);
             } catch (IllegalStateException | IllegalArgumentException ex) {
                 LOGGER.log(Level.WARNING, "Revision request validation failed for topic #" + topicId + ": " + ex.getMessage());
                 response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId

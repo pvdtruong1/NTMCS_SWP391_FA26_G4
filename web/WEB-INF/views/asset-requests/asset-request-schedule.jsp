@@ -53,6 +53,7 @@ request.setAttribute("wf03Active", "requests");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kiểm tra trùng lịch yêu cầu #AR-<%=item.getRequestId()%> | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
@@ -62,7 +63,7 @@ request.setAttribute("wf03Active", "requests");
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="<%=\"Kiểm soát Xung đột Lịch Thiết bị (SCR-3.6) #AR-\" + item.getRequestId()%>"/>
+            <jsp:param name="title" value="<%=\"📅 Kiểm soát Lịch Thiết Bị #AR-\" + item.getRequestId()%>"/>
         </jsp:include>
 
         <main>

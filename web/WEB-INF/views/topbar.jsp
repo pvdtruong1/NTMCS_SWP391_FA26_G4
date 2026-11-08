@@ -7,7 +7,7 @@
     <div class="brand-desk-info">
         <strong><c:out value="${not empty param.title ? param.title : (not empty topUser.deskName ? topUser.deskName : 'Hệ Thống Tòa Soạn Hội Tụ')}" /></strong>
     </div>
-    <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
         <!-- Notification Bell Button -->
         <button type="button" class="icon-btn notif" id="notifTriggerBtn" onclick="openNotificationsModal()" title="Xem thông báo mới" style="cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;">
             <span style="font-size: 16px;">🔔</span>

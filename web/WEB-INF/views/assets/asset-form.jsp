@@ -35,6 +35,7 @@ request.setAttribute("wf03Active", editing ? "assets" : "add");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><%=editing ? "Cập nhật tài sản" : "Thêm tài sản mới"%> | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
@@ -44,7 +45,7 @@ request.setAttribute("wf03Active", editing ? "assets" : "add");
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="<%=editing ? \"Cập nhật Thông tin Trang thiết bị (WF-03)\" : \"Thêm mới Trang thiết bị Tác nghiệp (WF-03)\"%>"/>
+            <jsp:param name="title" value="<%=editing ? \"📦 Cập nhật Thiết bị (WF-03)\" : \"📦 Thêm Thiết bị mới (WF-03)\"%>"/>
         </jsp:include>
 
         <main>

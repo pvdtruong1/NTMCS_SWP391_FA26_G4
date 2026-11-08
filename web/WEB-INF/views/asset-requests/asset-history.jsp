@@ -44,6 +44,7 @@ request.setAttribute("wf03Active", "assets");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Lịch sử sử dụng tài sản #<%=assetId%> | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
@@ -53,7 +54,7 @@ request.setAttribute("wf03Active", "assets");
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="<%=\"Nhật ký Điều phối & Lịch sử Thiết bị #\" + assetId%>"/>
+            <jsp:param name="title" value="<%=\"📜 Nhật ký Luân chuyển Thiết bị #\" + assetId%>"/>
         </jsp:include>
 
         <main>

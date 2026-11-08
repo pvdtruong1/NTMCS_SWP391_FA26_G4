@@ -84,6 +84,7 @@ String baseQuery = "keyword=" + qEnc + "&category=" + catEnc + "&status=" + stat
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Quản lý danh sách tài sản | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 <body>
@@ -93,7 +94,7 @@ String baseQuery = "keyword=" + qEnc + "&category=" + catEnc + "&status=" + stat
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="Phân Hệ Hậu Cần và Quản Lý Trang Thiết Bị (WF-03)"/>
+            <jsp:param name="title" value="📦 Quản Lý Trang Thiết Bị (WF-03)"/>
         </jsp:include>
 
         <main>

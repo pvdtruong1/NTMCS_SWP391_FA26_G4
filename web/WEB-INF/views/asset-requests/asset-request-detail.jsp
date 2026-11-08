@@ -60,6 +60,7 @@ request.setAttribute("wf03Active", "requests");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Chi tiết yêu cầu #AR-<%=x.getRequestId()%> | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
@@ -69,7 +70,7 @@ request.setAttribute("wf03Active", "requests");
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="<%=\"Xử lý Phiếu Yêu cầu Thiết bị #AR-\" + x.getRequestId()%>"/>
+            <jsp:param name="title" value="<%=\"📋 Xử lý Yêu cầu #AR-\" + x.getRequestId()%>"/>
         </jsp:include>
 
         <main>

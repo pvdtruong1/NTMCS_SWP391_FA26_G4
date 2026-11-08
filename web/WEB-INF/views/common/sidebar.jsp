@@ -14,7 +14,7 @@ if (reqStatus == null) {
 String ctx = request.getContextPath();
 %>
 
-<aside class="sidebar">
+<aside id="sidebar" class="sidebar">
 
     <a class="brand" href="<%=ctx%>/assets">
         <span class="brand-mark">N</span>
@@ -64,9 +64,9 @@ String ctx = request.getContextPath();
         Đang bàn giao / Thu hồi
     </a>
 
-    <div class="side-note">
-        <b>LOGISTICS COORDINATOR</b>
-        <small>WF-03 • Phân hệ Hậu cần & Thiết bị</small>
+    <div class="sidebar-bottom">
+        <span class="demo">SWP391 — NHÓM 4</span>
+        <small>Tòa Soạn Hội Tụ (NTMCS)</small>
     </div>
 
 </aside>

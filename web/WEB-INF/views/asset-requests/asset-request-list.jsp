@@ -74,6 +74,7 @@ request.setAttribute("wf03Active", "requests");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Quản lý yêu cầu sử dụng tài sản | NTMCS</title>
+    <link rel="stylesheet" href="<%=ctx%>/css/style.css">
     <link rel="stylesheet" href="<%=ctx%>/assets/css/asset-management.css">
 </head>
 
@@ -83,7 +84,7 @@ request.setAttribute("wf03Active", "requests");
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
-            <jsp:param name="title" value="Điều Phối và Quản Lý Yêu Cầu Thiết Bị Tác Nghiệp (WF-03)"/>
+            <jsp:param name="title" value="📋 Quản Lý Yêu Cầu Thiết Bị (WF-03)"/>
         </jsp:include>
 
         <main>

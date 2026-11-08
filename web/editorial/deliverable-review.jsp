@@ -99,7 +99,7 @@
 <body>
 <div class="app">
     <jsp:include page="/WEB-INF/views/sidebar.jsp">
-        <jsp:param name="active" value="pending-queue"/>
+        <jsp:param name="active" value="editorial-dashboard"/>
     </jsp:include>
     <div class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">
@@ -115,7 +115,9 @@
                     <p>Đối soát chốt chặn an toàn tài sản (RULE-01), thẩm định chất lượng bản thảo và cấp mã HMAC-SHA256 Token chuyển giao CMS.</p>
                 </div>
                 <div class="page-actions">
-                    <a href="${base}/editorial/pending-queue?status=DELIVERED" class="btn" style="text-decoration:none;">&larr; Hàng Đợi Chờ Thẩm Định</a>
+                    <a href="${base}/editorial/dashboard" class="btn" style="text-decoration:none;">
+                        &larr; Bàn Nghiệm Thu Dashboard
+                    </a>
                 </div>
             </div>
 

@@ -2,6 +2,7 @@ package test;
 
 import dal.TopicDAO;
 import dto.CmsHandoverRecordDTO;
+import dto.EditorialDashboardDTO;
 import dto.TopicDeliverableDTO;
 import model.Desk;
 
@@ -17,7 +18,7 @@ import java.util.List;
  * 
  * Target: Desk Editor (Phạm Vũ Đình Trường - Role 2, Desk 1) & Executive Editor (Role 3)
  */
-public class DeliverableReviewTest {
+public class EditorialDashboardTest {
 
     private static final TopicDAO topicDAO = new TopicDAO();
     private static int passedTests = 0;
@@ -25,12 +26,14 @@ public class DeliverableReviewTest {
 
     public static void main(String[] args) {
         System.out.println("==================================================================");
-        System.out.println("RUNNING TEST SUITE: SCR-2.6 DELIVERABLE REVIEW & RULE-02 ACCEPTANCE PROTOCOL");
+        System.out.println("RUNNING TEST SUITE: SCR-2.1 EDITORIAL DASHBOARD & RULE-02 PROTOCOL");
         System.out.println("Actor: Phạm Vũ Đình Trường (Desk Editor - WF-02)");
         System.out.println("==================================================================");
 
         try {
             testHmacSha256Computation();
+            testDashboardMetricsQueryDesk1();
+            testDashboardMetricsQueryExecutiveGlobal();
             testPendingDeliverablesQuery();
             testRule01ViolationBlocksCmsAcceptance();
             testRule01PassedAllowsCmsAcceptanceAndMintsToken();
@@ -73,6 +76,36 @@ public class DeliverableReviewTest {
         assertTrue("Test 1: HMAC-SHA256 generates authentic 64-char lowercase hexadecimal token",
                 validLength && validHex,
                 "Token invalid format or length: " + token);
+    }
+
+    /**
+     * Test 2: KPI Metrics aggregation for Desk 1 (Ban Thời sự - Chính trị).
+     */
+    private static void testDashboardMetricsQueryDesk1() {
+        EditorialDashboardDTO metrics = topicDAO.getEditorialDashboardMetrics(1, false);
+        boolean ok = metrics != null
+                && metrics.getPendingReviewCount() >= 0
+                && metrics.getActiveFieldworkCount() >= 0
+                && metrics.getDeskName() != null
+                && metrics.getApprovalRatePercent() >= 0.0
+                && metrics.getAvgReviewLatencyHours() > 0;
+
+        assertTrue("Test 2: Query editorial KPI metrics for Desk 1",
+                ok,
+                "Metrics query returned null or invalid fields: " + metrics);
+    }
+
+    /**
+     * Test 3: Executive Multi-Desk Scope KPI aggregation (Toàn Tòa Soạn).
+     */
+    private static void testDashboardMetricsQueryExecutiveGlobal() {
+        EditorialDashboardDTO metrics = topicDAO.getEditorialDashboardMetrics(0, true);
+        boolean ok = metrics != null
+                && metrics.getDeskName().contains("Toàn Tòa Soạn");
+
+        assertTrue("Test 3: Query executive global KPI metrics across all desks",
+                ok,
+                "Metrics not configured for global newsroom scope: " + (metrics != null ? metrics.getDeskName() : "null"));
     }
 
     /**

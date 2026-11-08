@@ -46,7 +46,7 @@ public class PendingQueueServlet extends HttpServlet {
 
         // 2. Parse Filter & Pagination Parameters
         String status = request.getParameter("status");
-        if (status == null || (!status.equals("SUBMITTED") && !status.equals("PENDING_EXECUTIVE_APPROVAL") && !status.equals("DELIVERED"))) {
+        if (status == null || (!status.equals("SUBMITTED") && !status.equals("PENDING_EXECUTIVE_APPROVAL"))) {
             status = "SUBMITTED";
         }
 
@@ -74,7 +74,6 @@ public class PendingQueueServlet extends HttpServlet {
         Desk currentDesk = null;
         int totalPendingCount = 0;
         int totalEscalatedCount = 0;
-        int totalDeliveredCount = 0;
         List<TopicPendingDTO> paginatedTopics = new ArrayList<>();
         int totalPages = 1;
         int totalRecords = 0;
@@ -119,7 +118,6 @@ public class PendingQueueServlet extends HttpServlet {
         request.setAttribute("totalRecords", totalRecords);
         request.setAttribute("pendingCount", totalPendingCount);
         request.setAttribute("escalatedCount", totalEscalatedCount);
-        request.setAttribute("deliveredCount", totalDeliveredCount);
         request.setAttribute("currentDesk", currentDesk);
 
         request.getRequestDispatcher("/editorial/pending-queue.jsp").forward(request, response);

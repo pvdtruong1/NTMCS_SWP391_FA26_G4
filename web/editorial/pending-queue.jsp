@@ -118,24 +118,7 @@
             </div>
 
             <!-- Feedback Notification Banner -->
-            <c:if test="${param.msg == 'accepted'}">
-                <div class="alert alert-success" style="background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:14px 18px; border-radius:10px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                    <div>
-                        <span style="font-size:18px;">✅</span>
-                        <strong>Nghiệm thu thành công!</strong> Đề tài <b>#${param.code}</b> đã đạt chuẩn và được chuyển sang <b>ACCEPTED_READY_FOR_CMS</b>.
-                        <c:if test="${not empty param.token}">
-                            <div style="margin-top:6px; font-size:12px;">Mã HMAC-SHA256 Token: <code style="background:#d1fae5; padding:2px 6px; border-radius:4px; font-weight:700;">${param.token}</code></div>
-                        </c:if>
-                    </div>
-                </div>
-            </c:if>
-            <c:if test="${param.msg == 'revision_requested'}">
-                <div class="alert alert-info" style="background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; padding:14px 18px; border-radius:10px; margin-bottom:18px;">
-                    <span style="font-size:18px;">↩️</span>
-                    <strong>Đã gửi yêu cầu chỉnh sửa!</strong> Bản thảo đề tài <b>#${param.code}</b> đã được chuyển về cho phóng viên tiếp thu chỉnh sửa.
-                </div>
-            </c:if>
-            <c:if test="${not empty param.msg and param.msg != 'accepted' and param.msg != 'revision_requested'}">
+            <c:if test="${not empty param.msg}">
                 <div style="margin-bottom: 18px; padding: 14px 18px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 12px;
                      ${param.msg == 'approved' or param.msg == 'tbt_approved' or param.msg == 'directive_commissioned' ? 'background: #e8f7ef; color: #15734f; border: 1px solid #ccebdd;' : ''}
                      ${param.msg == 'escalated' ? 'background: #fff4dd; color: #9a6200; border: 1px solid #f4ddb2;' : ''}
@@ -242,18 +225,18 @@
                     </div>
                 </div>
                 <div class="stat">
-                    <div class="stat-icon" style="background:#e0f2fe; color:#0369a1;">📦</div>
+                    <div class="stat-icon" style="background:#e8f7ef; color:#16845b;">🏛️</div>
                     <div>
-                        <span>Chờ Nghiệm Thu Bản Thảo</span>
-                        <strong id="badge-count-delivered">${deliveredCount}</strong>
-                        <small>Trạng thái DELIVERED</small>
+                        <span>Ban Chuyên Môn</span>
+                        <strong style="font-size:16px; margin-top:6px;">${currentDesk != null ? currentDesk.deskName : 'Ban Thời sự'}</strong>
+                        <small>Phạm vi thẩm quyền hiện tại</small>
                     </div>
                 </div>
                 <div class="stat">
                     <div class="stat-icon" style="background:#eef2ff; color:#3458d4;">📑</div>
                     <div>
                         <span>Tổng Cần Xử Lý</span>
-                        <strong id="badge-count-total">${pendingCount + escalatedCount + deliveredCount}</strong>
+                        <strong id="badge-count-total">${pendingCount + escalatedCount}</strong>
                         <small>Hồ sơ trong hàng đợi Ban</small>
                     </div>
                 </div>
@@ -276,13 +259,6 @@
                             class="tab-btn ${currentStatus == 'PENDING_EXECUTIVE_APPROVAL' ? 'active' : ''}">
                         <span>🚀 Đã Chuyển Lên TBT (PENDING_EXECUTIVE_APPROVAL)</span>
                         <span class="tab-badge">${escalatedCount}</span>
-                    </button>
-                    <button type="button"
-                            data-tab-status="DELIVERED"
-                            onclick="switchTab('DELIVERED', event)"
-                            class="tab-btn ${currentStatus == 'DELIVERED' ? 'active' : ''}">
-                        <span>📦 Chờ Nghiệm Thu Bản Thảo (DELIVERED)</span>
-                        <span class="tab-badge">${deliveredCount}</span>
                     </button>
                 </div>
 
@@ -344,9 +320,6 @@
                                                 <c:when test="${t.status == 'PENDING_EXECUTIVE_APPROVAL'}">
                                                     <span class="badge b-escalated">Chờ TBT Duyệt</span>
                                                 </c:when>
-                                                <c:when test="${t.status == 'DELIVERED'}">
-                                                    <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">Chờ Nghiệm Thu</span>
-                                                </c:when>
                                                 <c:otherwise>
                                                     <span class="badge">${t.status}</span>
                                                 </c:otherwise>
@@ -369,12 +342,6 @@
                                                             </a>
                                                         </c:otherwise>
                                                     </c:choose>
-                                                </c:when>
-                                                <c:when test="${t.status == 'DELIVERED'}">
-                                                    <a href="${pageContext.request.contextPath}/editorial/deliverable-review?topicId=${t.topicId}"
-                                                       class="btn primary sm" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; border: none; font-weight:700; text-decoration:none; white-space:nowrap;">
-                                                        🔍 Nghiệm Thu &rarr;
-                                                    </a>
                                                 </c:when>
                                                 <c:otherwise>
                                                     <a href="${pageContext.request.contextPath}/editorial/criteria-scoring?topicId=${t.topicId}"

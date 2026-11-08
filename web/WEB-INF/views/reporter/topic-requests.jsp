@@ -1,619 +1,644 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <c:set var="base" value="${pageContext.request.contextPath}" />
-<%
-    // Đảm bảo danh sách thông báo đề xuất nhân sự của đề tài luôn được lấy mới nhất từ bảng Notification
-    java.util.List<String> notifs = (java.util.List<String>) request.getAttribute("memberNotifications");
-    if (notifs == null || notifs.isEmpty()) {
-        notifs = new java.util.ArrayList<String>();
-        try {
-            model.Topic tObj = (model.Topic) request.getAttribute("topic");
-            if (tObj != null) {
-                try (java.sql.Connection conn = new dal.DBContext().getConnection();
-                     java.sql.PreparedStatement ps = conn.prepareStatement(
-                        "SELECT message FROM Notification WHERE topic_id = ? AND (message LIKE '[[]ĐỀ XUẤT NHÂN SỰ]%' OR message LIKE N'%ĐỀ XUẤT NHÂN SỰ%') ORDER BY notification_id DESC")) {
-                    ps.setInt(1, tObj.getTopicId());
-                    try (java.sql.ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            notifs.add(rs.getString("message"));
-                        }
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-        request.setAttribute("memberNotifications", notifs);
-    }
-%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đề Xuất & Xin Hỗ Trợ Đề Tài — NTMCS</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <title>Phiếu Đề Xuất &amp; Xin Hỗ Trợ Đề Tài — NTMCS</title>
     <link rel="stylesheet" href="${base}/css/style.css">
     <link rel="stylesheet" href="${base}/css/reporter.css">
     <style>
-        .nav-pills .nav-link {
-            border-radius: 8px;
-            padding: 10px 18px;
-            color: #495057;
+        .tabs-nav {
+            display: flex;
+            gap: 6px;
+            border-bottom: 2px solid var(--line);
+            margin-bottom: 22px;
+            overflow-x: auto;
         }
-        .nav-pills .nav-link.active {
-            background-color: #0d6efd;
-            color: #fff;
-            box-shadow: 0 2px 4px rgba(13,110,253,0.3);
+        .tab-btn {
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 12px 18px;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--muted);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+            margin-bottom: -2px;
+            border-radius: 8px 8px 0 0;
         }
-        .topic-summary-card {
+        .tab-btn:hover {
+            color: var(--text);
+            background: var(--surface2);
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: rgba(52, 88, 212, 0.06);
+        }
+        .tab-pane {
+            display: none;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        .form-card {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        .form-row label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .form-row input, .form-row select, .form-row textarea {
+            border: 1px solid var(--line);
+            background: var(--surface);
             border-radius: 10px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 10px 12px;
+            font-size: 13.5px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+            border-color: #9eafe9;
+            box-shadow: 0 0 0 3px rgba(52, 88, 212, 0.15);
+        }
+        .form-hint {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+        .radio-switch {
+            display: flex;
+            gap: 12px;
+        }
+        .radio-switch label {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--surface);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all 0.15s ease;
+        }
+        .radio-switch input[type="radio"]:checked + span {
+            color: var(--primary);
+        }
+        .radio-switch label.active {
+            border-color: var(--primary);
+            background: rgba(52, 88, 212, 0.05);
+            box-shadow: 0 0 0 2px rgba(52, 88, 212, 0.2);
+        }
+        .lock-box {
+            padding: 36px 20px;
+            text-align: center;
+            background: var(--surface2);
+            border: 1px dashed var(--line);
+            border-radius: 14px;
+            margin: 12px 0;
+        }
+        .lock-box i {
+            font-size: 36px;
+            display: block;
+            margin-bottom: 10px;
         }
     </style>
 </head>
-<body class="bg-light">
+<body>
 <div class="app">
     <jsp:include page="/WEB-INF/views/sidebar.jsp">
         <jsp:param name="active" value="reporter-requests"/>
     </jsp:include>
 
-    <div class="main p-4">
-        <!-- Breadcrumb & Top Bar -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item"><a href="${base}/reporter/requests">Đề xuất xin hỗ trợ</a></li>
-                        <li class="breadcrumb-item"><a href="${base}/reporter/detail?id=${topic.topicId}"><c:out value="${topic.topicCode != null ? topic.topicCode : ('#' += topic.topicId)}"/></a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Phiếu đề xuất</li>
-                    </ol>
-                </nav>
-                <h3 class="fw-bold mb-0 text-primary">
-                    <i class="bi bi-file-earmark-diff me-2"></i>Phiếu Đề Xuất & Xin Hỗ Trợ
-                </h3>
+    <div class="main">
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="Đề xuất xin hỗ trợ"/>
+        </jsp:include>
+
+        <main>
+            <div style="margin-bottom: 12px;">
+                <a href="${base}/reporter/requests" class="btn sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                    ← Quay lại danh sách đề tài
+                </a>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <!-- Notification Bell Button -->
-                <div class="position-relative">
-                    <button class="btn btn-outline-secondary position-relative" type="button" title="Thông báo hệ thống" onclick="toggleReqNotifDropdown()">
-                        <i class="bi bi-bell-fill text-warning"></i>
-                        <span id="reqNotifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
-                    </button>
-                    <div id="reqNotifDropdown" class="position-absolute end-0 mt-2 bg-white rounded-3 shadow border" style="display:none; width:340px; z-index:1050; overflow:hidden;">
-                        <div class="p-2 px-3 border-bottom d-flex justify-content-between align-items-center bg-light">
-                            <span class="fw-bold small text-dark"><i class="bi bi-bell me-1"></i>Thông báo của bạn</span>
-                            <button type="button" class="btn btn-link btn-sm text-decoration-none p-0" onclick="markAllReqNotifsRead()">Đã đọc hết</button>
-                        </div>
-                        <div id="reqNotifList" class="p-2" style="max-height:300px; overflow-y:auto;">
-                            <div class="text-center text-muted py-3 small">Đang tải thông báo...</div>
-                        </div>
+
+            <div class="page-head">
+                <div>
+                    <span class="eyebrow">PHÂN HỆ PHÓNG VIÊN / WF-01 &middot; PHIẾU ĐỀ XUẤT</span>
+                    <h1>Phiếu Đề Xuất &amp; Xin Hỗ Trợ Đề Tài</h1>
+                    <p>Khởi tạo đề xuất mượn tài sản, xin gia hạn hạn nộp bài (deadline) hoặc thay đổi nhân sự nhóm đề tài.</p>
+                </div>
+                <div class="page-actions">
+                    <a class="btn" href="${base}/reporter/requests">
+                        <i>📋</i> <span>Danh sách đề tài đã duyệt</span>
+                    </a>
+                    <a class="btn" href="${base}/reporter/detail?id=${topic.topicId}">
+                        <i>👁</i> <span>Chi tiết đề tài</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- THÔNG BÁO ALERT PHẢN HỒI KHI THỰC HIỆN THAO TÁC -->
+            <c:if test="${param.status eq 'success'}">
+                <div style="background: #e8f7ef; color: var(--success); border: 1px solid #ccebdd; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">✓</span>
+                    <div>
+                        <strong>Thành công!</strong>
+                        <c:choose>
+                            <c:when test="${param.type eq 'asset'}">
+                                Yêu cầu mượn tài sản đã được tạo thành công và đang chuyển cho Quản lý tài sản thẩm duyệt.
+                            </c:when>
+                            <c:when test="${param.type eq 'deadline'}">
+                                Đơn xin gia hạn Deadline đã được chuyển tới Thư ký tòa soạn (Desk Editor) xem xét.
+                            </c:when>
+                            <c:when test="${param.type eq 'member'}">
+                                Đề xuất thay đổi nhân sự nhóm đã được gửi thành công dưới dạng thông báo tới Ban biên tập.
+                            </c:when>
+                            <c:otherwise>
+                                Yêu cầu của bạn đã được ghi nhận vào hệ thống.
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                 </div>
+            </c:if>
 
-                <a href="${base}/reporter/requests" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i> Danh sách đề tài đã duyệt
-                </a>
-                <a href="${base}/reporter/detail?id=${topic.topicId}" class="btn btn-outline-primary">
-                    <i class="bi bi-eye me-1"></i> Xem chi tiết đề tài
-                </a>
-            </div>
-        </div>
-
-        <!-- THÔNG BÁO ALERT KHI GỬI FORM THÀNH CÔNG HOẶC THẤT BẠI -->
-        <c:if test="${param.status eq 'success'}">
-            <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
-                <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-                <strong>Thành công!</strong>
-                <c:choose>
-                    <c:when test="${param.type eq 'asset'}">
-                        Yêu cầu mượn tài sản đã được tạo thành công và đang chuyển cho Quản lý tài sản duyệt.
-                    </c:when>
-                    <c:when test="${param.type eq 'deadline'}">
-                        Đơn xin gia hạn Deadline đã được chuyển tới Thư ký tòa soạn (Desk Editor) xem xét.
-                    </c:when>
-                    <c:when test="${param.type eq 'member'}">
-                        Đề xuất thay đổi nhân sự nhóm đã được gửi thành công dưới dạng thông báo tới Ban biên tập.
-                    </c:when>
-                    <c:otherwise>
-                        Yêu cầu của bạn đã được ghi nhận vào hệ thống.
-                    </c:otherwise>
-                </c:choose>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </c:if>
-
-        <c:if test="${param.status eq 'notApproved'}">
-            <div class="alert alert-warning alert-dismissible fade show shadow-sm mb-4" role="alert">
-                <i class="bi bi-shield-lock-fill me-2 fs-5"></i>
-                <strong>Không đủ điều kiện!</strong> Chỉ những đề tài đã được phê duyệt chính thức (APPROVED) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </c:if>
-
-        <c:if test="${param.status eq 'failed'}">
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-                <strong>Lỗi xử lý!</strong> Không thể gửi yêu cầu. Vui lòng kiểm tra lại thời gian hoặc dữ liệu đã nhập.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </c:if>
-
-        <!-- THÔNG TIN TÓM TẮT ĐỀ TÀI -->
-        <div class="card border-0 shadow-sm mb-4 topic-summary-card">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+            <c:if test="${param.status eq 'notApproved'}">
+                <div style="background: #fff4dd; color: #9a6200; border: 1px solid #fce8b2; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">⚠️</span>
                     <div>
-                        <span class="badge bg-secondary mb-2"><c:out value="${topic.topicCode != null ? topic.topicCode : ('#' += topic.topicId)}"/></span>
-                        <h4 class="fw-bold text-dark mb-1"><c:out value="${topic.title}"/></h4>
-                        <div class="text-muted"><c:out value="${topic.angle}"/></div>
+                        <strong>Không đủ điều kiện!</strong> Chỉ những đề tài đã được phê duyệt chính thức (APPROVED) mới có quyền xin cấp tài sản hoặc thay đổi nhân sự.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'failed'}">
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">✕</span>
+                    <div>
+                        <strong>Lỗi xử lý!</strong> Không thể gửi yêu cầu. Vui lòng kiểm tra lại thời gian hoặc dữ liệu đã nhập.
+                    </div>
+                </div>
+            </c:if>
+
+            <!-- TÓM TẮT THÔNG TIN ĐỀ TÀI -->
+            <div class="card" style="margin-bottom: 22px; background: linear-gradient(135deg, #ffffff 0%, var(--surface2) 100%);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+                    <div>
+                        <span class="tag" style="font-weight: 800; color: var(--primary); margin-bottom: 6px;">
+                            <c:choose>
+                                <c:when test="${not empty topic.topicCode}">
+                                    <c:out value="${topic.topicCode}"/>
+                                </c:when>
+                                <c:otherwise>
+                                    #${topic.topicId}
+                                </c:otherwise>
+                            </c:choose>
+                        </span>
+                        <h2 style="font-size: 20px; font-weight: 800; margin: 4px 0 6px; color: var(--text);">
+                            <c:out value="${topic.title}"/>
+                        </h2>
+                        <div style="color: var(--muted); font-size: 13.5px; line-height: 1.5;">
+                            <c:out value="${topic.angle != null ? topic.angle : topic.summary}"/>
+                        </div>
                     </div>
                     <div>
                         <c:choose>
                             <c:when test="${topic.status eq 'APPROVED'}">
-                                <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-check-circle me-1"></i> ĐÃ DUYỆT (APPROVED)</span>
+                                <span class="badge b-approved" style="font-size: 12px; padding: 6px 14px;">
+                                    ✓ ĐÃ DUYỆT (APPROVED)
+                                </span>
                             </c:when>
                             <c:otherwise>
-                                <span class="badge bg-secondary fs-6 px-3 py-2"><c:out value="${topic.status}"/></span>
+                                <span class="badge" style="font-size: 12px; padding: 6px 14px;">
+                                    <c:out value="${topic.status}"/>
+                                </span>
                             </c:otherwise>
                         </c:choose>
                     </div>
                 </div>
 
-                <div class="row g-3 pt-2 border-top">
-                    <div class="col-md-3 col-6">
-                        <small class="text-muted d-block">Chuyên mục / Ban</small>
-                        <strong class="text-dark"><c:out value="${topic.categoryName}"/> (<c:out value="${topic.deskName}"/>)</strong>
+                <div class="meta-grid" style="margin: 0; padding-top: 14px; border-top: 1px solid var(--line);">
+                    <div>
+                        <span>Chuyên mục &amp; Ban</span>
+                        <b><c:out value="${topic.categoryName}"/> (<c:out value="${topic.deskName}"/>)</b>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <small class="text-muted d-block">Thể loại / Độ ưu tiên</small>
-                        <strong class="text-dark"><c:out value="${topic.genre}"/> &middot; <span class="badge bg-light text-dark border"><c:out value="${topic.priority}"/></span></strong>
+                    <div>
+                        <span>Thể loại &amp; Ưu tiên</span>
+                        <b><c:out value="${topic.genre}"/> &middot; <span class="tag"><c:out value="${topic.priority}"/></span></b>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <small class="text-muted d-block">Hạn nộp hiện tại (Deadline)</small>
-                        <strong class="text-danger"><i class="bi bi-calendar-event me-1"></i><c:out value="${topic.deadline}"/></strong>
+                    <div>
+                        <span>Hạn nộp hiện tại (Deadline)</span>
+                        <b style="color: var(--danger);">📅 <c:out value="${topic.deadline != null ? topic.deadline : 'Chưa đặt'}"/></b>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <small class="text-muted d-block">Số thành viên nhóm</small>
-                        <strong class="text-dark"><i class="bi bi-people me-1"></i><c:out value="${not empty currentMembers ? currentMembers.size() : 0}"/> người</strong>
+                    <div>
+                        <span>Thành viên nhóm đề tài</span>
+                        <b>👥 <c:out value="${not empty currentMembers ? fn:length(currentMembers) : 0}"/> người</b>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- TABS GIAO DIỆN 3 LOẠI REQUEST + LỊCH SỬ -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0 pt-3 px-4">
-                <ul class="nav nav-pills card-header-pills" id="requestTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active fw-semibold" id="asset-tab" data-bs-toggle="pill" data-bs-target="#asset-pane" type="button" role="tab">
-                            <i class="bi bi-box-seam me-1"></i> 1. Mượn trang thiết bị / Tài sản
-                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill ms-1 text-muted" title="Cần trạng thái APPROVED"></i></c:if>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-semibold" id="deadline-tab" data-bs-toggle="pill" data-bs-target="#deadline-pane" type="button" role="tab">
-                            <i class="bi bi-clock-history me-1"></i> 2. Xin gia hạn Deadline
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-semibold" id="member-tab" data-bs-toggle="pill" data-bs-target="#member-pane" type="button" role="tab">
-                            <i class="bi bi-person-gear me-1"></i> 3. Đề xuất nhân sự
-                            <c:if test="${not isApproved}"><i class="bi bi-lock-fill ms-1 text-muted" title="Cần trạng thái APPROVED"></i></c:if>
-                        </button>
-                    </li>
-                    <li class="nav-item ms-auto" role="presentation">
-                        <button class="nav-link fw-semibold text-secondary" id="history-tab" data-bs-toggle="pill" data-bs-target="#history-pane" type="button" role="tab">
-                            <i class="bi bi-list-check me-1"></i> Lịch sử đề xuất
-                            <span class="badge bg-secondary ms-1">${assetRequests.size() + deadlineRequests.size() + memberNotifications.size()}</span>
-                        </button>
-                    </li>
-                </ul>
-            </div>
+            <!-- TABS ĐIỀU HƯỚNG 3 LOẠI REQUEST + LỊCH SỬ -->
+            <div class="card" style="padding: 24px;">
+                <div class="tabs-nav">
+                    <button type="button" class="tab-btn active" id="tabBtn-asset" onclick="switchTab('asset')">
+                        📦 1. Mượn trang thiết bị
+                        <c:if test="${not isApproved}"><span title="Cần trạng thái APPROVED">🔒</span></c:if>
+                    </button>
+                    <button type="button" class="tab-btn" id="tabBtn-deadline" onclick="switchTab('deadline')">
+                        ⏳ 2. Xin gia hạn Deadline
+                    </button>
+                    <button type="button" class="tab-btn" id="tabBtn-member" onclick="switchTab('member')">
+                        👥 3. Đề xuất nhân sự
+                        <c:if test="${not isApproved}"><span title="Cần trạng thái APPROVED">🔒</span></c:if>
+                    </button>
+                    <button type="button" class="tab-btn" id="tabBtn-history" onclick="switchTab('history')" style="margin-left: auto;">
+                        📜 Lịch sử đề xuất
+                        <span class="badge" style="background: var(--surface2); border: 1px solid var(--line); font-size: 11px;">
+                            ${(not empty assetRequests ? fn:length(assetRequests) : 0) + (not empty deadlineRequests ? fn:length(deadlineRequests) : 0) + (not empty memberNotifications ? fn:length(memberNotifications) : 0)}
+                        </span>
+                    </button>
+                </div>
 
-            <div class="card-body p-4">
-                <div class="tab-content" id="requestTabsContent">
-
-                    <!-- ================= TAB 1: MƯỢN TÀI SẢN ================= -->
-                    <div class="tab-pane fade show active" id="asset-pane" role="tabpanel">
-                        <div class="row justify-content-center">
-                            <div class="col-lg-8">
-                                <div class="border-bottom pb-3 mb-4">
-                                    <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-camera-reels me-2"></i>Đề xuất xin cấp phát / mượn thiết bị tác nghiệp</h5>
-                                    <small class="text-muted">Chỉ áp dụng cho các đề tài đã được duyệt chính thức. Tài sản mượn từ kho thiết bị của tòa soạn.</small>
-                                </div>
-
-                                <c:choose>
-                                    <c:when test="${not isApproved}">
-                                        <div class="card bg-light border-0 p-4 text-center my-3">
-                                            <i class="bi bi-lock-fill fs-1 text-secondary mb-2"></i>
-                                            <h6 class="fw-bold text-dark">Chức năng mượn tài sản đang bị khóa</h6>
-                                            <p class="text-muted small mb-0">Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp thực địa.</p>
-                                        </div>
-                                    </c:when>
-
-                                    <c:otherwise>
-                                        <form action="${base}/reporter/requests" method="POST">
-                                            <input type="hidden" name="requestType" value="ASSET_REQUEST">
-                                            <input type="hidden" name="topicId" value="${topic.topicId}">
-
-                                            <div class="mb-3">
-                                                <label for="assetId" class="form-label fw-semibold">Chọn tài sản / thiết bị cần mượn <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="assetId" name="assetId" required>
-                                                    <option value="">-- Chọn tài sản khả dụng từ kho --</option>
-                                                    <c:forEach var="a" items="${availableAssets}">
-                                                        <option value="${a.assetId}">
-                                                            [${a.assetCategory}] ${a.assetName} (${a.assetCode}) - Serial: ${a.serialNumber != null ? a.serialNumber : 'N/A'}
-                                                        </option>
-                                                    </c:forEach>
-                                                </select>
-                                                <div class="form-text">Chỉ các tài sản đang ở trạng thái khả dụng (AVAILABLE) mới được hiển thị.</div>
-                                            </div>
-
-                                            <div class="row g-3 mb-4">
-                                                <div class="col-md-6">
-                                                    <label for="startTime" class="form-label fw-semibold">Thời gian bắt đầu mượn <span class="text-danger">*</span></label>
-                                                    <input type="datetime-local" class="form-control" id="startTime" name="startTime" required>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label for="endTime" class="form-label fw-semibold">Thời gian dự kiến hoàn trả <span class="text-danger">*</span></label>
-                                                    <input type="datetime-local" class="form-control" id="endTime" name="endTime" required>
-                                                </div>
-                                            </div>
-
-                                            <div class="text-end">
-                                                <button type="submit" class="btn btn-primary px-4 py-2">
-                                                    <i class="bi bi-send me-1"></i> Gửi yêu cầu mượn thiết bị
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </c:otherwise>
-                                </c:choose>
-                            </div>
+                <!-- ================= TAB 1: MƯỢN TÀI SẢN ================= -->
+                <div class="tab-pane active" id="pane-asset">
+                    <div class="form-card">
+                        <div style="border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 20px;">
+                            <h3 style="font-size: 17px; margin: 0 0 4px; font-weight: 800; color: var(--primary);">
+                                📷 Đề xuất xin cấp phát / mượn thiết bị tác nghiệp
+                            </h3>
+                            <small style="color: var(--muted);">Chỉ áp dụng cho các đề tài đã được duyệt chính thức. Tài sản mượn từ kho thiết bị của tòa soạn.</small>
                         </div>
-                    </div>
 
-                    <!-- ================= TAB 2: GIA HẠN DEADLINE ================= -->
-                    <div class="tab-pane fade" id="deadline-pane" role="tabpanel">
-                        <div class="row justify-content-center">
-                            <div class="col-lg-8">
-                                <div class="border-bottom pb-3 mb-4">
-                                    <h5 class="fw-bold mb-1 text-warning text-dark"><i class="bi bi-hourglass-split me-2"></i>Xin gia hạn hạn nộp bài (Deadline)</h5>
-                                    <small class="text-muted">Đơn xin gia hạn sẽ được chuyển trực tiếp tới Thư ký tòa soạn (Desk Editor) xem xét phê duyệt.</small>
+                        <c:choose>
+                            <c:when test="${not isApproved}">
+                                <div class="lock-box">
+                                    <i>🔒</i>
+                                    <h4 style="font-size: 16px; margin: 0 0 6px; font-weight: 700;">Chức năng mượn tài sản đang bị khóa</h4>
+                                    <p style="color: var(--muted); font-size: 13px; max-width: 500px; margin: 0 auto;">
+                                        Đề tài này hiện đang ở trạng thái <strong>${topic.status}</strong>. Chỉ những đề tài đã được duyệt chính thức (<strong>APPROVED</strong>) mới đủ điều kiện xin cấp phát trang thiết bị tác nghiệp thực địa.
+                                    </p>
                                 </div>
+                            </c:when>
 
+                            <c:otherwise>
                                 <form action="${base}/reporter/requests" method="POST">
-                                    <input type="hidden" name="requestType" value="DEADLINE_REQUEST">
+                                    <input type="hidden" name="requestType" value="ASSET_REQUEST">
                                     <input type="hidden" name="topicId" value="${topic.topicId}">
 
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Hạn nộp hiện tại của đề tài</label>
-                                        <input type="text" class="form-control bg-light" value="${topic.deadline}" readonly>
-                                        <div class="form-text">Hạn nộp đã được ấn định khi đề tài khởi tạo/duyệt.</div>
+                                    <div class="form-row">
+                                        <label for="assetId">Chọn tài sản / thiết bị cần mượn <span style="color: var(--danger);">*</span></label>
+                                        <select id="assetId" name="assetId" required style="width: 100%;">
+                                            <option value="">-- Chọn tài sản khả dụng từ kho --</option>
+                                            <c:forEach var="a" items="${availableAssets}">
+                                                <option value="${a.assetId}">
+                                                    [${a.assetCategory}] ${a.assetName} (${a.assetCode}) - Serial: ${a.serialNumber != null ? a.serialNumber : 'N/A'}
+                                                </option>
+                                            </c:forEach>
+                                        </select>
+                                        <span class="form-hint">Chỉ các tài sản đang ở trạng thái khả dụng (AVAILABLE) mới hiển thị trong danh mục.</span>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label for="requestedDeadline" class="form-label fw-semibold">Hạn nộp mới mong muốn <span class="text-danger">*</span></label>
-                                        <input type="date" class="form-control" id="requestedDeadline" name="requestedDeadline" required min="${topic.deadline}">
-                                        <div class="form-text">Hạn mới phải sau hạn nộp hiện tại.</div>
+                                    <div class="form-grid" style="margin-bottom: 18px;">
+                                        <div class="form-row" style="margin-bottom: 0;">
+                                            <label for="startTime">Thời gian bắt đầu mượn <span style="color: var(--danger);">*</span></label>
+                                            <input type="datetime-local" id="startTime" name="startTime" required>
+                                        </div>
+                                        <div class="form-row" style="margin-bottom: 0;">
+                                            <label for="endTime">Thời gian dự kiến hoàn trả <span style="color: var(--danger);">*</span></label>
+                                            <input type="datetime-local" id="endTime" name="endTime" required>
+                                        </div>
                                     </div>
 
-                                    <div class="mb-4">
-                                        <label for="deadlineReason" class="form-label fw-semibold">Lý do xin gia hạn <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" id="deadlineReason" name="reason" rows="4" placeholder="Giải trình cụ thể lý do khách quan/chủ quan cần kéo dài thời gian tác nghiệp..." required></textarea>
-                                    </div>
-
-                                    <div class="text-end">
-                                        <button type="submit" class="btn btn-warning px-4 py-2 text-dark fw-semibold">
-                                            <i class="bi bi-calendar-plus me-1"></i> Gửi đơn xin gia hạn
+                                    <div style="text-align: right; margin-top: 24px;">
+                                        <button type="submit" class="btn primary" style="padding: 11px 22px; font-size: 14px;">
+                                            <i>📤</i> <span>Gửi yêu cầu mượn thiết bị</span>
                                         </button>
                                     </div>
                                 </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ================= TAB 3: ĐỀ XUẤT NHÂN SỰ ================= -->
-                    <div class="tab-pane fade" id="member-pane" role="tabpanel">
-                        <div class="row justify-content-center">
-                            <div class="col-lg-8">
-                                <div class="border-bottom pb-3 mb-4">
-                                    <h5 class="fw-bold mb-1 text-success"><i class="bi bi-people-fill me-2"></i>Đề xuất thay đổi nhân sự nhóm đề tài</h5>
-                                    <small class="text-muted">Chỉ dành cho đề tài đã duyệt. Đề xuất gửi tới Ban biên tập để bổ sung hoặc rút bớt thành viên.</small>
-                                </div>
-
-                                <c:choose>
-                                    <c:when test="${not isApproved}">
-                                        <div class="card bg-light border-0 p-4 text-center my-3">
-                                            <i class="bi bi-lock-fill fs-1 text-secondary mb-2"></i>
-                                            <h6 class="fw-bold text-dark">Chức năng thay đổi nhân sự đang bị khóa</h6>
-                                            <p class="text-muted small mb-0">Đề tài này chưa được duyệt (trạng thái: <strong>${topic.status}</strong>). Chỉ những đề tài đã duyệt chính thức (<strong>APPROVED</strong>) mới có quyền gửi đề xuất thêm hoặc rút bớt nhân sự nhóm.</p>
-                                        </div>
-                                    </c:when>
-
-                                    <c:otherwise>
-                                        <form action="${base}/reporter/requests" method="POST">
-                                            <input type="hidden" name="requestType" value="MEMBER_REQUEST">
-                                            <input type="hidden" name="topicId" value="${topic.topicId}">
-
-                                            <div class="mb-3">
-                                                <label class="form-label fw-semibold d-block">Loại hành động <span class="text-danger">*</span></label>
-                                                <div class="btn-group w-100" role="group">
-                                                    <input type="radio" class="btn-check" name="actionType" id="actionAdd" value="ADD" checked onchange="toggleMemberSelect('ADD')">
-                                                    <label class="btn btn-outline-success py-2" for="actionAdd">
-                                                        <i class="bi bi-person-plus-fill me-1"></i> Xin bổ sung thêm người vào nhóm
-                                                    </label>
-
-                                                    <input type="radio" class="btn-check" name="actionType" id="actionRemove" value="REMOVE" onchange="toggleMemberSelect('REMOVE')">
-                                                    <label class="btn btn-outline-danger py-2" for="actionRemove">
-                                                        <i class="bi bi-person-dash-fill me-1"></i> Xin rút / xóa người khỏi nhóm
-                                                    </label>
-                                                </div>
-                                            </div>
-
-                                            <!-- Chọn khi THÊM NGƯỜI (danh sách user tòa soạn) -->
-                                            <div class="mb-3" id="selectAddGroup">
-                                                <label for="targetUserAdd" class="form-label fw-semibold">Chọn nhân sự muốn thêm vào nhóm <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="targetUserAdd" name="targetUserId" required>
-                                                    <option value="">-- Chọn phóng viên / biên tập viên --</option>
-                                                    <c:forEach var="u" items="${allUsers}">
-                                                        <option value="${u.userId}">${u.fullName} (${u.email}) - Vị trí: ${u.roleName}</option>
-                                                    </c:forEach>
-                                                </select>
-                                            </div>
-
-                                            <!-- Chọn khi RÚT NGƯỜI (chỉ thành viên đang trong nhóm đề tài) -->
-                                            <div class="mb-3 d-none" id="selectRemoveGroup">
-                                                <label for="targetUserRemove" class="form-label fw-semibold">Chọn thành viên muốn rút khỏi nhóm <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="targetUserRemove">
-                                                    <option value="">-- Chọn thành viên nhóm hiện tại --</option>
-                                                    <c:forEach var="m" items="${currentMembers}">
-                                                        <option value="${m.userId}">${m.userName} (${m.userEmail}) - Vai trò: ${m.roleInTeam}</option>
-                                                    </c:forEach>
-                                                </select>
-                                            </div>
-
-                                            <div class="mb-4">
-                                                <label for="memberReason" class="form-label fw-semibold">Lý do đề xuất <span class="text-danger">*</span></label>
-                                                <textarea class="form-control" id="memberReason" name="reason" rows="3" placeholder="Nêu rõ lý do cần bổ sung thêm người hoặc rút thành viên khỏi đề tài..." required></textarea>
-                                            </div>
-
-                                            <div class="text-end">
-                                                <button type="submit" class="btn btn-success px-4 py-2">
-                                                    <i class="bi bi-check2-circle me-1"></i> Gửi đề xuất nhân sự
-                                                </button>
-                                            </div>
-                                        </form>
-
-                                        <!-- HIỂN THỊ CÁC THÔNG BÁO / ĐỀ XUẤT NHÂN SỰ ĐÃ GỬI TRỰC TIẾP TẠI TAB NÀY -->
-                                        <div class="mt-5 border-top pt-4">
-                                            <h6 class="fw-bold text-dark mb-3">
-                                                <i class="bi bi-bell-fill text-success me-1"></i> Các đề xuất nhân sự đã gửi cho đề tài này (${not empty memberNotifications ? memberNotifications.size() : 0})
-                                            </h6>
-                                            <div class="list-group">
-                                                <c:forEach var="msg" items="${memberNotifications}">
-                                                    <div class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-3 bg-light">
-                                                        <span class="badge bg-success mt-1"><i class="bi bi-send-check"></i> Đã gửi</span>
-                                                        <div class="flex-grow-1">
-                                                            <div class="text-dark fw-medium"><c:out value="${msg}"/></div>
-                                                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Đã tạo thông báo gửi tới Ban biên tập & lưu vết hệ thống</small>
-                                                        </div>
-                                                    </div>
-                                                </c:forEach>
-                                                <c:if test="${empty memberNotifications}">
-                                                    <div class="text-center text-muted py-3 border rounded bg-white small">
-                                                        Chưa có đề xuất thay đổi nhân sự nào cho đề tài này.
-                                                    </div>
-                                                </c:if>
-                                            </div>
-                                        </div>
-                                    </c:otherwise>
-                                </c:choose>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ================= TAB 4: LỊCH SỬ ĐỀ XUẤT ================= -->
-                    <div class="tab-pane fade" id="history-pane" role="tabpanel">
-                        <div class="border-bottom pb-2 mb-3">
-                            <h5 class="fw-bold mb-0 text-secondary"><i class="bi bi-journal-text me-2"></i>Lịch sử các yêu cầu đã gửi cho Đề tài này</h5>
-                        </div>
-
-                        <!-- 1. Yêu cầu mượn tài sản -->
-                        <h6 class="fw-bold mt-4 text-primary"><i class="bi bi-camera me-1"></i> 1. Yêu cầu mượn tài sản (Asset Requests)</h6>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Mã YC</th>
-                                        <th>Tài sản</th>
-                                        <th>Loại</th>
-                                        <th>Thời gian mượn - trả</th>
-                                        <th>Trạng thái</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <c:forEach var="ar" items="${assetRequests}">
-                                        <tr>
-                                            <td>#${ar.requestId}</td>
-                                            <td><strong>${ar.assetName}</strong> <small class="text-muted">(${ar.assetCode})</small></td>
-                                            <td><span class="badge bg-light text-dark border">${ar.assetCategory}</span></td>
-                                            <td><small>${ar.startTime} &rarr; ${ar.endTime}</small></td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${ar.status eq 'APPROVED'}"><span class="badge bg-success">Đã duyệt</span></c:when>
-                                                    <c:when test="${ar.status eq 'REJECTED'}"><span class="badge bg-danger">Bị từ chối</span></c:when>
-                                                    <c:otherwise><span class="badge bg-warning text-dark">Chờ duyệt</span></c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                        </tr>
-                                    </c:forEach>
-                                    <c:if test="${empty assetRequests}">
-                                        <tr><td colspan="5" class="text-center text-muted py-3">Chưa có yêu cầu mượn tài sản nào.</td></tr>
-                                    </c:if>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- 2. Yêu cầu gia hạn Deadline -->
-                        <h6 class="fw-bold mt-4 text-warning text-dark"><i class="bi bi-calendar-plus me-1"></i> 2. Yêu cầu xin gia hạn Deadline</h6>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Mã YC</th>
-                                        <th>Hạn nộp gốc</th>
-                                        <th>Hạn mới xin</th>
-                                        <th>Lý do giải trình</th>
-                                        <th>Trạng thái</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <c:forEach var="dr" items="${deadlineRequests}">
-                                        <tr>
-                                            <td>#${dr.requestId}</td>
-                                            <td class="text-muted"><del>${dr.currentDeadline}</del></td>
-                                            <td class="text-danger fw-bold">${dr.requestedDeadline}</td>
-                                            <td><c:out value="${dr.reason}"/></td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${dr.status eq 'APPROVED'}"><span class="badge bg-success">Đã duyệt</span></c:when>
-                                                    <c:when test="${dr.status eq 'REJECTED'}"><span class="badge bg-danger">Bị từ chối</span></c:when>
-                                                    <c:otherwise><span class="badge bg-warning text-dark">Chờ duyệt</span></c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                        </tr>
-                                    </c:forEach>
-                                    <c:if test="${empty deadlineRequests}">
-                                        <tr><td colspan="5" class="text-center text-muted py-3">Chưa có yêu cầu gia hạn nào.</td></tr>
-                                    </c:if>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- 3. Đề xuất đổi nhân sự (TỪ BẢNG NOTIFICATION) -->
-                        <h6 class="fw-bold mt-4 text-success"><i class="bi bi-people me-1"></i> 3. Đề xuất thay đổi nhân sự nhóm (${not empty memberNotifications ? memberNotifications.size() : 0})</h6>
-                        <div class="list-group">
-                            <c:forEach var="msg" items="${memberNotifications}">
-                                <div class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-3 bg-light">
-                                    <span class="badge bg-success mt-1"><i class="bi bi-send-check"></i> Đã gửi</span>
-                                    <div class="flex-grow-1">
-                                        <div class="text-dark fw-medium"><c:out value="${msg}"/></div>
-                                        <small class="text-muted"><i class="bi bi-bell me-1"></i>Thông báo đã gửi tới Ban Biên Tập (Desk Editor)</small>
-                                    </div>
-                                </div>
-                            </c:forEach>
-                            <c:if test="${empty memberNotifications}">
-                                <div class="text-center text-muted py-3 border rounded bg-white">Chưa có đề xuất thay đổi nhân sự nào.</div>
-                            </c:if>
-                        </div>
-
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                 </div>
+
+                <!-- ================= TAB 2: GIA HẠN DEADLINE ================= -->
+                <div class="tab-pane" id="pane-deadline">
+                    <div class="form-card">
+                        <div style="border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 20px;">
+                            <h3 style="font-size: 17px; margin: 0 0 4px; font-weight: 800; color: #b26a00;">
+                                ⏳ Xin gia hạn hạn nộp bài (Deadline)
+                            </h3>
+                            <small style="color: var(--muted);">Đơn xin gia hạn sẽ được chuyển trực tiếp tới Thư ký tòa soạn (Desk Editor) xem xét phê duyệt.</small>
+                        </div>
+
+                        <form action="${base}/reporter/requests" method="POST">
+                            <input type="hidden" name="requestType" value="DEADLINE_REQUEST">
+                            <input type="hidden" name="topicId" value="${topic.topicId}">
+
+                            <div class="form-row">
+                                <label>Hạn nộp hiện tại của đề tài</label>
+                                <input type="text" value="${topic.deadline != null ? topic.deadline : 'Chưa thiết lập'}" readonly style="background: var(--surface2); color: var(--muted);">
+                                <span class="form-hint">Hạn nộp đã được ấn định khi đề tài khởi tạo / được phê duyệt.</span>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="requestedDeadline">Hạn nộp mới mong muốn <span style="color: var(--danger);">*</span></label>
+                                <input type="date" id="requestedDeadline" name="requestedDeadline" required min="${topic.deadline}">
+                                <span class="form-hint">Hạn nộp mới xin gia hạn phải sau thời hạn hiện tại.</span>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="deadlineReason">Lý do xin gia hạn <span style="color: var(--danger);">*</span></label>
+                                <textarea id="deadlineReason" name="reason" rows="4" placeholder="Giải trình cụ thể lý do khách quan/chủ quan cần kéo dài thời gian tác nghiệp..." required></textarea>
+                            </div>
+
+                            <div style="text-align: right; margin-top: 24px;">
+                                <button type="submit" class="btn warning" style="padding: 11px 22px; font-size: 14px; font-weight: 800;">
+                                    <i>⏳</i> <span>Gửi đơn xin gia hạn</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 3: ĐỀ XUẤT NHÂN SỰ ================= -->
+                <div class="tab-pane" id="pane-member">
+                    <div class="form-card">
+                        <div style="border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 20px;">
+                            <h3 style="font-size: 17px; margin: 0 0 4px; font-weight: 800; color: var(--success);">
+                                👥 Đề xuất thay đổi nhân sự nhóm đề tài
+                            </h3>
+                            <small style="color: var(--muted);">Chỉ dành cho đề tài đã duyệt. Đề xuất gửi tới Ban biên tập để bổ sung hoặc rút bớt thành viên.</small>
+                        </div>
+
+                        <c:choose>
+                            <c:when test="${not isApproved}">
+                                <div class="lock-box">
+                                    <i>🔒</i>
+                                    <h4 style="font-size: 16px; margin: 0 0 6px; font-weight: 700;">Chức năng thay đổi nhân sự đang bị khóa</h4>
+                                    <p style="color: var(--muted); font-size: 13px; max-width: 500px; margin: 0 auto;">
+                                        Đề tài này chưa được duyệt (trạng thái: <strong>${topic.status}</strong>). Chỉ những đề tài đã duyệt chính thức (<strong>APPROVED</strong>) mới có quyền gửi đề xuất thêm hoặc rút bớt nhân sự nhóm.
+                                    </p>
+                                </div>
+                            </c:when>
+
+                            <c:otherwise>
+                                <form action="${base}/reporter/requests" method="POST">
+                                    <input type="hidden" name="requestType" value="MEMBER_REQUEST">
+                                    <input type="hidden" name="topicId" value="${topic.topicId}">
+
+                                    <div class="form-row">
+                                        <label>Loại hành động <span style="color: var(--danger);">*</span></label>
+                                        <div class="radio-switch">
+                                            <label id="lblActionAdd" class="active">
+                                                <input type="radio" name="actionType" id="actionAdd" value="ADD" checked onchange="toggleMemberSelect('ADD')">
+                                                <span>➕ Xin bổ sung thêm người vào nhóm</span>
+                                            </label>
+                                            <label id="lblActionRemove">
+                                                <input type="radio" name="actionType" id="actionRemove" value="REMOVE" onchange="toggleMemberSelect('REMOVE')">
+                                                <span>➖ Xin rút / xóa người khỏi nhóm</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Chọn khi THÊM NGƯỜI (danh sách user tòa soạn) -->
+                                    <div class="form-row" id="selectAddGroup">
+                                        <label for="targetUserAdd">Chọn nhân sự muốn thêm vào nhóm <span style="color: var(--danger);">*</span></label>
+                                        <select id="targetUserAdd" name="targetUserId" required style="width: 100%;">
+                                            <option value="">-- Chọn phóng viên / biên tập viên --</option>
+                                            <c:forEach var="u" items="${allUsers}">
+                                                <option value="${u.userId}">${u.fullName} (${u.email}) - Vị trí: ${u.roleName}</option>
+                                            </c:forEach>
+                                        </select>
+                                    </div>
+
+                                    <!-- Chọn khi RÚT NGƯỜI (chỉ thành viên đang trong nhóm đề tài) -->
+                                    <div class="form-row" id="selectRemoveGroup" style="display: none;">
+                                        <label for="targetUserRemove">Chọn thành viên muốn rút khỏi nhóm <span style="color: var(--danger);">*</span></label>
+                                        <select id="targetUserRemove" style="width: 100%;">
+                                            <option value="">-- Chọn thành viên nhóm hiện tại --</option>
+                                            <c:forEach var="m" items="${currentMembers}">
+                                                <option value="${m.userId}">${m.userName} (${m.userEmail}) - Vai trò: ${m.roleInTeam}</option>
+                                            </c:forEach>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <label for="memberReason">Lý do đề xuất <span style="color: var(--danger);">*</span></label>
+                                        <textarea id="memberReason" name="reason" rows="3" placeholder="Nêu rõ lý do cần bổ sung thêm người hoặc rút thành viên khỏi đề tài..." required></textarea>
+                                    </div>
+
+                                    <div style="text-align: right; margin-top: 24px;">
+                                        <button type="submit" class="btn success" style="padding: 11px 22px; font-size: 14px; font-weight: 800;">
+                                            <i>👥</i> <span>Gửi đề xuất nhân sự</span>
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <!-- HIỂN THỊ CÁC THÔNG BÁO / ĐỀ XUẤT NHÂN SỰ ĐÃ GỬI TRỰC TIẾP TẠI TAB NÀY -->
+                                <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line);">
+                                    <h4 style="font-size: 15px; font-weight: 800; margin: 0 0 12px; color: var(--text);">
+                                        🔔 Các đề xuất nhân sự đã gửi cho đề tài này (${not empty memberNotifications ? fn:length(memberNotifications) : 0})
+                                    </h4>
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <c:forEach var="msg" items="${memberNotifications}">
+                                            <div style="background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px;">
+                                                <span class="badge b-approved" style="font-size: 10px; margin-top: 2px;">Đã gửi</span>
+                                                <div style="flex: 1;">
+                                                    <div style="font-size: 13px; font-weight: 600; color: var(--text);"><c:out value="${msg}"/></div>
+                                                    <small style="color: var(--muted); font-size: 11px;">Đã tạo thông báo gửi tới Ban biên tập &amp; lưu vết hệ thống</small>
+                                                </div>
+                                            </div>
+                                        </c:forEach>
+                                        <c:if test="${empty memberNotifications}">
+                                            <div style="padding: 24px; text-align: center; color: var(--muted); background: var(--surface2); border-radius: 10px; font-size: 13px;">
+                                                Chưa có đề xuất thay đổi nhân sự nào cho đề tài này.
+                                            </div>
+                                        </c:if>
+                                    </div>
+                                </div>
+                            </c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 4: LỊCH SỬ ĐỀ XUẤT ================= -->
+                <div class="tab-pane" id="pane-history">
+                    <div style="border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 20px;">
+                        <h3 style="font-size: 17px; margin: 0 0 4px; font-weight: 800; color: var(--text);">
+                            📜 Lịch sử các yêu cầu đã gửi cho đề tài này
+                        </h3>
+                        <small style="color: var(--muted);">Toàn bộ danh sách đề xuất mượn tài sản, xin gia hạn deadline và đề xuất nhân sự.</small>
+                    </div>
+
+                    <!-- 1. Yêu cầu mượn tài sản -->
+                    <h4 style="font-size: 14.5px; font-weight: 800; color: var(--primary); margin: 24px 0 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>📷</span> 1. Yêu cầu mượn tài sản (${not empty assetRequests ? fn:length(assetRequests) : 0})
+                    </h4>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Mã YC</th>
+                                    <th>Tài sản</th>
+                                    <th>Phân loại</th>
+                                    <th>Thời gian mượn - trả</th>
+                                    <th style="width: 130px; text-align: right;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="ar" items="${assetRequests}">
+                                    <tr>
+                                        <td><strong>#${ar.requestId}</strong></td>
+                                        <td>
+                                            <strong><c:out value="${ar.assetName}"/></strong>
+                                            <small style="color: var(--muted);">(<c:out value="${ar.assetCode}"/>)</small>
+                                        </td>
+                                        <td><span class="tag"><c:out value="${ar.assetCategory}"/></span></td>
+                                        <td><small style="font-size: 12px;">📅 ${ar.startTime} &rarr; ${ar.endTime}</small></td>
+                                        <td style="text-align: right;">
+                                            <c:choose>
+                                                <c:when test="${ar.status eq 'APPROVED'}"><span class="badge b-approved">Đã duyệt</span></c:when>
+                                                <c:when test="${ar.status eq 'REJECTED'}"><span class="badge b-rejected">Bị từ chối</span></c:when>
+                                                <c:otherwise><span class="badge b-pending">Chờ duyệt</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                                <c:if test="${empty assetRequests}">
+                                    <tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">Chưa có yêu cầu mượn tài sản nào.</td></tr>
+                                </c:if>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 2. Yêu cầu gia hạn Deadline -->
+                    <h4 style="font-size: 14.5px; font-weight: 800; color: #b26a00; margin: 30px 0 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>⏳</span> 2. Yêu cầu xin gia hạn Deadline (${not empty deadlineRequests ? fn:length(deadlineRequests) : 0})
+                    </h4>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Mã YC</th>
+                                    <th style="width: 140px;">Hạn nộp gốc</th>
+                                    <th style="width: 140px;">Hạn mới xin</th>
+                                    <th>Lý do giải trình</th>
+                                    <th style="width: 130px; text-align: right;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="dr" items="${deadlineRequests}">
+                                    <tr>
+                                        <td><strong>#${dr.requestId}</strong></td>
+                                        <td style="color: var(--muted);"><del>${dr.currentDeadline}</del></td>
+                                        <td style="color: var(--danger); font-weight: 800;">${dr.requestedDeadline}</td>
+                                        <td><c:out value="${dr.reason}"/></td>
+                                        <td style="text-align: right;">
+                                            <c:choose>
+                                                <c:when test="${dr.status eq 'APPROVED'}"><span class="badge b-approved">Đã duyệt</span></c:when>
+                                                <c:when test="${dr.status eq 'REJECTED'}"><span class="badge b-rejected">Bị từ chối</span></c:when>
+                                                <c:otherwise><span class="badge b-pending">Chờ duyệt</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                                <c:if test="${empty deadlineRequests}">
+                                    <tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">Chưa có yêu cầu gia hạn nào.</td></tr>
+                                </c:if>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 3. Đề xuất đổi nhân sự -->
+                    <h4 style="font-size: 14.5px; font-weight: 800; color: var(--success); margin: 30px 0 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>👥</span> 3. Đề xuất thay đổi nhân sự nhóm (${not empty memberNotifications ? fn:length(memberNotifications) : 0})
+                    </h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <c:forEach var="msg" items="${memberNotifications}">
+                            <div style="background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px;">
+                                <span class="badge b-approved" style="font-size: 10px; margin-top: 2px;">Đã gửi</span>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 13px; font-weight: 600; color: var(--text);"><c:out value="${msg}"/></div>
+                                    <small style="color: var(--muted); font-size: 11px;">Thông báo đã chuyển tới Ban Biên Tập (Desk Editor)</small>
+                                </div>
+                            </div>
+                        </c:forEach>
+                        <c:if test="${empty memberNotifications}">
+                            <div style="padding: 24px; text-align: center; color: var(--muted); background: var(--surface2); border-radius: 10px; font-size: 13px;">
+                                Chưa có đề xuất thay đổi nhân sự nào.
+                            </div>
+                        </c:if>
+                    </div>
+                </div>
+
             </div>
-        </div>
+        </main>
     </div>
 </div>
 
-<!-- Bootstrap 5 Bundle JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+        const targetBtn = document.getElementById('tabBtn-' + tabName);
+        const targetPane = document.getElementById('pane-' + tabName);
+
+        if (targetBtn) targetBtn.classList.add('active');
+        if (targetPane) targetPane.classList.add('active');
+    }
+
     function toggleMemberSelect(type) {
         const addGroup = document.getElementById('selectAddGroup');
         const removeGroup = document.getElementById('selectRemoveGroup');
         const addSelect = document.getElementById('targetUserAdd');
         const removeSelect = document.getElementById('targetUserRemove');
+        const lblActionAdd = document.getElementById('lblActionAdd');
+        const lblActionRemove = document.getElementById('lblActionRemove');
+
+        if (!addGroup || !removeGroup || !addSelect || !removeSelect) return;
 
         if (type === 'ADD') {
-            addGroup.classList.remove('d-none');
-            removeGroup.classList.add('d-none');
+            if (lblActionAdd) lblActionAdd.classList.add('active');
+            if (lblActionRemove) lblActionRemove.classList.remove('active');
+            addGroup.style.display = 'flex';
+            removeGroup.style.display = 'none';
             addSelect.setAttribute('name', 'targetUserId');
             addSelect.setAttribute('required', 'required');
             removeSelect.removeAttribute('name');
             removeSelect.removeAttribute('required');
         } else {
-            addGroup.classList.add('d-none');
-            removeGroup.classList.remove('d-none');
+            if (lblActionAdd) lblActionAdd.classList.remove('active');
+            if (lblActionRemove) lblActionRemove.classList.add('active');
+            addGroup.style.display = 'none';
+            removeGroup.style.display = 'flex';
             removeSelect.setAttribute('name', 'targetUserId');
             removeSelect.setAttribute('required', 'required');
             addSelect.removeAttribute('name');
             addSelect.removeAttribute('required');
         }
     }
-
-    // Topbar Notification Bell Script
-    function toggleReqNotifDropdown() {
-        const dd = document.getElementById('reqNotifDropdown');
-        if (!dd) return;
-        const isShown = dd.style.display === 'block';
-        dd.style.display = isShown ? 'none' : 'block';
-        if (!isShown) {
-            loadReqNotifs();
-        }
-    }
-
-    function loadReqNotifs() {
-        fetch('${base}/api-notifications.jsp')
-            .then(r => r.json())
-            .then(data => {
-                const badge = document.getElementById('reqNotifBadge');
-                const list = document.getElementById('reqNotifList');
-                if (badge) {
-                    if (data.unreadCount > 0) {
-                        badge.innerText = data.unreadCount > 99 ? '99+' : data.unreadCount;
-                        badge.style.display = 'inline-block';
-                    } else {
-                        badge.style.display = 'none';
-                    }
-                }
-                if (list) {
-                    if (!data.notifications || data.notifications.length === 0) {
-                        list.innerHTML = '<div class="text-center text-muted py-3 small">Chưa có thông báo nào.</div>';
-                    } else {
-                        list.innerHTML = data.notifications.map(n => {
-                            const isUnread = !n.isRead;
-                            const topicLink = n.topicId ? ('${base}/reporter/requests?topicId=' + n.topicId) : '#';
-                            return '<div class="p-2 mb-1 rounded border-bottom ' + (isUnread ? 'bg-light border-primary' : 'bg-white') + '" style="font-size:12px;">'
-                                 + '<div class="d-flex justify-content-between align-items-start gap-1">'
-                                 + '<span class="' + (isUnread ? 'fw-bold text-dark' : 'text-muted') + '">' + escapeHtml(n.message) + '</span>'
-                                 + (isUnread ? '<span class="badge bg-primary" style="font-size:8px;">Mới</span>' : '')
-                                 + '</div>'
-                                 + (n.topicId ? '<div class="mt-1"><a href="' + topicLink + '" class="small text-decoration-none">Xem đề tài &rarr;</a></div>' : '')
-                                 + '</div>';
-                        }).join('');
-                    }
-                }
-            })
-            .catch(err => {
-                const list = document.getElementById('reqNotifList');
-                if (list) list.innerHTML = '<div class="text-center text-danger py-2 small">Lỗi tải thông báo</div>';
-            });
-    }
-
-    function markAllReqNotifsRead() {
-        fetch('${base}/api-notifications.jsp?action=markAllRead', { method: 'POST' })
-            .then(r => r.json())
-            .then(() => {
-                const badge = document.getElementById('reqNotifBadge');
-                if (badge) badge.style.display = 'none';
-                loadReqNotifs();
-            });
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', loadReqNotifs);
-    document.addEventListener('click', function(e) {
-        const btn = document.querySelector('[onclick="toggleReqNotifDropdown()"]');
-        const dd = document.getElementById('reqNotifDropdown');
-        if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
-            dd.style.display = 'none';
-        }
-    });
 </script>
 </body>
 </html>

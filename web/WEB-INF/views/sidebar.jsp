@@ -49,7 +49,7 @@
             </div>
         </c:if>
 
-        <c:if test="${(sessionScope.loggedUser != null and (sessionScope.loggedUser.roleId == 1 or sessionScope.loggedUser.roleId == 2 or sessionScope.loggedUser.roleId == 3 or sessionScope.loggedUser.roleId == 5)) or (sessionScope.user != null and (sessionScope.user.roleId == 1 or sessionScope.user.roleId == 2 or sessionScope.user.roleId == 3 or sessionScope.user.roleId == 5)) or (not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE') or sessionScope.permissions.contains('ASSET_MANAGE')))}">
+        <c:if test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or sessionScope.loggedUser.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.user.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.loggedUser.roleId == 2 or sessionScope.loggedUser.roleId == 3 or sessionScope.loggedUser.roleId == 5 or sessionScope.loggedUser.roleId == 6 or sessionScope.loggedUser.roleId == 7 or (not empty sessionScope.permissions and (sessionScope.permissions.contains('LOGISTICS_MANAGE') or sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE')))}">
             <div class="nav-group">
                 <div class="nav-label">HẬU CẦN &amp; THIẾT BỊ (WF-03)</div>
                 <a href="${base}/assets" class="nav-item ${param.active == 'assets' ? 'active' : ''}">

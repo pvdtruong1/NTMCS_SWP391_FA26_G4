@@ -50,6 +50,11 @@ public class HomeServlet extends HttpServlet {
             return;
         }
 
+        if (user.getRoleId() == 4 || "LOGISTICS_COORDINATOR".equalsIgnoreCase(user.getRoleName()) || codes.contains("LOGISTICS_MANAGE")) {
+            response.sendRedirect(request.getContextPath() + "/assets");
+            return;
+        }
+
         if (user.getRoleId() == 6 || user.getRoleId() == 7 || codes.contains("QUOTA_MANAGE") || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName()) || "BUSINESS_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
             response.sendRedirect(request.getContextPath() + "/dashboard");
             return;
@@ -84,7 +89,9 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"Nhật ký phát thanh & Ping nhắc việc", "/fieldwork/audit"});
             screens.add(new String[]{"Cấu hình SLA hiện trường", "/fieldwork/sla"});
         }
-        if (user.getRoleId() == 1 || user.getRoleId() == 2 || user.getRoleId() == 3 || user.getRoleId() == 5 || codes.contains("FIELDWORK_TRACK") || codes.contains("TOPIC_EVALUATE") || codes.contains("ASSET_MANAGE")) {
+        if (codes.contains("LOGISTICS_MANAGE") || user.getRoleId() == 4 || "LOGISTICS_COORDINATOR".equalsIgnoreCase(user.getRoleName())
+                || user.getRoleId() == 2 || user.getRoleId() == 3 || user.getRoleId() == 5 || user.getRoleId() == 6 || user.getRoleId() == 7
+                || codes.contains("FIELDWORK_TRACK") || codes.contains("TOPIC_EVALUATE") || codes.contains("ASSET_MANAGE")) {
             screens.add(new String[]{"Quản lý danh mục trang thiết bị (Asset Inventory)", "/assets"});
             screens.add(new String[]{"Điều phối & Bàn giao thiết bị tác nghiệp (Asset Requests)", "/asset-requests"});
         }

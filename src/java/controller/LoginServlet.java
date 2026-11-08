@@ -80,6 +80,8 @@ public class LoginServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/editorial/dashboard");
         } else if (roleId == 5 || "FIELDWORK_COORDINATOR".equals(roleName)) {
             response.sendRedirect(request.getContextPath() + "/fieldwork/kanban");
+        } else if (roleId == 4 || "LOGISTICS_COORDINATOR".equals(roleName)) {
+            response.sendRedirect(request.getContextPath() + "/assets");
         } else if (roleId == 6 || roleId == 7 || "SYSTEM_ADMINISTRATOR".equals(roleName) || "BUSINESS_ADMINISTRATOR".equals(roleName)) {
             response.sendRedirect(request.getContextPath() + "/dashboard");
         } else {

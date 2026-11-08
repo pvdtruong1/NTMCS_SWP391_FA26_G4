@@ -52,16 +52,30 @@ public class AssetServlet extends HttpServlet {
             return false;
         }
         int roleId = user.getRoleId();
-        if (roleId == 1 || roleId == 2 || roleId == 3 || roleId == 5) {
+        String roleName = user.getRoleName() != null ? user.getRoleName().toUpperCase() : "";
+
+        // Explicit authorization for Logistics Coordinator (4), Fieldwork Coordinator (5), Desk Editor (2), Executive Editor (3), Administrators (6, 7)
+        if (roleId == 4 || roleId == 5 || roleId == 2 || roleId == 3 || roleId == 6 || roleId == 7
+                || "LOGISTICS_COORDINATOR".equals(roleName)
+                || "FIELDWORK_COORDINATOR".equals(roleName)
+                || "DESK_EDITOR".equals(roleName)
+                || "EXECUTIVE_EDITOR".equals(roleName)
+                || "SYSTEM_ADMINISTRATOR".equals(roleName)
+                || "BUSINESS_ADMINISTRATOR".equals(roleName)
+                || "ADMIN".equals(roleName)) {
             return true;
         }
+
         @SuppressWarnings("unchecked")
         Set<String> perms = (Set<String>) req.getSession().getAttribute("permissions");
         if (perms == null) {
             perms = permissionDAO.getCodesByRole(roleId);
             req.getSession().setAttribute("permissions", perms);
         }
-        if (perms != null && (perms.contains("ASSET_MANAGE") || perms.contains("FIELDWORK_TRACK") || perms.contains("TOPIC_EVALUATE"))) {
+        if (perms != null && (perms.contains("LOGISTICS_MANAGE")
+                || perms.contains("ASSET_MANAGE")
+                || perms.contains("FIELDWORK_TRACK")
+                || perms.contains("TOPIC_EVALUATE"))) {
             return true;
         }
         resp.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền truy cập quản lý trang thiết bị.");

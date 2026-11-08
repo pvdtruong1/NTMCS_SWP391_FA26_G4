@@ -68,10 +68,9 @@ request.setAttribute("wf03Active", "requests");
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <a href="<%=ctx%>/asset-requests" style="color:inherit;text-decoration:none;">Yêu cầu</a> / <b>Chi tiết #AR-<%=x.getRequestId()%></b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="<%=\"Xử lý Phiếu Yêu cầu Thiết bị #AR-\" + x.getRequestId()%>"/>
+        </jsp:include>
 
         <main>
             <div class="head">

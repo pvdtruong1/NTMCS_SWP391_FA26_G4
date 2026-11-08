@@ -61,10 +61,9 @@ request.setAttribute("wf03Active", "requests");
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <a href="<%=ctx%>/asset-requests" style="color:inherit;text-decoration:none;">Yêu cầu</a> / <b>Kiểm tra trùng lịch</b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="<%=\"Kiểm soát Xung đột Lịch Thiết bị (SCR-3.6) #AR-\" + item.getRequestId()%>"/>
+        </jsp:include>
 
         <main>
             <div class="head">

@@ -25,6 +25,8 @@
                         <c:when test="${topUser.roleName == 'BUSINESS_ADMINISTRATOR'}">Quản Trị Nghiệp Vụ</c:when>
                         <c:when test="${topUser.roleName == 'SYSTEM_ADMINISTRATOR'}">Quản Trị Hệ Thống</c:when>
                         <c:when test="${topUser.roleName == 'REPORTER'}">Phóng Viên Tác Nghiệp</c:when>
+                        <c:when test="${topUser.roleName == 'LOGISTICS_COORDINATOR'}">Điều Phối Hậu Cần &amp; Thiết Bị</c:when>
+                        <c:when test="${topUser.roleName == 'FIELDWORK_COORDINATOR'}">Điều Phối Hiện Trường</c:when>
                         <c:otherwise><c:out value="${not empty topUser.roleName ? topUser.roleName : 'Thành viên'}" /></c:otherwise>
                     </c:choose>
                 </small>

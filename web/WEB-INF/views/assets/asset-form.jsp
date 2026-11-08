@@ -43,10 +43,9 @@ request.setAttribute("wf03Active", editing ? "assets" : "add");
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <b><%=editing ? "Cập nhật tài sản" : "Thêm tài sản mới"%></b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="<%=editing ? \"Cập nhật Thông tin Trang thiết bị (WF-03)\" : \"Thêm mới Trang thiết bị Tác nghiệp (WF-03)\"%>"/>
+        </jsp:include>
 
         <main>
             <div class="head">

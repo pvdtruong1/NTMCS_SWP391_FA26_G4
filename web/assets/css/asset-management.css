@@ -120,24 +120,261 @@ body {
 }
 
 .topbar {
-    min-height: 62px;
+    min-height: 70px;
+    height: 70px;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e5eaf2;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.brand-desk-info strong {
+    font-size: 15px;
+    font-weight: 700;
+    color: #172033;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon-btn {
+    border: 1px solid #e5eaf2;
     background: #fff;
-    border-bottom: 1px solid #e7ebf2;
-    padding: 0 30px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.icon-btn:hover {
+    background: #f8fafc;
+}
+
+.icon-btn.mobile-menu {
+    display: none;
+}
+
+.notif {
+    position: relative;
+}
+
+.notif em {
+    position: absolute;
+    right: -3px;
+    top: -4px;
+    background: #c83a4a;
+    color: #fff;
+    border-radius: 99px;
+    font-style: normal;
+    font-size: 10px;
+    min-width: 17px;
+    padding: 2px 4px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.account-chip {
+    margin-left: auto;
+    border: 1px solid #e5eaf2;
+    background: #fff;
+    border-radius: 12px;
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.account-chip small, .account-chip b {
+    display: block;
+    text-align: left;
+}
+
+.account-chip b {
+    font-size: 13px;
+    color: #172033;
+}
+
+.account-chip small {
+    color: #68758a;
+    font-size: 11px;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: #e8edff;
+    color: #304db7;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 12px;
+}
+
+.btn.sm.danger {
+    background: #fff0f2;
+    color: #c83a4a;
+    border: 1px solid #f0c8ce;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: .2s;
+    cursor: pointer;
+}
+
+.btn.sm.danger:hover {
+    background: #ffe3e6;
+}
+
+/* In-App Notification Modal Styles */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notif-modal {
+    max-width: 620px;
+    width: 95%;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.notif-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.notif-tabs {
+    display: flex;
+    gap: 8px;
+}
+
+.notif-tab-btn {
+    background: transparent;
+    color: #64748b;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.notif-tab-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.notif-tab-btn.active {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.notif-mark-all-btn {
+    background: none;
+    border: none;
+    color: #059669;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.notif-mark-all-btn:hover {
+    background: rgba(16, 185, 129, 0.08);
+    color: #047857;
+}
+
+.notif-card-item {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.notif-card-item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.notif-card-item.unread {
+    border-left: 4px solid #dc2626;
+    background: #fff;
+}
+
+.notif-card-item.read {
+    opacity: 0.8;
+}
+
+.notif-card-title {
+    font-size: 13.5px;
+    color: #1e293b;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.notif-card-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    color: #667085;
+    font-size: 12px;
+    color: #64748b;
 }
 
-.topbar b {
-    color: #26344d;
+.notif-card-topic-btn {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: none;
 }
 
-.topbar span {
-    font-size: 10px;
-    letter-spacing: 1.2px;
-    color: #98a2b3;
+.notif-mark-item-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.notif-mark-item-btn:hover {
+    color: #059669;
+    text-decoration: underline;
 }
 
 main {

@@ -52,10 +52,9 @@ request.setAttribute("wf03Active", "assets");
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <a href="<%=ctx%>/assets" style="color:inherit;text-decoration:none;">Tài sản</a> / <b>Lịch sử sử dụng</b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="<%=\"Nhật ký Điều phối & Lịch sử Thiết bị #\" + assetId%>"/>
+        </jsp:include>
 
         <main>
             <div class="head">

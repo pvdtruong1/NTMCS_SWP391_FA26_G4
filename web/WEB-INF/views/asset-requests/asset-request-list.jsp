@@ -82,10 +82,9 @@ request.setAttribute("wf03Active", "requests");
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <b>Yêu cầu tài sản</b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="Điều Phối và Quản Lý Yêu Cầu Thiết Bị Tác Nghiệp (WF-03)"/>
+        </jsp:include>
 
         <main>
             <div class="head">

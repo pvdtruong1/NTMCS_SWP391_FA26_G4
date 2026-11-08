@@ -64,28 +64,6 @@ String ctx = request.getContextPath();
         Đang bàn giao / Thu hồi
     </a>
 
-    <div class="nav-label">ĐIỀU HƯỚNG TÒA SOẠN</div>
-
-    <a class="nav-link" href="<%=ctx%>/home">
-        <span>🏠</span>
-        Trang chủ tòa soạn
-    </a>
-
-    <a class="nav-link" href="<%=ctx%>/editorial/dashboard">
-        <span>📊</span>
-        Ban Biên tập (WF-02)
-    </a>
-
-    <a class="nav-link" href="<%=ctx%>/fieldwork/kanban">
-        <span>📌</span>
-        Hiện trường (WF-04)
-    </a>
-
-    <a class="nav-link" href="<%=ctx%>/logout" style="color: #ff9b9b;">
-        <span>🚪</span>
-        Đăng xuất
-    </a>
-
     <div class="side-note">
         <b>LOGISTICS COORDINATOR</b>
         <small>WF-03 • Phân hệ Hậu cần & Thiết bị</small>

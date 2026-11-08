@@ -92,10 +92,9 @@ String baseQuery = "keyword=" + qEnc + "&category=" + catEnc + "&status=" + stat
     <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
 
     <section class="main">
-        <header class="topbar">
-            <span>NTMCS / Hậu cần / <b>Quản lý tài sản</b></span>
-            <span>LOGISTICS COORDINATOR</span>
-        </header>
+        <jsp:include page="/WEB-INF/views/topbar.jsp">
+            <jsp:param name="title" value="Phân Hệ Hậu Cần và Quản Lý Trang Thiết Bị (WF-03)"/>
+        </jsp:include>
 
         <main>
             <div class="head">

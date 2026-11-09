@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,8 +34,8 @@ public class FieldworkServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(FieldworkServlet.class.getName());
 
     private final FieldworkTaskDAO taskDAO = new FieldworkTaskDAO();
-    private final TaskNudgeDAO nudgeDAO = new TaskNudgeDAO();
     private final BroadcastAuditDAO auditDAO = new BroadcastAuditDAO();
+    private final TaskNudgeDAO nudgeDAO = new TaskNudgeDAO();
     private final SLAConfigDAO slaDAO = new SLAConfigDAO();
     private final TopicDAO topicDAO = new TopicDAO();
     private final UserDAO userDAO = new UserDAO();
@@ -86,8 +87,17 @@ public class FieldworkServlet extends HttpServlet {
         List<Object[]> approvedTopics = taskDAO.getActiveApprovedTopics();
         request.setAttribute("approvedTopics", approvedTopics);
 
-        List<User> users = userDAO.getAll();
-        request.setAttribute("users", users);
+        // Chỉ nạp danh sách Phóng viên tác nghiệp (Role 1), loại bỏ Trưởng ban, TBT, Admin, Hậu cần khỏi danh sách giao việc
+        List<User> allUsers = userDAO.getAll();
+        List<User> reporters = new ArrayList<>();
+        if (allUsers != null) {
+            for (User u : allUsers) {
+                if (u.isActiveStatus() && (u.getRoleId() == 1 || "REPORTER".equalsIgnoreCase(u.getRoleName()))) {
+                    reporters.add(u);
+                }
+            }
+        }
+        request.setAttribute("users", reporters);
 
         request.getRequestDispatcher("/WEB-INF/views/fieldwork/kanban.jsp").forward(request, response);
     }

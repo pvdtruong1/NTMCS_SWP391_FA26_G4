@@ -335,7 +335,9 @@
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px;">Phóng Viên Đảm Nhận</label>
                     <select name="assigneeUserId" id="createAssigneeId" required style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:13px;">
                         <c:forEach var="u" items="${users}">
-                            <option value="${u.userId}">${u.fullName} (${u.roleName} — ${u.email})</option>
+                        <c:if test="${u.roleId == 1 or u.roleName == 'REPORTER'}">
+                            <option value="${u.userId}">${u.fullName} (Ph&oacute;ng vi&ecirc;n &mdash; ${u.email})</option>
+                        </c:if>
                         </c:forEach>
                     </select>
                 </div>

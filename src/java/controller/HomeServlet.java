@@ -90,8 +90,7 @@ public class HomeServlet extends HttpServlet {
             screens.add(new String[]{"Cấu hình SLA hiện trường", "/fieldwork/sla"});
         }
         if (codes.contains("LOGISTICS_MANAGE") || user.getRoleId() == 4 || "LOGISTICS_COORDINATOR".equalsIgnoreCase(user.getRoleName())
-                || user.getRoleId() == 2 || user.getRoleId() == 3 || user.getRoleId() == 5 || user.getRoleId() == 6 || user.getRoleId() == 7
-                || codes.contains("FIELDWORK_TRACK") || codes.contains("TOPIC_EVALUATE") || codes.contains("ASSET_MANAGE")) {
+                || user.getRoleId() == 7 || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(user.getRoleName())) {
             screens.add(new String[]{"Quản lý danh mục trang thiết bị (Asset Inventory)", "/assets"});
             screens.add(new String[]{"Điều phối & Bàn giao thiết bị tác nghiệp (Asset Requests)", "/asset-requests"});
         }

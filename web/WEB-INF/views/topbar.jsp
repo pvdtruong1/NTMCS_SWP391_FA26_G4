@@ -131,6 +131,9 @@
                     <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('FIELDWORK_TRACK')}">
                         detailUrl = '${base}/fieldwork/kanban';
                     </c:when>
+                    <c:when test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
+                        detailUrl = '${base}/asset-requests';
+                    </c:when>
                 </c:choose>
                 html += '<a href="' + detailUrl + '" class="notif-detail-link" onclick="handleDetailClick(event, ' + n.id + ', \x27' + detailUrl + '\x27)">' +
                     'Xem hồ sơ đề tài #' + n.topicId + ' ↗</a>';

@@ -197,6 +197,32 @@ public class FieldworkTaskDAO extends DBContext {
                     ps.executeUpdate();
                 }
 
+                // Truy van thong tin de tai de ban thong bao In-app cho nguoi nhan viec
+                String topicCode = "TOPIC-" + topicId;
+                String topicTitle = "";
+                String topicSql = "SELECT topic_code, title FROM Topic WHERE topic_id = ?";
+                try (PreparedStatement psTopic = connection.prepareStatement(topicSql)) {
+                    psTopic.setInt(1, topicId);
+                    try (ResultSet rsTopic = psTopic.executeQuery()) {
+                        if (rsTopic.next()) {
+                            String code = rsTopic.getString("topic_code");
+                            if (code != null && !code.trim().isEmpty()) topicCode = code.trim();
+                            String t = rsTopic.getString("title");
+                            if (t != null) topicTitle = t.trim();
+                        }
+                    }
+                }
+
+                String notifMsg = "[GIAO VI\u1EC6C HI\u1EC6N TR\u01AF\u1EDCNG] B\u1EA1n \u0111\u01B0\u1EE3c ph\u00E2n c\u00F4ng nhi\u1EC7m v\u1EE5 m\u1EDBi cho \u0111\u1EC1 t\u00E0i ["
+                                + topicCode + "] " + topicTitle + ": " + description.trim();
+                String notifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
+                try (PreparedStatement psNotif = connection.prepareStatement(notifSql)) {
+                    psNotif.setInt(1, assigneeUserId);
+                    psNotif.setInt(2, topicId);
+                    psNotif.setString(3, notifMsg);
+                    psNotif.executeUpdate();
+                }
+
                 connection.commit();
                 return taskId;
             } catch (SQLException | RuntimeException ex) {

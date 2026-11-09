@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import model.FieldworkTask;
 import model.User;
 import util.AuthUtil;
@@ -27,7 +29,6 @@ public class FieldworkTaskServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
 
         User user = AuthUtil.getLoggedUser(request);
-        // If query param userId or topicId present
         String topicIdParam = request.getParameter("topicId");
         String userIdParam = request.getParameter("userId");
 
@@ -37,7 +38,7 @@ public class FieldworkTaskServlet extends HttpServlet {
                 tasks = taskDAO.getTasksByTopicId(Integer.parseInt(topicIdParam.trim()));
             } else if (userIdParam != null && !userIdParam.trim().isEmpty()) {
                 tasks = taskDAO.getTasksByAssignee(Integer.parseInt(userIdParam.trim()));
-            } else if (user != null && user.getRoleId() == 1) { // Reporter default to own tasks
+            } else if (user != null && user.getRoleId() == 1) {
                 tasks = taskDAO.getTasksByAssignee(user.getUserId());
             } else {
                 tasks = taskDAO.getAllTasks();
@@ -73,7 +74,7 @@ public class FieldworkTaskServlet extends HttpServlet {
         try (BufferedReader reader = request.getReader()) {
             String line;
             while ((line = reader.readLine()) != null) {
-                body.append(line);
+                body.append(line).append("\n");
             }
         }
 
@@ -82,17 +83,20 @@ public class FieldworkTaskServlet extends HttpServlet {
             int taskId = -1;
             String status = null;
 
-            if (json.contains("\"taskId\"")) {
-                taskId = Integer.parseInt(json.replaceAll(".*\"taskId\"\\s*:\\s*(\\d+).*", "$1"));
+            Matcher mTaskId = Pattern.compile("\"taskId\"\\s*:\\s*(\\d+)").matcher(json);
+            if (mTaskId.find()) {
+                taskId = Integer.parseInt(mTaskId.group(1));
             }
-            if (json.contains("\"taskStatus\"")) {
-                status = json.replaceAll(".*\"taskStatus\"\\s*:\\s*\"([^\"]+)\".*", "$1").trim();
+            Matcher mStatus = Pattern.compile("\"taskStatus\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+            if (mStatus.find()) {
+                status = mStatus.group(1).trim();
             }
 
-            if (taskId <= 0 || status == null) {
-                // Try from parameters if not in JSON body
-                taskId = Integer.parseInt(request.getParameter("taskId"));
-                status = request.getParameter("taskStatus");
+            if (taskId <= 0 && request.getParameter("taskId") != null) {
+                taskId = Integer.parseInt(request.getParameter("taskId").trim());
+            }
+            if (status == null && request.getParameter("taskStatus") != null) {
+                status = request.getParameter("taskStatus").trim();
             }
 
             boolean ok = taskDAO.updateTaskStatus(taskId, status);
@@ -116,7 +120,7 @@ public class FieldworkTaskServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
 
         User user = AuthUtil.getLoggedUser(request);
-        int actorUserId = (user != null) ? user.getUserId() : 4; // default coordinator if session absent
+        int actorUserId = (user != null) ? user.getUserId() : 4;
 
         try {
             int topicId = -1;
@@ -129,18 +133,22 @@ public class FieldworkTaskServlet extends HttpServlet {
                 try (BufferedReader reader = request.getReader()) {
                     String line;
                     while ((line = reader.readLine()) != null) {
-                        body.append(line);
+                        body.append(line).append("\n");
                     }
                 }
                 String json = body.toString();
-                if (json.contains("\"topicId\"")) {
-                    topicId = Integer.parseInt(json.replaceAll(".*\"topicId\"\\s*:\\s*(\\d+).*", "$1"));
+
+                Matcher mTopic = Pattern.compile("\"topicId\"\\s*:\\s*(\\d+)").matcher(json);
+                if (mTopic.find()) {
+                    topicId = Integer.parseInt(mTopic.group(1));
                 }
-                if (json.contains("\"assigneeUserId\"")) {
-                    assigneeUserId = Integer.parseInt(json.replaceAll(".*\"assigneeUserId\"\\s*:\\s*(\\d+).*", "$1"));
+                Matcher mUser = Pattern.compile("\"assigneeUserId\"\\s*:\\s*(\\d+)").matcher(json);
+                if (mUser.find()) {
+                    assigneeUserId = Integer.parseInt(mUser.group(1));
                 }
-                if (json.contains("\"description\"")) {
-                    description = json.replaceAll(".*\"description\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+                Matcher mDesc = Pattern.compile("\"description\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"").matcher(json);
+                if (mDesc.find()) {
+                    description = mDesc.group(1).replace("\\\"", "\"").replace("\\\\", "\\");
                 }
             }
 
@@ -150,7 +158,7 @@ public class FieldworkTaskServlet extends HttpServlet {
             if (assigneeUserId <= 0 && request.getParameter("assigneeUserId") != null) {
                 assigneeUserId = Integer.parseInt(request.getParameter("assigneeUserId").trim());
             }
-            if (description == null) {
+            if (description == null && request.getParameter("description") != null) {
                 description = request.getParameter("description");
             }
 

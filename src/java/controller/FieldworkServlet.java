@@ -1,6 +1,8 @@
 package controller;
 
 import dal.BroadcastAuditDAO;
+import dal.EmergencyIncidentDAO;
+import dal.FieldworkDeliverableDAO;
 import dal.FieldworkTaskDAO;
 import dal.SLAConfigDAO;
 import dal.TaskNudgeDAO;
@@ -16,9 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import model.FieldworkDeliverable;
 import model.FieldworkTask;
 import model.SLAConfig;
 import model.Topic;
+import model.TopicEstimate;
+import model.TopicMember;
 import model.User;
 import util.AuthUtil;
 
@@ -27,13 +32,16 @@ import util.AuthUtil;
     "/fieldwork/todo",
     "/fieldwork/nudge",
     "/fieldwork/audit",
-    "/fieldwork/sla"
+    "/fieldwork/sla",
+    "/fieldwork/topic-detail"
 })
 public class FieldworkServlet extends HttpServlet {
 
     private static final Logger LOGGER = Logger.getLogger(FieldworkServlet.class.getName());
 
     private final FieldworkTaskDAO taskDAO = new FieldworkTaskDAO();
+    private final FieldworkDeliverableDAO deliverableDAO = new FieldworkDeliverableDAO();
+    private final EmergencyIncidentDAO incidentDAO = new EmergencyIncidentDAO();
     private final BroadcastAuditDAO auditDAO = new BroadcastAuditDAO();
     private final TaskNudgeDAO nudgeDAO = new TaskNudgeDAO();
     private final SLAConfigDAO slaDAO = new SLAConfigDAO();
@@ -68,6 +76,9 @@ public class FieldworkServlet extends HttpServlet {
                     break;
                 case "/fieldwork/sla":
                     renderSLA(request, response, user);
+                    break;
+                case "/fieldwork/topic-detail":
+                    renderTopicDetail(request, response, user);
                     break;
                 default:
                     response.sendRedirect(request.getContextPath() + "/fieldwork/kanban");
@@ -216,5 +227,47 @@ public class FieldworkServlet extends HttpServlet {
         SLAConfig config = slaDAO.getConfig();
         request.setAttribute("slaConfig", config);
         request.getRequestDispatcher("/WEB-INF/views/fieldwork/sla.jsp").forward(request, response);
+    }
+
+    private void renderTopicDetail(HttpServletRequest request, HttpServletResponse response, User user)
+            throws Exception {
+        String idParam = request.getParameter("id");
+        if (idParam == null || idParam.trim().isEmpty()) {
+            idParam = request.getParameter("topicId");
+        }
+
+        int topicId = -1;
+        try {
+            if (idParam != null) {
+                topicId = Integer.parseInt(idParam.trim());
+            }
+        } catch (NumberFormatException ignored) {}
+
+        if (topicId <= 0) {
+            response.sendRedirect(request.getContextPath() + "/fieldwork/kanban");
+            return;
+        }
+
+        Topic topic = topicDAO.getTopicDetailForReporter(topicId, 0);
+        if (topic == null) {
+            request.setAttribute("errorMessage", "Không tìm thấy hồ sơ đề tài #" + topicId);
+            request.getRequestDispatcher("/WEB-INF/views/fieldwork/kanban.jsp").forward(request, response);
+            return;
+        }
+
+        List<TopicMember> members = topicDAO.findMembersByTopicId(topicId);
+        List<TopicEstimate> estimates = topicDAO.findEstimatesByTopicId(topicId);
+        List<FieldworkTask> tasks = taskDAO.getTasksByTopicId(topicId);
+        List<FieldworkDeliverable> deliverables = deliverableDAO.getDeliverablesByTopicId(topicId);
+        List<Object[]> incidents = incidentDAO.getIncidentsByTopicId(topicId);
+
+        request.setAttribute("topic", topic);
+        request.setAttribute("members", members);
+        request.setAttribute("estimates", estimates);
+        request.setAttribute("tasks", tasks);
+        request.setAttribute("deliverables", deliverables);
+        request.setAttribute("incidents", incidents);
+
+        request.getRequestDispatcher("/WEB-INF/views/fieldwork/topic-detail.jsp").forward(request, response);
     }
 }

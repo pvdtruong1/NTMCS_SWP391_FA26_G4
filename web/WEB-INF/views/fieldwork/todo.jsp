@@ -139,9 +139,9 @@
                     <div class="task-row-card" data-status="${task.taskStatus}">
                         <div style="flex:1;">
                             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                                <span style="font-family:monospace; font-weight:700; font-size:11px; background:#eff6ff; color:var(--primary); padding:2px 8px; border-radius:4px;">
-                                    ${task.topicCode}
-                                </span>
+                                <a href="${base}/fieldwork/topic-detail?id=${task.topicId}" style="font-family:monospace; font-weight:700; font-size:11px; background:#eff6ff; color:var(--primary); padding:2px 8px; border-radius:4px; text-decoration:none;" title="Xem hồ sơ đề tài">
+                                    ${task.topicCode} ↗
+                                </a>
                                 <c:choose>
                                     <c:when test="${task.taskStatus == 'TODO'}">
                                         <span class="badge-status badge-todo">Chờ tiếp nhận</span>

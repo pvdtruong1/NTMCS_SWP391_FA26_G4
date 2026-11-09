@@ -42,14 +42,20 @@ public class ReporterServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
 
-        if (!AuthUtil.check(request, response, "TOPIC_PITCH")) {
-            return;
+        String path = request.getPathInfo();
+        if ("/detail".equals(path)) {
+            if (AuthUtil.getLoggedUser(request) == null) {
+                response.sendRedirect(request.getContextPath() + "/login");
+                return;
+            }
+        } else {
+            if (!AuthUtil.check(request, response, "TOPIC_PITCH")) {
+                return;
+            }
         }
 
         User loggedUser = AuthUtil.getLoggedUser(request);
         setUserAttributes(request, loggedUser);
-
-        String path = request.getPathInfo();
         if (path == null || "/".equals(path) || "/dashboard".equals(path)) {
             showDashboard(request, response, loggedUser);
         } else if ("/topics".equals(path)) {

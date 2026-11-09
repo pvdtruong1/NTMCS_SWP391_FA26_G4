@@ -213,7 +213,7 @@
                                 <td>
                                     <c:choose>
                                         <c:when test="${not empty item[6]}">
-                                            <span style="font-family:monospace; font-weight:700; color:var(--primary); font-size:11px;">[${item[6]}]</span>
+                                            <a href="${base}/fieldwork/topic-detail?id=${item[5]}" style="font-family:monospace; font-weight:700; color:var(--primary); font-size:11px; text-decoration:none;" title="Xem hồ sơ đề tài">[${item[6]}] ↗</a>
                                             <div style="font-size:12px; color:#475569; max-width:180px;" class="truncate">${item[7]}</div>
                                         </c:when>
                                         <c:otherwise>

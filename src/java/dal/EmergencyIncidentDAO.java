@@ -135,4 +135,29 @@ public class EmergencyIncidentDAO extends DBContext {
             }
         }
     }
+
+    public List<Object[]> getIncidentsByTopicId(int topicId) throws SQLException {
+        List<Object[]> list = new ArrayList<>();
+        String sql = "SELECT a.log_id, a.actor_user_id, u.full_name AS reporter_name, a.details, a.created_at "
+                   + "FROM Audit_Log a "
+                   + "JOIN [User] u ON a.actor_user_id = u.user_id "
+                   + "WHERE a.action = 'EMERGENCY_INCIDENT' AND a.entity_id = ? "
+                   + "ORDER BY a.log_id DESC";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, topicId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Object[]{
+                        rs.getInt("log_id"),
+                        rs.getInt("actor_user_id"),
+                        rs.getString("reporter_name"),
+                        rs.getString("details"),
+                        rs.getTimestamp("created_at")
+                    });
+                }
+            }
+        }
+        return list;
+    }
 }

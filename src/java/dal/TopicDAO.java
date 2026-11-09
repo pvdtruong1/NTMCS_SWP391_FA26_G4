@@ -1707,13 +1707,23 @@ public class TopicDAO extends DBContext {
     }
 
     public Topic getTopicDetailForReporter(int topicId, int userId) {
-        String sql = baseReporterSelect() + "WHERE t.topic_id = ? AND (t.author_user_id = ? OR ? = 0)";
+        String sql = baseReporterSelect()
+                   + "WHERE t.topic_id = ? AND ( "
+                   + "    t.author_user_id = ? OR ? <= 0 "
+                   + "    OR EXISTS (SELECT 1 FROM Topic_Member tm WHERE tm.topic_id = t.topic_id AND tm.user_id = ?) "
+                   + "    OR EXISTS (SELECT 1 FROM Fieldwork_Task ft WHERE ft.topic_id = t.topic_id AND ft.assignee_user_id = ?) "
+                   + "    OR EXISTS (SELECT 1 FROM [User] u JOIN Role r ON u.role_id = r.role_id "
+                   + "               WHERE u.user_id = ? AND r.role_name IN ('FIELDWORK_COORDINATOR', 'DESK_EDITOR', 'EXECUTIVE_EDITOR', 'BUSINESS_ADMINISTRATOR', 'SYSTEM_ADMINISTRATOR', 'LOGISTICS_COORDINATOR')) "
+                   + ")";
         try {
             Connection conn = getConnection();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, topicId);
                 ps.setInt(2, userId);
                 ps.setInt(3, userId);
+                ps.setInt(4, userId);
+                ps.setInt(5, userId);
+                ps.setInt(6, userId);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         return mapReporterTopicRow(rs);
@@ -1721,7 +1731,7 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y chi ti蘯ｿt ﾄ黛ｻ・tﾃi #" + topicId + " cho phﾃｳng viﾃｪn #" + userId, ex);
+            LOGGER.log(Level.SEVERE, "Lỗi lấy chi tiết đề tài #" + topicId + " cho user #" + userId, ex);
         } finally {
             close();
         }

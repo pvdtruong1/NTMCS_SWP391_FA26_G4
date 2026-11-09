@@ -217,8 +217,8 @@
                             <c:if test="${task.taskStatus == 'TODO'}">
                                 <div class="kanban-card">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                        <span class="card-topic-tag">${task.topicCode}</span>
-                                        <small style="color:var(--muted); font-size:11px;">#${task.taskId}</small>
+                                        <a href="${base}/fieldwork/topic-detail?id=${task.topicId}" class="card-topic-tag" style="text-decoration:none;" title="Xem hồ sơ đề tài">[${task.topicCode}] ↗</a>
+                                        <small style="color:var(--muted); font-family:monospace;">#${task.taskId}</small>
                                     </div>
                                     <div style="font-weight:600; font-size:13px; margin-bottom:6px; color:#1e293b;">
                                         <c:out value="${task.topicTitle}" />
@@ -253,7 +253,7 @@
                             <c:if test="${task.taskStatus == 'IN_PROGRESS'}">
                                 <div class="kanban-card">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                        <span class="card-topic-tag" style="background:#fef9c3; color:#a16207;">${task.topicCode}</span>
+                                        <a href="${base}/fieldwork/topic-detail?id=${task.topicId}" class="card-topic-tag" style="background:#fef9c3; color:#a16207; text-decoration:none;" title="Xem hồ sơ đề tài">[${task.topicCode}] ↗</a>
                                         <small style="color:var(--muted); font-size:11px;">#${task.taskId}</small>
                                     </div>
                                     <div style="font-weight:600; font-size:13px; margin-bottom:6px; color:#1e293b;">
@@ -289,7 +289,7 @@
                             <c:if test="${task.taskStatus == 'DONE'}">
                                 <div class="kanban-card">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                        <span class="card-topic-tag" style="background:#dcfce7; color:#15803d;">${task.topicCode}</span>
+                                        <a href="${base}/fieldwork/topic-detail?id=${task.topicId}" class="card-topic-tag" style="background:#dcfce7; color:#15803d; text-decoration:none;" title="Xem hồ sơ đề tài">[${task.topicCode}] ↗</a>
                                         <span style="background:#dcfce7; color:#15803d; border-radius:10px; padding:2px 8px; font-size:10px; font-weight:700;">✓ HOÀN THÀNH</span>
                                     </div>
                                     <div style="font-weight:600; font-size:13px; margin-bottom:6px; color:#1e293b;">

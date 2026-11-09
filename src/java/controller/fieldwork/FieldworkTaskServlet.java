@@ -99,7 +99,10 @@ public class FieldworkTaskServlet extends HttpServlet {
                 status = request.getParameter("taskStatus").trim();
             }
 
-            boolean ok = taskDAO.updateTaskStatus(taskId, status);
+            User loggedUser = AuthUtil.getLoggedUser(request);
+            int actorUserId = (loggedUser != null) ? loggedUser.getUserId() : -1;
+
+            boolean ok = taskDAO.updateTaskStatus(taskId, status, actorUserId);
             if (ok) {
                 response.getWriter().write("{\"success\":true,\"message\":\"Cập nhật trạng thái thành công\"}");
             } else {

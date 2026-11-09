@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -22,39 +23,63 @@ public class BroadcastAuditDAO extends DBContext {
 
         String sql =
             "WITH Dispatch AS ("
-          + "    SELECT n.notification_id, n.user_id AS recipient_id, n.topic_id, n.message, n.is_read, "
-          + "           senderLog.actor_user_id AS sender_id, senderLog.created_at AS sent_at, "
-          + "           'TASK_NUDGE' AS source_type, "
-          + "           CASE WHEN n.message LIKE N'%[NHẮC VIỆC - KHẨN CẤP]%' THEN 'EMERGENCY' "
-          + "                WHEN n.message LIKE N'%[NHẮC VIỆC - ƯU TIÊN CAO]%' THEN 'HIGH' "
-          + "                ELSE 'NORMAL' END AS urgency "
-          + "    FROM Notification n "
-          + "    JOIN Audit_Log senderLog ON senderLog.entity_id = n.notification_id "
-          + "                            AND senderLog.action = 'SEND_TASK_NUDGE' "
-          + "    UNION ALL "
-          + "    SELECT n.notification_id, n.user_id AS recipient_id, n.topic_id, n.message, n.is_read, "
-          + "           incidentLog.actor_user_id AS sender_id, incidentLog.created_at AS sent_at, "
-          + "           'EMERGENCY_INCIDENT' AS source_type, 'EMERGENCY' AS urgency "
-          + "    FROM Notification n "
-          + "    JOIN Audit_Log incidentLog ON incidentLog.entity_id = n.notification_id "
-          + "                              AND incidentLog.action = 'SEND_INCIDENT_NOTIFICATION' "
-          + "    UNION ALL "
-          + "    SELECT n.notification_id, n.user_id AS recipient_id, n.topic_id, n.message, n.is_read, "
-          + "           COALESCE(oa.actor_user_id, 2) AS sender_id, "
-          + "           COALESCE(oa.created_at, SYSDATETIME()) AS sent_at, "
-          + "           'EMERGENCY_INCIDENT' AS source_type, 'EMERGENCY' AS urgency "
+          + "    SELECT n.notification_id, "
+          + "           n.user_id AS recipient_id, "
+          + "           n.topic_id, "
+          + "           n.message, "
+          + "           n.is_read, "
+          + "           COALESCE(directLog.actor_user_id, fallbackSender.sender_id, 4) AS sender_id, "
+          + "           COALESCE(directLog.created_at, fallbackTime.sent_at, SYSDATETIME()) AS sent_at, "
+          + "           CASE "
+          + "               WHEN directLog.action = 'PING_UNREAD_NOTIFICATION' OR n.message LIKE N'%[[]PING ĐÔN ĐỐC]%' THEN 'PING_NUDGE' "
+          + "               WHEN directLog.action = 'SEND_INCIDENT_NOTIFICATION' OR n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' THEN 'EMERGENCY_INCIDENT' "
+          + "               WHEN directLog.action = 'SEND_TASK_ASSIGNMENT' OR n.message LIKE N'%[[]GIAO VIỆC HIỆN TRƯỜNG]%' OR n.message LIKE N'%[[]GIAO NHIỆM VỤ]%' THEN 'TASK_ASSIGNMENT' "
+          + "               WHEN directLog.action = 'SEND_TASK_ACCEPTED' OR n.message LIKE N'%[[]TIẾP NHẬN TÁC NGHIỆP]%' OR n.message LIKE N'%[[]ĐÃ NHẬN NHIỆM VỤ]%' THEN 'TASK_ACCEPTED' "
+          + "               WHEN directLog.action = 'SEND_TASK_COMPLETED' OR n.message LIKE N'%[[]HOÀN THÀNH TÁC NGHIỆP]%' OR n.message LIKE N'%[[]NỘP SẢN PHẨM HIỆN TRƯỜNG]%' THEN 'TASK_COMPLETED' "
+          + "               WHEN directLog.action = 'SEND_TASK_NUDGE' OR n.message LIKE N'%[[]NHẮC VIỆC%' THEN 'TASK_NUDGE' "
+          + "               WHEN n.message LIKE N'%[[]Cảnh báo SLA]%' OR n.message LIKE N'%[[]CẢNH BÁO TIẾN ĐỘ]%' THEN 'SLA_ALERT' "
+          + "               ELSE 'OTHER' "
+          + "           END AS source_type, "
+          + "           CASE "
+          + "               WHEN n.message LIKE N'%[NHẮC VIỆC - KHẨN CẤP]%' OR n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' OR n.message LIKE N'%[KHẨN CẤP]%' THEN 'EMERGENCY' "
+          + "               WHEN n.message LIKE N'%[NHẮC VIỆC - ƯU TIÊN CAO]%' OR n.message LIKE N'%[[]PING ĐÔN ĐỐC]%' OR n.message LIKE N'%[[]HOÀN THÀNH TÁC NGHIỆP]%' OR n.message LIKE N'%[[]Cảnh báo SLA]%' THEN 'HIGH' "
+          + "               ELSE 'NORMAL' "
+          + "           END AS urgency "
           + "    FROM Notification n "
           + "    OUTER APPLY ( "
-          + "        SELECT TOP 1 a.actor_user_id, a.created_at "
+          + "        SELECT TOP 1 al.actor_user_id, al.created_at, al.action "
+          + "        FROM Audit_Log al "
+          + "        WHERE al.entity_id = n.notification_id "
+          + "          AND al.action IN ('PING_UNREAD_NOTIFICATION', 'SEND_INCIDENT_NOTIFICATION', 'SEND_TASK_ASSIGNMENT', 'SEND_TASK_ACCEPTED', 'SEND_TASK_COMPLETED', 'SEND_TASK_NUDGE') "
+          + "        ORDER BY al.log_id DESC "
+          + "    ) directLog "
+          + "    OUTER APPLY ( "
+          + "        SELECT TOP 1 a.actor_user_id AS sender_id "
           + "        FROM Audit_Log a "
-          + "        WHERE a.action = 'EMERGENCY_INCIDENT' AND a.entity_id = n.topic_id "
+          + "        WHERE (n.message LIKE N'%[[]PING ĐÔN ĐỐC]%' AND a.action = 'PING_UNREAD_NOTIFICATION') "
+          + "           OR (n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' AND a.action = 'EMERGENCY_INCIDENT' AND a.entity_id = n.topic_id) "
+          + "           OR (n.message LIKE N'%[[]GIAO VIỆC HIỆN TRƯỜNG]%' AND a.action = 'CREATE_FIELDWORK_TASK') "
           + "        ORDER BY a.log_id DESC "
-          + "    ) oa "
-          + "    WHERE n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' "
-          + "      AND NOT EXISTS ( "
-          + "          SELECT 1 FROM Audit_Log al "
-          + "          WHERE al.entity_id = n.notification_id AND al.action = 'SEND_INCIDENT_NOTIFICATION' "
-          + "      ) "
+          + "    ) fallbackSender "
+          + "    OUTER APPLY ( "
+          + "        SELECT TOP 1 a.created_at AS sent_at "
+          + "        FROM Audit_Log a "
+          + "        WHERE (n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' AND a.action = 'EMERGENCY_INCIDENT' AND a.entity_id = n.topic_id) "
+          + "           OR (n.message LIKE N'%[[]GIAO VIỆC HIỆN TRƯỜNG]%' AND a.action = 'CREATE_FIELDWORK_TASK') "
+          + "        ORDER BY a.log_id DESC "
+          + "    ) fallbackTime "
+          + "    WHERE directLog.action IS NOT NULL "
+          + "       OR n.message LIKE N'%[[]PING ĐÔN ĐỐC]%' "
+          + "       OR n.message LIKE N'%[[]SỰ CỐ KHẨN CẤP HIỆN TRƯỜNG]%' "
+          + "       OR n.message LIKE N'%[[]NHẮC VIỆC%' "
+          + "       OR n.message LIKE N'%[[]GIAO VIỆC HIỆN TRƯỜNG]%' "
+          + "       OR n.message LIKE N'%[[]GIAO NHIỆM VỤ]%' "
+          + "       OR n.message LIKE N'%[[]TIẾP NHẬN TÁC NGHIỆP]%' "
+          + "       OR n.message LIKE N'%[[]ĐÃ NHẬN NHIỆM VỤ]%' "
+          + "       OR n.message LIKE N'%[[]HOÀN THÀNH TÁC NGHIỆP]%' "
+          + "       OR n.message LIKE N'%[[]NỘP SẢN PHẨM HIỆN TRƯỜNG]%' "
+          + "       OR n.message LIKE N'%[[]Cảnh báo SLA]%' "
+          + "       OR n.message LIKE N'%[[]CẢNH BÁO TIẾN ĐỘ]%' "
           + ") "
           + "SELECT d.notification_id, d.recipient_id, recipient.full_name AS recipient_name, "
           + "       recipient.email AS recipient_email, recipientDesk.desk_name AS recipient_desk, "
@@ -70,7 +95,7 @@ public class BroadcastAuditDAO extends DBContext {
           + "           FROM Audit_Log WHERE action = 'READ_NOTIFICATION' AND entity_type = 'NOTIFICATION' "
           + "           GROUP BY entity_id, actor_user_id) readLog "
           + "     ON readLog.entity_id = d.notification_id AND readLog.actor_user_id = d.recipient_id "
-          + "ORDER BY d.sent_at DESC";
+          + "ORDER BY d.sent_at DESC, d.notification_id DESC";
 
         try (Connection connection = getConnection()) {
             try (PreparedStatement roleStatement = connection.prepareStatement(roleSql)) {
@@ -161,17 +186,23 @@ public class BroadcastAuditDAO extends DBContext {
                 }
 
                 String pingMessage = "[PING ĐÔN ĐỐC] " + originalMessage;
-                try (PreparedStatement ps = connection.prepareStatement(insertNotification)) {
+                int newPingNotifId = -1;
+                try (PreparedStatement ps = connection.prepareStatement(insertNotification, Statement.RETURN_GENERATED_KEYS)) {
                     ps.setInt(1, recipientUserId);
                     ps.setInt(2, topicId);
                     ps.setString(3, pingMessage);
                     ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (keys.next()) {
+                            newPingNotifId = keys.getInt(1);
+                        }
+                    }
                 }
 
                 try (PreparedStatement ps = connection.prepareStatement(auditSql)) {
                     ps.setInt(1, actorUserId);
-                    ps.setInt(2, originalNotificationId);
-                    ps.setString(3, "Ping nhắc đọc thông báo #" + originalNotificationId + " tới User #" + recipientUserId);
+                    ps.setInt(2, newPingNotifId > 0 ? newPingNotifId : originalNotificationId);
+                    ps.setString(3, "Ping nhắc đọc thông báo gốc #" + originalNotificationId + " tới User #" + recipientUserId);
                     ps.executeUpdate();
                 }
 

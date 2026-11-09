@@ -166,10 +166,25 @@ public class FieldworkServlet extends HttpServlet {
                 String sourceType = r[14] != null ? r[14].toString() : "";
                 String urgency = r[15] != null ? r[15].toString() : "";
 
+                String sourceLabel;
+                if ("TASK_ASSIGNMENT".equals(sourceType)) sourceLabel = "Giao việc hiện trường";
+                else if ("TASK_ACCEPTED".equals(sourceType)) sourceLabel = "Tiếp nhận tác nghiệp";
+                else if ("TASK_COMPLETED".equals(sourceType)) sourceLabel = "Hoàn thành tác nghiệp";
+                else if ("TASK_NUDGE".equals(sourceType)) sourceLabel = "Đôn đốc tác nghiệp";
+                else if ("EMERGENCY_INCIDENT".equals(sourceType)) sourceLabel = "Sự cố khẩn cấp";
+                else if ("PING_NUDGE".equals(sourceType)) sourceLabel = "Ping đôn đốc";
+                else if ("SLA_ALERT".equals(sourceType)) sourceLabel = "Cảnh báo SLA";
+                else sourceLabel = sourceType;
+
+                String urgencyLabel;
+                if ("EMERGENCY".equals(urgency)) urgencyLabel = "Khẩn cấp";
+                else if ("HIGH".equals(urgency)) urgencyLabel = "Ưu tiên cao";
+                else urgencyLabel = "Tiêu chuẩn";
+
                 writer.println(String.join(",",
                     csvEscape(notifId),
-                    csvEscape(sourceType),
-                    csvEscape(urgency),
+                    csvEscape(sourceLabel),
+                    csvEscape(urgencyLabel),
                     csvEscape(senderName),
                     csvEscape(recipientName),
                     csvEscape(recipientEmail),

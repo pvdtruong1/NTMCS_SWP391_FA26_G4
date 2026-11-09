@@ -37,7 +37,12 @@ public class FieldworkDeliverableDAO extends DBContext {
             throw new IllegalArgumentException("Trạng thái nhiệm vụ không hợp lệ: " + taskStatus);
         }
 
-        String taskSql = "SELECT topic_id, assignee_user_id FROM Fieldwork_Task WHERE task_id = ?";
+        String taskSql = "SELECT ft.topic_id, ft.assignee_user_id, ft.description, "
+                       + "       t.topic_code, t.title AS topic_title, u.full_name AS submitter_name "
+                       + "FROM Fieldwork_Task ft "
+                       + "JOIN Topic t ON ft.topic_id = t.topic_id "
+                       + "LEFT JOIN [User] u ON u.user_id = ? "
+                       + "WHERE ft.task_id = ?";
         String insertSql = "INSERT INTO Fieldwork_Deliverable "
                 + "(task_id, submitted_by_user_id, submission_type, deliverable_note, "
                 + " original_file_name, stored_file_path, content_type, file_size_bytes, external_url) "
@@ -50,15 +55,24 @@ public class FieldworkDeliverableDAO extends DBContext {
             try {
                 int topicId;
                 int assigneeUserId;
+                String taskDesc = "";
+                String topicCode = "";
+                String topicTitle = "";
+                String submitterName = "";
 
                 try (PreparedStatement taskStatement = connection.prepareStatement(taskSql)) {
-                    taskStatement.setInt(1, taskId);
+                    taskStatement.setInt(1, submittedByUserId);
+                    taskStatement.setInt(2, taskId);
                     try (ResultSet rs = taskStatement.executeQuery()) {
                         if (!rs.next()) {
                             throw new IllegalArgumentException("Không tìm thấy đầu việc #" + taskId);
                         }
                         topicId = rs.getInt("topic_id");
                         assigneeUserId = rs.getInt("assignee_user_id");
+                        taskDesc = rs.getString("description");
+                        topicCode = rs.getString("topic_code");
+                        topicTitle = rs.getString("topic_title");
+                        submitterName = rs.getString("submitter_name");
                     }
                 }
 
@@ -109,6 +123,62 @@ public class FieldworkDeliverableDAO extends DBContext {
                     try (PreparedStatement updateTopic = connection.prepareStatement(updateTopicSql)) {
                         updateTopic.setInt(1, topicId);
                         updateTopic.executeUpdate();
+                    }
+                }
+
+                // Gửi thông báo nộp sản phẩm / hoàn thành tác nghiệp tới ĐPV, Desk Editor & Tác giả đề tài
+                String topicLabel = (topicCode != null && !topicCode.trim().isEmpty()) ? topicCode.trim() : ("#" + topicId);
+                String reporter = (submitterName != null && !submitterName.trim().isEmpty()) ? submitterName.trim() : ("User #" + submittedByUserId);
+                String deliverableSummary = (note != null && !note.trim().isEmpty()) ? note.trim() : (taskDesc != null ? taskDesc.trim() : "Sản phẩm nộp");
+                
+                String notifMsg = "DONE".equals(taskStatus)
+                        ? ("[HOÀN THÀNH TÁC NGHIỆP] Phóng viên " + reporter + " đã hoàn thành nhiệm vụ và nộp sản phẩm cho đề tài [" + topicLabel + "] " + topicTitle + ": " + deliverableSummary)
+                        : ("[NỘP SẢN PHẨM HIỆN TRƯỜNG] Phóng viên " + reporter + " đã nộp tài liệu tác nghiệp cho đề tài [" + topicLabel + "] " + topicTitle + ": " + deliverableSummary);
+
+                String relatedManagersSql =
+                    "SELECT DISTINCT u.user_id "
+                  + "FROM [User] u "
+                  + "JOIN Role r ON u.role_id = r.role_id "
+                  + "WHERE u.active_status = 1 AND ( "
+                  + "    r.role_name IN ('FIELDWORK_COORDINATOR', 'DESK_EDITOR') "
+                  + "    OR u.user_id IN (SELECT author_user_id FROM Topic WHERE topic_id = ?) "
+                  + ") AND u.user_id <> ?";
+
+                java.util.Set<Integer> recipientIds = new java.util.LinkedHashSet<>();
+                try (PreparedStatement psRel = connection.prepareStatement(relatedManagersSql)) {
+                    psRel.setInt(1, topicId);
+                    psRel.setInt(2, submittedByUserId);
+                    try (ResultSet rsRel = psRel.executeQuery()) {
+                        while (rsRel.next()) {
+                            recipientIds.add(rsRel.getInt("user_id"));
+                        }
+                    }
+                }
+
+                if (!recipientIds.isEmpty()) {
+                    String insertNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
+                    String insertNotifAuditSql = "INSERT INTO Audit_Log (actor_user_id, action, entity_type, entity_id, details) "
+                                               + "VALUES (?, 'SEND_TASK_COMPLETED', 'NOTIFICATION', ?, ?)";
+
+                    try (PreparedStatement psNotif = connection.prepareStatement(insertNotifSql, Statement.RETURN_GENERATED_KEYS);
+                         PreparedStatement psNotifAudit = connection.prepareStatement(insertNotifAuditSql)) {
+
+                        for (int recId : recipientIds) {
+                            psNotif.setInt(1, recId);
+                            psNotif.setInt(2, topicId);
+                            psNotif.setString(3, notifMsg);
+                            psNotif.executeUpdate();
+
+                            try (ResultSet keys = psNotif.getGeneratedKeys()) {
+                                if (keys.next()) {
+                                    int notifId = keys.getInt(1);
+                                    psNotifAudit.setInt(1, submittedByUserId);
+                                    psNotifAudit.setInt(2, notifId);
+                                    psNotifAudit.setString(3, "Thông báo nộp sản phẩm nhiệm vụ #" + taskId + " tới user #" + recId);
+                                    psNotifAudit.executeUpdate();
+                                }
+                            }
+                        }
                     }
                 }
 

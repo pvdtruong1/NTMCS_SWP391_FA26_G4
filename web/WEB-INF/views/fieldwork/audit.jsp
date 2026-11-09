@@ -67,13 +67,13 @@
     </jsp:include>
     <div class="main">
         <jsp:include page="../topbar.jsp">
-            <jsp:param name="title" value="Nhật Ký Phát Thanh &amp; Báo Cáo Tỷ Lệ Đọc (SCR-4.8)"/>
+            <jsp:param name="title" value="Nhật Ký Phát Thanh & Báo Cáo Tỷ Lệ Đọc (SCR-4.8)"/>
         </jsp:include>
         <main>
             <div class="page-head">
                 <div>
                     <span class="eyebrow">GIÁM SÁT TRUYỀN THÔNG NỘI BỘ / WF-04</span>
-                    <h1>Nhật Ký Phát Thanh &amp; Đôn Đốc Hiện Trường (SCR-4.8)</h1>
+                    <h1>Nhật Ký Phát Thanh & Đôn Đốc Hiện Trường (SCR-4.8)</h1>
                     <p>Theo dõi tỷ lệ đọc thông báo, lịch sử phát thanh điều phối và thực hiện Ping trực tiếp đối với phóng viên chưa đọc.</p>
                 </div>
             </div>
@@ -136,6 +136,16 @@
                         <button type="button" class="filter-btn" onclick="setAuditFilter('READ', this)">Đã đọc (${readCount})</button>
                         <button type="button" class="filter-btn" onclick="setAuditFilter('UNREAD', this)">Chưa đọc (${unreadCount})</button>
                     </div>
+                    <select id="auditSourceFilter" onchange="applyFilters()" style="padding:6px 12px; border-radius:6px; border:1px solid var(--line); font-size:12px; font-weight:600; background:var(--surface); color:var(--text); cursor:pointer;">
+                        <option value="ALL">Toàn bộ loại thông báo</option>
+                        <option value="TASK_ASSIGNMENT">📋 Giao việc hiện trường</option>
+                        <option value="TASK_ACCEPTED">🤝 Tiếp nhận tác nghiệp</option>
+                        <option value="TASK_COMPLETED">📦 Hoàn thành / Nộp SP</option>
+                        <option value="TASK_NUDGE">⚡ Đôn đốc tiến độ</option>
+                        <option value="EMERGENCY_INCIDENT">🚨 Sự cố khẩn cấp</option>
+                        <option value="PING_NUDGE">🔔 Ping đôn đốc</option>
+                        <option value="SLA_ALERT">⏳ Cảnh báo SLA</option>
+                    </select>
                     <a href="${base}/fieldwork/audit?export=csv" class="btn-export-csv" title="Xuất toàn bộ nhật ký kiểm toán thông báo ra file CSV chuẩn UTF-8">
                         📥 Xuất File CSV
                     </a>
@@ -151,6 +161,7 @@
                     <thead>
                         <tr>
                             <th>Mã</th>
+                            <th>Loại Nguồn</th>
                             <th>Người Gửi</th>
                             <th>Người Nhận (Phòng/Ban)</th>
                             <th>Đề Tài</th>
@@ -164,8 +175,36 @@
                     </thead>
                     <tbody>
                         <c:forEach var="item" items="${auditLogs}">
-                            <tr class="audit-row" data-read="${item[9]}">
+                            <tr class="audit-row" data-read="${item[9]}" data-source="${item[14]}">
                                 <td><small style="color:var(--muted); font-family:monospace;">#${item[0]}</small></td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${item[14] == 'TASK_ASSIGNMENT'}">
+                                            <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">📋 Giao việc</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'TASK_ACCEPTED'}">
+                                            <span style="background:#fef9c3; color:#a16207; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">🤝 Tiếp nhận</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'TASK_COMPLETED'}">
+                                            <span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">📦 Hoàn thành</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'TASK_NUDGE'}">
+                                            <span style="background:#ffedd5; color:#c2410c; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">⚡ Đôn đốc</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'EMERGENCY_INCIDENT'}">
+                                            <span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">🚨 Sự cố</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'PING_NUDGE'}">
+                                            <span style="background:#f3e8ff; color:#7e22ce; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">🔔 Ping nhắc</span>
+                                        </c:when>
+                                        <c:when test="${item[14] == 'SLA_ALERT'}">
+                                            <span style="background:#fef2f2; color:#991b1b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap;">⏳ SLA</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;"><c:out value="${item[14]}" default="Thông báo" /></span>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
                                 <td><b><c:out value="${item[11]}" default="Hệ thống" /></b></td>
                                 <td>
                                     <div><b><c:out value="${item[2]}" /></b></div>
@@ -235,7 +274,7 @@
                         </c:forEach>
                         <c:if test="${empty auditLogs}">
                             <tr>
-                                <td colspan="10" style="text-align:center; padding:30px; color:var(--muted);">
+                                <td colspan="11" style="text-align:center; padding:30px; color:var(--muted);">
                                     Không có dữ liệu phát thanh thông báo hiện trường.
                                 </td>
                             </tr>
@@ -263,13 +302,20 @@ function searchAuditLogs() {
 
 function applyFilters() {
     const q = document.getElementById('auditSearchInput').value.toLowerCase().trim();
+    const sourceSelect = document.getElementById('auditSourceFilter');
+    const source = sourceSelect ? sourceSelect.value : 'ALL';
     const rows = document.querySelectorAll('.audit-row');
 
     rows.forEach(r => {
         const isRead = r.getAttribute('data-read') === 'true';
-        let matchesType = true;
-        if (currentReadFilter === 'READ' && !isRead) matchesType = false;
-        if (currentReadFilter === 'UNREAD' && isRead) matchesType = false;
+        const rowSource = r.getAttribute('data-source');
+
+        let matchesRead = true;
+        if (currentReadFilter === 'READ' && !isRead) matchesRead = false;
+        if (currentReadFilter === 'UNREAD' && isRead) matchesRead = false;
+
+        let matchesSource = true;
+        if (source !== 'ALL' && rowSource !== source) matchesSource = false;
 
         let matchesSearch = true;
         if (q) {
@@ -277,7 +323,7 @@ function applyFilters() {
             if (!text.includes(q)) matchesSearch = false;
         }
 
-        r.style.display = (matchesType && matchesSearch) ? '' : 'none';
+        r.style.display = (matchesRead && matchesSource && matchesSearch) ? '' : 'none';
     });
 }
 

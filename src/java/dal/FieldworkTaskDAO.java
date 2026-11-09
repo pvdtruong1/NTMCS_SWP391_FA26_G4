@@ -147,16 +147,138 @@ public class FieldworkTaskDAO extends DBContext {
     }
 
     public boolean updateTaskStatus(int taskId, String status) throws SQLException {
+        return updateTaskStatus(taskId, status, -1);
+    }
+
+    public boolean updateTaskStatus(int taskId, String status, int actorUserId) throws SQLException {
         if (!"TODO".equals(status) && !"IN_PROGRESS".equals(status) && !"DONE".equals(status)) {
             throw new IllegalArgumentException("Trạng thái nhiệm vụ không hợp lệ: " + status);
         }
 
-        String sql = "UPDATE Fieldwork_Task SET task_status = ? WHERE task_id = ?";
-        try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, status);
-            statement.setInt(2, taskId);
-            return statement.executeUpdate() > 0;
+        String fetchSql = "SELECT ft.topic_id, ft.assignee_user_id, ft.description, ft.task_status, "
+                        + "       t.topic_code, t.title AS topic_title, u.full_name AS assignee_name "
+                        + "FROM Fieldwork_Task ft "
+                        + "JOIN Topic t ON ft.topic_id = t.topic_id "
+                        + "LEFT JOIN [User] u ON ft.assignee_user_id = u.user_id "
+                        + "WHERE ft.task_id = ?";
+
+        String updateSql = "UPDATE Fieldwork_Task SET task_status = ? WHERE task_id = ?";
+
+        try (Connection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                int topicId = -1;
+                int assigneeUserId = -1;
+                String oldStatus = "";
+                String description = "";
+                String topicCode = "";
+                String topicTitle = "";
+                String assigneeName = "";
+
+                try (PreparedStatement fetchPs = connection.prepareStatement(fetchSql)) {
+                    fetchPs.setInt(1, taskId);
+                    try (ResultSet rs = fetchPs.executeQuery()) {
+                        if (rs.next()) {
+                            topicId = rs.getInt("topic_id");
+                            assigneeUserId = rs.getInt("assignee_user_id");
+                            oldStatus = rs.getString("task_status");
+                            description = rs.getString("description");
+                            topicCode = rs.getString("topic_code");
+                            topicTitle = rs.getString("topic_title");
+                            assigneeName = rs.getString("assignee_name");
+                        } else {
+                            connection.rollback();
+                            return false;
+                        }
+                    }
+                }
+
+                try (PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
+                    updatePs.setString(1, status);
+                    updatePs.setInt(2, taskId);
+                    int updated = updatePs.executeUpdate();
+                    if (updated == 0) {
+                        connection.rollback();
+                        return false;
+                    }
+                }
+
+                int effectiveActorId = (actorUserId > 0) ? actorUserId : assigneeUserId;
+
+                // Ghi vết cập nhật trạng thái nhiệm vụ vào Audit_Log
+                String auditTaskSql = "INSERT INTO Audit_Log (actor_user_id, action, entity_type, entity_id, details) "
+                                    + "VALUES (?, 'UPDATE_FIELDWORK_TASK_STATUS', 'TASK', ?, ?)";
+                try (PreparedStatement psAudit = connection.prepareStatement(auditTaskSql)) {
+                    psAudit.setInt(1, effectiveActorId);
+                    psAudit.setInt(2, taskId);
+                    psAudit.setString(3, "Cập nhật trạng thái nhiệm vụ #" + taskId + " từ " + oldStatus + " sang " + status);
+                    psAudit.executeUpdate();
+                }
+
+                // Khi phóng viên tiếp nhận nhiệm vụ (IN_PROGRESS), bắn thông báo tới ĐPV, Desk Editor & Tác giả đề tài
+                if ("IN_PROGRESS".equals(status) && !"IN_PROGRESS".equals(oldStatus)) {
+                    String topicLabel = (topicCode != null && !topicCode.trim().isEmpty()) ? topicCode.trim() : ("#" + topicId);
+                    String reporter = (assigneeName != null && !assigneeName.trim().isEmpty()) ? assigneeName.trim() : ("User #" + effectiveActorId);
+                    String notifMsg = "[TIẾP NHẬN TÁC NGHIỆP] Phóng viên " + reporter
+                                    + " đã tiếp nhận và bắt đầu thực hiện nhiệm vụ: " + (description != null ? description.trim() : "")
+                                    + " (Đề tài [" + topicLabel + "] " + (topicTitle != null ? topicTitle.trim() : "") + ")";
+
+                    String relatedManagersSql =
+                        "SELECT DISTINCT u.user_id "
+                      + "FROM [User] u "
+                      + "JOIN Role r ON u.role_id = r.role_id "
+                      + "WHERE u.active_status = 1 AND ( "
+                      + "    r.role_name IN ('FIELDWORK_COORDINATOR', 'DESK_EDITOR') "
+                      + "    OR u.user_id IN (SELECT author_user_id FROM Topic WHERE topic_id = ?) "
+                      + ") AND u.user_id <> ?";
+
+                    java.util.Set<Integer> recipientIds = new java.util.LinkedHashSet<>();
+                    try (PreparedStatement psRel = connection.prepareStatement(relatedManagersSql)) {
+                        psRel.setInt(1, topicId);
+                        psRel.setInt(2, effectiveActorId);
+                        try (ResultSet rsRel = psRel.executeQuery()) {
+                            while (rsRel.next()) {
+                                recipientIds.add(rsRel.getInt("user_id"));
+                            }
+                        }
+                    }
+
+                    if (!recipientIds.isEmpty()) {
+                        String insertNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
+                        String insertNotifAuditSql = "INSERT INTO Audit_Log (actor_user_id, action, entity_type, entity_id, details) "
+                                                   + "VALUES (?, 'SEND_TASK_ACCEPTED', 'NOTIFICATION', ?, ?)";
+
+                        try (PreparedStatement psNotif = connection.prepareStatement(insertNotifSql, Statement.RETURN_GENERATED_KEYS);
+                             PreparedStatement psNotifAudit = connection.prepareStatement(insertNotifAuditSql)) {
+
+                            for (int recId : recipientIds) {
+                                psNotif.setInt(1, recId);
+                                psNotif.setInt(2, topicId);
+                                psNotif.setString(3, notifMsg);
+                                psNotif.executeUpdate();
+
+                                try (ResultSet keys = psNotif.getGeneratedKeys()) {
+                                    if (keys.next()) {
+                                        int notifId = keys.getInt(1);
+                                        psNotifAudit.setInt(1, effectiveActorId);
+                                        psNotifAudit.setInt(2, notifId);
+                                        psNotifAudit.setString(3, "Thông báo tiếp nhận nhiệm vụ #" + taskId + " tới user #" + recId);
+                                        psNotifAudit.executeUpdate();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                connection.commit();
+                return true;
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            } finally {
+                connection.setAutoCommit(true);
+            }
         }
     }
 
@@ -216,11 +338,25 @@ public class FieldworkTaskDAO extends DBContext {
                 String notifMsg = "[GIAO VI\u1EC6C HI\u1EC6N TR\u01AF\u1EDCNG] B\u1EA1n \u0111\u01B0\u1EE3c ph\u00E2n c\u00F4ng nhi\u1EC7m v\u1EE5 m\u1EDBi cho \u0111\u1EC1 t\u00E0i ["
                                 + topicCode + "] " + topicTitle + ": " + description.trim();
                 String notifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
-                try (PreparedStatement psNotif = connection.prepareStatement(notifSql)) {
+                String notifAuditSql = "INSERT INTO Audit_Log (actor_user_id, action, entity_type, entity_id, details) "
+                                     + "VALUES (?, 'SEND_TASK_ASSIGNMENT', 'NOTIFICATION', ?, ?)";
+
+                try (PreparedStatement psNotif = connection.prepareStatement(notifSql, Statement.RETURN_GENERATED_KEYS);
+                     PreparedStatement psNotifAudit = connection.prepareStatement(notifAuditSql)) {
                     psNotif.setInt(1, assigneeUserId);
                     psNotif.setInt(2, topicId);
                     psNotif.setString(3, notifMsg);
                     psNotif.executeUpdate();
+
+                    try (ResultSet notifKeys = psNotif.getGeneratedKeys()) {
+                        if (notifKeys.next()) {
+                            int notifId = notifKeys.getInt(1);
+                            psNotifAudit.setInt(1, actorUserId);
+                            psNotifAudit.setInt(2, notifId);
+                            psNotifAudit.setString(3, "Giao nhiệm vụ #" + taskId + " cho user #" + assigneeUserId);
+                            psNotifAudit.executeUpdate();
+                        }
+                    }
                 }
 
                 connection.commit();

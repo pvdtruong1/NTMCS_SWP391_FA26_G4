@@ -2018,7 +2018,8 @@ public class TopicDAO extends DBContext {
                    + "JOIN Role r ON u.role_id = r.role_id "
                    + "LEFT JOIN Desk d ON u.desk_id = d.desk_id "
                    + "WHERE u.active_status = 1 "
-                   + "ORDER BY u.user_id ASC";
+                   + "AND r.role_name = 'REPORTER' "
+                   + "ORDER BY u.full_name ASC";
 
         try {
             Connection conn = getConnection();

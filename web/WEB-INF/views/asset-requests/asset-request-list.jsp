@@ -62,7 +62,11 @@ String q = URLEncoder.encode(keyword, "UTF-8");
 String s = URLEncoder.encode(status, "UTF-8");
 String f = URLEncoder.encode(from, "UTF-8");
 String t = URLEncoder.encode(to, "UTF-8");
+Integer topicId = (Integer) request.getAttribute("topicId");
 String baseQuery = "keyword=" + q + "&status=" + s + "&fromDate=" + f + "&toDate=" + t;
+if (topicId != null && topicId > 0) {
+    baseQuery += "&topicId=" + topicId;
+}
 
 SimpleDateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 request.setAttribute("wf03Active", "requests");
@@ -165,7 +169,17 @@ request.setAttribute("wf03Active", "requests");
                     <span class="count"><%=total%> yêu cầu</span>
                 </div>
 
+                <% if (topicId != null && topicId > 0) { %>
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>🔍 Đang lọc danh sách yêu cầu tài sản cho Đề tài <b>#<%=topicId%></b></span>
+                        <a href="<%=ctx%>/asset-requests" class="btn sm" style="background:#fff; color:#1e40af; border:1px solid #bfdbfe; text-decoration:none; padding:4px 10px; font-size:12px;">✕ Xóa bộ lọc đề tài</a>
+                    </div>
+                <% } %>
+
                 <form class="filters" method="get" action="<%=ctx%>/asset-requests">
+                    <% if (topicId != null && topicId > 0) { %>
+                        <input type="hidden" name="topicId" value="<%=topicId%>">
+                    <% } %>
                     <input type="text"
                            name="keyword"
                            value="<%=esc(keyword)%>"

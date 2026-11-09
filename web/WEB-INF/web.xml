@@ -161,14 +161,22 @@
         <url-pattern>/fieldwork/nudge</url-pattern>
         <url-pattern>/fieldwork/audit</url-pattern>
         <url-pattern>/fieldwork/sla</url-pattern>
+        <url-pattern>/fieldwork/topic-detail</url-pattern>
     </servlet-mapping>
 
     <servlet>
         <servlet-name>FieldworkDeliverableServlet</servlet-name>
         <servlet-class>controller.fieldwork.FieldworkDeliverableServlet</servlet-class>
+        <multipart-config>
+            <max-file-size>15728640</max-file-size>
+            <max-request-size>20971520</max-request-size>
+            <file-size-threshold>1048576</file-size-threshold>
+        </multipart-config>
     </servlet>
     <servlet-mapping>
         <servlet-name>FieldworkDeliverableServlet</servlet-name>
+        <url-pattern>/api/fieldwork-deliverables</url-pattern>
+        <url-pattern>/api/fieldwork/deliverables</url-pattern>
         <url-pattern>/fieldwork/deliverables/submit</url-pattern>
     </servlet-mapping>
 

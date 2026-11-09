@@ -125,12 +125,24 @@
                     </p>
                 </div>
                 <div class="page-actions" style="display:flex; gap:10px;">
-                    <a href="${base}/fieldwork/kanban" class="btn" style="background:var(--surface); border:1px solid var(--line); color:var(--text); text-decoration:none;">
-                        ← Quay lại Kanban
-                    </a>
-                    <a href="${base}/fieldwork/nudge" class="btn" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; text-decoration:none;">
-                        ⚡ Đôn đốc tiến độ
-                    </a>
+                    <c:choose>
+                        <c:when test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
+                            <button type="button" onclick="history.back()" class="btn" style="background:var(--surface); border:1px solid var(--line); color:var(--text); text-decoration:none; cursor:pointer;">
+                                ← Quay lại
+                            </button>
+                            <a href="${base}/asset-requests?topicId=${topic.topicId}" class="btn primary" style="text-decoration:none;">
+                                📋 Yêu cầu tài sản của đề tài
+                            </a>
+                        </c:when>
+                        <c:otherwise>
+                            <a href="${base}/fieldwork/kanban" class="btn" style="background:var(--surface); border:1px solid var(--line); color:var(--text); text-decoration:none;">
+                                ← Quay lại Kanban
+                            </a>
+                            <a href="${base}/fieldwork/nudge" class="btn" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; text-decoration:none;">
+                                ⚡ Đôn đốc tiến độ
+                            </a>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </div>
 
@@ -348,8 +360,8 @@
                             <div style="display:flex; flex-direction:column; gap:8px;">
                                 <c:forEach var="est" items="${estimates}">
                                     <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 0; border-bottom:1px dashed #e2e8f0;">
-                                        <span style="color:#475569;"><c:out value="${est.description}" /></span>
-                                        <strong style="color:#15803d;"><fmt:formatNumber value="${est.cost}" type="number" /> đ</strong>
+                                        <span style="color:#475569;"><c:out value="${est.costItem}" /></span>
+                                        <strong style="color:#15803d;"><fmt:formatNumber value="${est.amount}" type="number" /> đ</strong>
                                     </div>
                                 </c:forEach>
                             </div>

@@ -43,8 +43,23 @@ public class AssetRequestDAO extends DBContext {
             String fromDate,
             String toDate,
             List<Object> params) {
+        return buildWhere(keyword, status, fromDate, toDate, 0, params);
+    }
+
+    private String buildWhere(
+            String keyword,
+            String status,
+            String fromDate,
+            String toDate,
+            int topicId,
+            List<Object> params) {
 
         StringBuilder sql = new StringBuilder(" WHERE 1=1 ");
+
+        if (topicId > 0) {
+            sql.append(" AND ar.topic_id = ? ");
+            params.add(topicId);
+        }
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             sql.append(
@@ -119,9 +134,19 @@ public class AssetRequestDAO extends DBContext {
             String fromDate,
             String toDate,
             int page) throws SQLException {
+        return findAll(keyword, status, fromDate, toDate, 0, page);
+    }
+
+    public List<AssetRequest> findAll(
+            String keyword,
+            String status,
+            String fromDate,
+            String toDate,
+            int topicId,
+            int page) throws SQLException {
 
         List<Object> params = new ArrayList<>();
-        String where = buildWhere(keyword, status, fromDate, toDate, params);
+        String where = buildWhere(keyword, status, fromDate, toDate, topicId, params);
 
         String sql = BASE_SELECT + where
                 + " ORDER BY ar.request_id DESC "
@@ -151,9 +176,18 @@ public class AssetRequestDAO extends DBContext {
             String status,
             String fromDate,
             String toDate) throws SQLException {
+        return countAll(keyword, status, fromDate, toDate, 0);
+    }
+
+    public int countAll(
+            String keyword,
+            String status,
+            String fromDate,
+            String toDate,
+            int topicId) throws SQLException {
 
         List<Object> params = new ArrayList<>();
-        String where = buildWhere(keyword, status, fromDate, toDate, params);
+        String where = buildWhere(keyword, status, fromDate, toDate, topicId, params);
 
         String sql = "SELECT COUNT(*) FROM Asset_Request ar "
                    + "JOIN Topic t ON t.topic_id = ar.topic_id "
@@ -177,12 +211,22 @@ public class AssetRequestDAO extends DBContext {
     }
 
     public int countByStatus(String status) throws SQLException {
+        return countByStatus(status, 0);
+    }
+
+    public int countByStatus(String status, int topicId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM Asset_Request WHERE status = ?";
+        if (topicId > 0) {
+            sql += " AND topic_id = ?";
+        }
 
         try (Connection con = getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setString(1, status.trim().toUpperCase());
+            if (topicId > 0) {
+                ps.setInt(2, topicId);
+            }
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

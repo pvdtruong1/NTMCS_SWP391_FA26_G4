@@ -10,6 +10,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -75,7 +77,7 @@ public class TopicRequestServlet extends HttpServlet {
             boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
             List<Asset> availableAssets = assetDAO.getAvailableAssets();
-            List<User> allUsers = userDAO.getAll();
+            List<User> allUsers = userDAO.getActiveReporters();
             List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
             List<AssetRequest> assetRequests = requestDAO.getAssetRequestsByTopic(topicId);
             List<RequestDeadlineExtension> deadlineRequests = requestDAO.getDeadlineRequestsByTopic(topicId);
@@ -142,8 +144,28 @@ public class TopicRequestServlet extends HttpServlet {
 
         try {
             if ("ASSET_REQUEST".equalsIgnoreCase(requestType)) {
-                // 1. Phóng viên xin mượn tài sản
-                int assetId = Integer.parseInt(request.getParameter("assetId"));
+                // 1. Phóng viên xin mượn tài sản (hỗ trợ nhiều thiết bị cùng lúc)
+                String[] assetIdStrs = request.getParameterValues("assetId");
+                List<Integer> selectedAssetIds = new ArrayList<>();
+                if (assetIdStrs != null) {
+                    for (String str : assetIdStrs) {
+                        if (str != null && !str.trim().isEmpty()) {
+                            try {
+                                int aId = Integer.parseInt(str.trim());
+                                if (aId > 0 && !selectedAssetIds.contains(aId)) {
+                                    selectedAssetIds.add(aId);
+                                }
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    }
+                }
+
+                if (selectedAssetIds.isEmpty()) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=noAsset&type=asset");
+                    return;
+                }
+
                 String startTimeStr = request.getParameter("startTime");
                 String endTimeStr = request.getParameter("endTime");
 
@@ -166,22 +188,36 @@ public class TopicRequestServlet extends HttpServlet {
                     return;
                 }
 
-                // 1.3 Kiểm tra xung đột lịch với các yêu cầu đã duyệt hoặc đang chờ duyệt của tài sản này
-                if (requestDAO.hasAssetScheduleConflict(assetId, startTime, endTime)) {
-                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                            + "&status=conflict&type=asset");
-                    return;
+                // 1.3 Kiểm tra xung đột lịch cho từng thiết bị
+                for (int aId : selectedAssetIds) {
+                    if (requestDAO.hasAssetScheduleConflict(aId, startTime, endTime)) {
+                        String conflictName = requestDAO.getAssetName(aId);
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=conflict&type=asset&conflictName=" + URLEncoder.encode(conflictName, StandardCharsets.UTF_8.name()));
+                        return;
+                    }
                 }
 
-                AssetRequest req = new AssetRequest();
-                req.setTopicId(topicId);
-                req.setAssetId(assetId);
-                req.setRequesterUserId(loggedUser.getUserId());
-                req.setStartTime(startTime);
-                req.setEndTime(endTime);
+                List<AssetRequest> requestList = new ArrayList<>();
+                for (int aId : selectedAssetIds) {
+                    AssetRequest req = new AssetRequest();
+                    req.setTopicId(topicId);
+                    req.setAssetId(aId);
+                    req.setRequesterUserId(loggedUser.getUserId());
+                    req.setStartTime(startTime);
+                    req.setEndTime(endTime);
+                    requestList.add(req);
+                }
 
-                success = requestDAO.insertAssetRequest(req);
+                int insertedCount = requestDAO.insertAssetRequests(requestList);
+                success = (insertedCount > 0);
                 type = "asset";
+
+                response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                        + "&status=" + (success ? "success" : "failed")
+                        + "&count=" + insertedCount
+                        + "&type=asset");
+                return;
 
             } else if ("DEADLINE_REQUEST".equalsIgnoreCase(requestType)) {
                 // 2. Phóng viên xin gia hạn deadline
@@ -202,10 +238,16 @@ public class TopicRequestServlet extends HttpServlet {
                 type = "deadline";
 
             } else if ("MEMBER_REQUEST".equalsIgnoreCase(requestType)) {
-                // 3. Phóng viên xin thay đổi nhân sự
+                // 3. Phﾃｳng viﾃｪn xin thay ﾄ黛ｻ品 nhﾃ｢n s盻ｱ
                 int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
+
+                if ("ADD".equalsIgnoreCase(actionType) && !userDAO.isReporter(targetUserId)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidRole&type=member");
+                    return;
+                }
 
                 success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
                 type = "member";

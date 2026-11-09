@@ -209,10 +209,10 @@
                                                 <tr class="member-row">
                                                     <td>
                                                         <select name="memberUserId" class="user-select-box" required>
-                                                            <option value="">-- Chọn nhân sự --</option>
+                                                            <option value="">-- Chọn phóng viên tác nghiệp --</option>
                                                             <c:forEach var="u" items="${activeUsers}">
                                                                 <option value="${u.userId}" ${m.userId == u.userId ? 'selected' : ''}>
-                                                                    ${u.fullName} (${u.roleName})
+                                                                    ${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})
                                                                 </option>
                                                             </c:forEach>
                                                         </select>
@@ -236,9 +236,9 @@
                                             <tr class="member-row">
                                                 <td>
                                                     <select name="memberUserId" class="user-select-box">
-                                                        <option value="">-- Chọn nhân sự --</option>
+                                                        <option value="">-- Chọn phóng viên tác nghiệp --</option>
                                                         <c:forEach var="u" items="${activeUsers}">
-                                                            <option value="${u.userId}">${u.fullName} (${u.roleName})</option>
+                                                            <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
                                                         </c:forEach>
                                                     </select>
                                                     <div class="schedule-feedback-box"></div>
@@ -330,9 +330,9 @@
 
 <!-- Template options for JavaScript dynamic rows -->
 <div id="user-options-template" style="display:none;">
-    <option value="">-- Chọn nhân sự --</option>
+    <option value="">-- Chọn phóng viên tác nghiệp --</option>
     <c:forEach var="u" items="${activeUsers}">
-        <option value="${u.userId}">${u.fullName} (${u.roleName})</option>
+        <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
     </c:forEach>
 </div>
 

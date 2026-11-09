@@ -132,7 +132,7 @@
                         detailUrl = '${base}/editorial/criteria-scoring?topicId=' + n.topicId;
                     </c:when>
                     <c:when test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
-                        detailUrl = '${base}/asset-requests?topicId=' + n.topicId;
+                        detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
                     </c:when>
                     <c:otherwise>
                         detailUrl = '${base}/reporter/detail?id=' + n.topicId;

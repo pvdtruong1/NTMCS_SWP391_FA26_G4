@@ -126,6 +126,7 @@ public class AssetRequestServlet extends HttpServlet {
         String status = trim(req.getParameter("status"));
         String fromDate = trim(req.getParameter("fromDate"));
         String toDate = trim(req.getParameter("toDate"));
+        int topicId = positiveInt(req.getParameter("topicId"), 0);
 
         if (status.isEmpty()) {
             status = "ALL";
@@ -149,7 +150,7 @@ public class AssetRequestServlet extends HttpServlet {
 
         int page = positiveInt(req.getParameter("page"), 1);
 
-        int total = dao.countAll(keyword, status, fromDate, toDate);
+        int total = dao.countAll(keyword, status, fromDate, toDate, topicId);
 
         int totalPages = Math.max(1, (int) Math.ceil(total / (double) PAGE_SIZE));
 
@@ -157,24 +158,25 @@ public class AssetRequestServlet extends HttpServlet {
             page = totalPages;
         }
 
-        List<AssetRequest> rows = dao.findAll(keyword, status, fromDate, toDate, page);
+        List<AssetRequest> rows = dao.findAll(keyword, status, fromDate, toDate, topicId, page);
 
         req.setAttribute("requests", rows);
         req.setAttribute("keyword", keyword);
         req.setAttribute("status", status);
         req.setAttribute("fromDate", fromDate);
         req.setAttribute("toDate", toDate);
+        req.setAttribute("topicId", topicId > 0 ? topicId : null);
 
         req.setAttribute("totalRecords", total);
         req.setAttribute("currentPage", page);
         req.setAttribute("totalPages", totalPages);
         req.setAttribute("pageSize", PAGE_SIZE);
 
-        req.setAttribute("pendingCount", dao.countByStatus("PENDING"));
-        req.setAttribute("approvedCount", dao.countByStatus("APPROVED"));
-        req.setAttribute("rejectedCount", dao.countByStatus("REJECTED"));
-        req.setAttribute("checkedOutCount", dao.countByStatus("CHECKED_OUT"));
-        req.setAttribute("returnedCount", dao.countByStatus("RETURNED"));
+        req.setAttribute("pendingCount", dao.countByStatus("PENDING", topicId));
+        req.setAttribute("approvedCount", dao.countByStatus("APPROVED", topicId));
+        req.setAttribute("rejectedCount", dao.countByStatus("REJECTED", topicId));
+        req.setAttribute("checkedOutCount", dao.countByStatus("CHECKED_OUT", topicId));
+        req.setAttribute("returnedCount", dao.countByStatus("RETURNED", topicId));
 
         forward(req, resp, "asset-request-list.jsp");
     }

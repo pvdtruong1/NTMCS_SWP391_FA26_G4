@@ -1,6 +1,7 @@
 package controller;
 
 import dal.CategoryDAO;
+import dal.UserDAO;
 import dal.NotificationDAO;
 import dal.TopicDAO;
 import jakarta.servlet.ServletException;
@@ -635,6 +636,7 @@ public class ReporterServlet extends HttpServlet {
         String[] roles = request.getParameterValues("memberRole");
 
         Set<Integer> added = new HashSet<>();
+        UserDAO userDAO = new UserDAO();
         if (userIds != null && roles != null) {
             for (int i = 0; i < userIds.length && i < roles.length; i++) {
                 String uidStr = trim(userIds[i]);
@@ -642,7 +644,7 @@ public class ReporterServlet extends HttpServlet {
                 if (!uidStr.isEmpty()) {
                     try {
                         int uid = Integer.parseInt(uidStr);
-                        if (uid > 0 && !added.contains(uid)) {
+                        if (uid > 0 && !added.contains(uid) && userDAO.isReporter(uid)) {
                             added.add(uid);
                             TopicMember mem = new TopicMember();
                             mem.setUserId(uid);

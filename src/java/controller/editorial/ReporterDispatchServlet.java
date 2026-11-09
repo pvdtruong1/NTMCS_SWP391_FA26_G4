@@ -67,7 +67,7 @@ public class ReporterDispatchServlet extends HttpServlet {
             }
 
             prepareViewData(request, topic, currentDeskId, topicDAO);
-            request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+            request.getRequestDispatcher("/WEB-INF/views/editorial/reporter-dispatch.jsp").forward(request, response);
         }
     }
 
@@ -116,7 +116,7 @@ public class ReporterDispatchServlet extends HttpServlet {
                 request.setAttribute("error", "Vui lòng chọn một phóng viên phụ trách chính (Trưởng nhóm tác nghiệp) từ danh sách.");
                 request.setAttribute("commissionNotes", commissionNotes);
                 prepareViewData(request, topic, currentDeskId, topicDAO);
-                request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+                request.getRequestDispatcher("/WEB-INF/views/editorial/reporter-dispatch.jsp").forward(request, response);
                 return;
             }
 
@@ -140,7 +140,7 @@ public class ReporterDispatchServlet extends HttpServlet {
                 request.setAttribute("error", "Không thể phát lệnh đặt hàng: " + ex.getMessage());
                 request.setAttribute("commissionNotes", commissionNotes);
                 prepareViewData(request, topic, currentDeskId, topicDAO);
-                request.getRequestDispatcher("/editorial/reporter-dispatch.jsp").forward(request, response);
+                request.getRequestDispatcher("/WEB-INF/views/editorial/reporter-dispatch.jsp").forward(request, response);
             }
         }
     }

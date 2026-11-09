@@ -117,7 +117,7 @@ public class IdeaArchiveServlet extends HttpServlet {
             request.setAttribute("feedbackError", "Đã xảy ra sự cố máy chủ khi xử lý phục hồi đề tài.");
         }
 
-        request.getRequestDispatcher("/editorial/idea-archive.jsp").forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/editorial/idea-archive.jsp").forward(request, response);
     }
 
     @Override

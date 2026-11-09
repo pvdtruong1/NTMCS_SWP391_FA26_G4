@@ -112,7 +112,7 @@ public class EditorialDashboardServlet extends HttpServlet {
         request.setAttribute("token", token);
         request.setAttribute("error", error);
 
-        request.getRequestDispatcher("/editorial/editorial-dashboard.jsp").forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/editorial/editorial-dashboard.jsp").forward(request, response);
     }
 
     @Override

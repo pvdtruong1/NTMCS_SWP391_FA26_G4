@@ -77,7 +77,7 @@ public class CriteriaScoringServlet extends HttpServlet {
         boolean isTbtDirectOverride = (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7) && "SUBMITTED".equalsIgnoreCase(topicDetail.getStatus());
         request.setAttribute("isTbtDirectOverride", isTbtDirectOverride);
 
-        request.getRequestDispatcher("/editorial/criteria-scoring.jsp").forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/editorial/criteria-scoring.jsp").forward(request, response);
     }
 
     @Override

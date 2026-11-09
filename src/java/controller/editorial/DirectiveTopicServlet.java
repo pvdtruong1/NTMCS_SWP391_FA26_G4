@@ -103,7 +103,7 @@ public class DirectiveTopicServlet extends HttpServlet {
             request.setAttribute("minSameDayHours", MIN_SAME_DAY_DEADLINE_HOURS);
             request.setAttribute("topic", topic);
 
-            request.getRequestDispatcher("/editorial/directive-creation.jsp").forward(request, response);
+            request.getRequestDispatcher("/WEB-INF/views/editorial/directive-creation.jsp").forward(request, response);
         } catch (Exception ex) {
             LOGGER.log(Level.SEVERE, "Error loading Directive Topic Creation Form (SCR-2.4)", ex);
             response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=server_error");
@@ -221,7 +221,7 @@ public class DirectiveTopicServlet extends HttpServlet {
                 request.setAttribute("topic", mockTopic);
                 request.setAttribute("errorMessage", validationError);
 
-                request.getRequestDispatcher("/editorial/directive-creation.jsp").forward(request, response);
+                request.getRequestDispatcher("/WEB-INF/views/editorial/directive-creation.jsp").forward(request, response);
                 return;
             } catch (Exception ex) {
                 LOGGER.log(Level.SEVERE, "Error recovering from validation error in DirectiveTopicServlet", ex);

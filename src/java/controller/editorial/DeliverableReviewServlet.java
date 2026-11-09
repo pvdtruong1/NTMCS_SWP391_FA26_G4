@@ -93,7 +93,7 @@ public class DeliverableReviewServlet extends HttpServlet {
         request.setAttribute("error", request.getParameter("error"));
         request.setAttribute("msg", request.getParameter("msg"));
 
-        request.getRequestDispatcher("/editorial/deliverable-review.jsp").forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/editorial/deliverable-review.jsp").forward(request, response);
     }
 
     @Override

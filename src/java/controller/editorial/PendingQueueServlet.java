@@ -120,7 +120,7 @@ public class PendingQueueServlet extends HttpServlet {
         request.setAttribute("escalatedCount", totalEscalatedCount);
         request.setAttribute("currentDesk", currentDesk);
 
-        request.getRequestDispatcher("/editorial/pending-queue.jsp").forward(request, response);
+        request.getRequestDispatcher("/WEB-INF/views/editorial/pending-queue.jsp").forward(request, response);
     }
 
     @Override

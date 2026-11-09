@@ -41,6 +41,23 @@
             color: #fff;
             border-color: var(--primary);
         }
+        .btn-export-csv {
+            background: #0284c7;
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s ease;
+        }
+        .btn-export-csv:hover {
+            background: #0369a1;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -111,12 +128,17 @@
                 </div>
             </div>
 
-            <!-- Filters -->
+            <!-- Filters & CSV Export -->
             <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
-                <div style="display:flex; gap:8px;">
-                    <button type="button" class="filter-btn active" onclick="setAuditFilter('ALL', this)">Tất cả (${totalCount})</button>
-                    <button type="button" class="filter-btn" onclick="setAuditFilter('READ', this)">Đã đọc (${readCount})</button>
-                    <button type="button" class="filter-btn" onclick="setAuditFilter('UNREAD', this)">Chưa đọc (${unreadCount})</button>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="filter-btn active" onclick="setAuditFilter('ALL', this)">Tất cả (${totalCount})</button>
+                        <button type="button" class="filter-btn" onclick="setAuditFilter('READ', this)">Đã đọc (${readCount})</button>
+                        <button type="button" class="filter-btn" onclick="setAuditFilter('UNREAD', this)">Chưa đọc (${unreadCount})</button>
+                    </div>
+                    <a href="${base}/fieldwork/audit?export=csv" class="btn-export-csv" title="Xuất toàn bộ nhật ký kiểm toán thông báo ra file CSV chuẩn UTF-8">
+                        📥 Xuất File CSV
+                    </a>
                 </div>
                 <div style="flex:1; max-width:320px;">
                     <input type="text" id="auditSearchInput" placeholder="Tìm theo người gửi, người nhận, đề tài..." onkeyup="searchAuditLogs()" style="width:100%; padding:8px 12px; border:1px solid var(--line); border-radius:6px; font-size:13px; box-sizing:border-box;"/>
@@ -136,6 +158,7 @@
                             <th>Nội Dung Thông Báo</th>
                             <th>Thời Gian Gửi</th>
                             <th>Trạng Thái</th>
+                            <th>Thời Gian Đọc</th>
                             <th style="text-align:right;">Thao Tác</th>
                         </tr>
                     </thead>
@@ -182,12 +205,22 @@
                                     <c:choose>
                                         <c:when test="${item[9] == true}">
                                             <span class="badge-read">✓ Đã đọc</span>
-                                            <c:if test="${not empty item[13]}">
-                                                <div style="font-size:10px; color:#15803d; margin-top:2px;">${item[13]}</div>
-                                            </c:if>
                                         </c:when>
                                         <c:otherwise>
                                             <span class="badge-unread">⏳ Chưa đọc</span>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td style="font-size:12px; white-space:nowrap;">
+                                    <c:choose>
+                                        <c:when test="${item[9] == true && not empty item[13]}">
+                                            <span style="color:#15803d; font-weight:600;">${item[13]}</span>
+                                        </c:when>
+                                        <c:when test="${item[9] == true}">
+                                            <span style="color:#64748b; font-size:11px; font-style:italic;">(Trước khi gắn log)</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span style="color:var(--muted); font-size:12px;">—</span>
                                         </c:otherwise>
                                     </c:choose>
                                 </td>
@@ -202,7 +235,7 @@
                         </c:forEach>
                         <c:if test="${empty auditLogs}">
                             <tr>
-                                <td colspan="9" style="text-align:center; padding:30px; color:var(--muted);">
+                                <td colspan="10" style="text-align:center; padding:30px; color:var(--muted);">
                                     Không có dữ liệu phát thanh thông báo hiện trường.
                                 </td>
                             </tr>

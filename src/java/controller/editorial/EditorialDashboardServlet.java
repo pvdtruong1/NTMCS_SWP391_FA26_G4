@@ -52,7 +52,7 @@ public class EditorialDashboardServlet extends HttpServlet {
             return;
         }
 
-        boolean isExecutive = (currentUser.getRoleId() == 3 || "EXECUTIVE_EDITOR".equalsIgnoreCase(currentUser.getRoleName()));
+        boolean isExecutive = (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7 || "EXECUTIVE_EDITOR".equalsIgnoreCase(currentUser.getRoleName()) || "SYSTEM_ADMINISTRATOR".equalsIgnoreCase(currentUser.getRoleName()));
         boolean isDeskEditor = (currentUser.getRoleId() == 2 || "DESK_EDITOR".equalsIgnoreCase(currentUser.getRoleName()));
 
         if (!isExecutive && !isDeskEditor) {

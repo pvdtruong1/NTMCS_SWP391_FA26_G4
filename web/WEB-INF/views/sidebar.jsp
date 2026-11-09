@@ -10,6 +10,7 @@
         </div>
     </div>
     <nav>
+
         <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_PITCH')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ PHÓNG VIÊN (WF-01)</div>
@@ -52,11 +53,23 @@
         <c:if test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or sessionScope.loggedUser.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.user.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.loggedUser.roleId == 7 or sessionScope.user.roleId == 7 or sessionScope.loggedUser.roleName == 'SYSTEM_ADMINISTRATOR' or sessionScope.user.roleName == 'SYSTEM_ADMINISTRATOR' or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
             <div class="nav-group">
                 <div class="nav-label">HẬU CẦN &amp; THIẾT BỊ (WF-03)</div>
-                <a href="${base}/assets" class="nav-item ${param.active == 'assets' ? 'active' : ''}">
+                <a href="${base}/assets" class="nav-item ${(param.active == 'assets' and empty param.action and empty param.status) ? 'active' : ''}">
                     <i>📦</i> Danh sách trang thiết bị
                 </a>
-                <a href="${base}/asset-requests" class="nav-item ${param.active == 'asset-requests' ? 'active' : ''}">
-                    <i>📋</i> Quản lý mượn &amp; Điều phối
+                <a href="${base}/assets?action=add" class="nav-item ${param.active == 'asset-add' or param.action == 'add' ? 'active' : ''}">
+                    <i>➕</i> Thêm tài sản mới
+                </a>
+                <a href="${base}/asset-requests" class="nav-item ${(param.active == 'asset-requests' and empty param.action and empty param.status) ? 'active' : ''}">
+                    <i>📋</i> Tất cả yêu cầu cấp phát
+                </a>
+                <a href="${base}/asset-requests?status=PENDING" class="nav-item ${param.status == 'PENDING' ? 'active' : ''}">
+                    <i>⏳</i> Yêu cầu chờ duyệt
+                </a>
+                <a href="${base}/asset-requests?status=APPROVED" class="nav-item ${param.status == 'APPROVED' ? 'active' : ''}">
+                    <i>🚚</i> Chờ xuất kho bàn giao
+                </a>
+                <a href="${base}/asset-requests?status=CHECKED_OUT" class="nav-item ${param.status == 'CHECKED_OUT' ? 'active' : ''}">
+                    <i>🔄</i> Đang bàn giao / Thu hồi
                 </a>
             </div>
         </c:if>

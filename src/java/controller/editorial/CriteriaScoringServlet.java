@@ -71,10 +71,10 @@ public class CriteriaScoringServlet extends HttpServlet {
         request.setAttribute("estimates", topicDetail.getEstimates());
         request.setAttribute("totalEstimate", topicDetail.getTotalEstimateAmount());
 
-        boolean isExecReviewer = (currentUser.getRoleId() == 3) && "PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(topicDetail.getStatus());
+        boolean isExecReviewer = (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7) && "PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(topicDetail.getStatus());
         request.setAttribute("isExecReviewer", isExecReviewer);
 
-        boolean isTbtDirectOverride = (currentUser.getRoleId() == 3) && "SUBMITTED".equalsIgnoreCase(topicDetail.getStatus());
+        boolean isTbtDirectOverride = (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7) && "SUBMITTED".equalsIgnoreCase(topicDetail.getStatus());
         request.setAttribute("isTbtDirectOverride", isTbtDirectOverride);
 
         request.getRequestDispatcher("/editorial/criteria-scoring.jsp").forward(request, response);
@@ -123,7 +123,7 @@ public class CriteriaScoringServlet extends HttpServlet {
             // =========================================================================
             if ("PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(existingTopic.getStatus())) {
                 // Security Guard: Only Executive Editor (role_id = 3) can decide on escalated pitches
-                if (currentUser.getRoleId() != 3) {
+                if (currentUser.getRoleId() != 3 && currentUser.getRoleId() != 7) {
                     LOGGER.log(Level.WARNING, "Blocked non-TBT user {0} (role {1}) from deciding on escalated topic {2}",
                             new Object[]{currentUser.getUserId(), currentUser.getRoleId(), topicId});
                     response.sendRedirect(request.getContextPath() + "/editorial/pending-queue?error=forbidden_not_tbt");
@@ -162,7 +162,7 @@ public class CriteriaScoringServlet extends HttpServlet {
             }
 
             // Defense-in-Depth Guard: TBT cannot escalate to themselves
-            if (currentUser.getRoleId() == 3 && "ESCALATED".equals(decision)) {
+            if ((currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7) && "ESCALATED".equals(decision)) {
                 LOGGER.log(Level.WARNING, "Blocked invalid self-escalation by TBT {0} on topic {1}",
                         new Object[]{currentUser.getUserId(), topicId});
                 response.sendRedirect(request.getContextPath() + "/editorial/criteria-scoring?topicId=" + topicId + "&error=tbt_cannot_escalate");
@@ -187,7 +187,7 @@ public class CriteriaScoringServlet extends HttpServlet {
             }
 
             // Executive Escalation Guard Clause for Desk Editors: if legal_risk >= 8.0, decision MUST be ESCALATED
-            if (currentUser.getRoleId() != 3 && legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
+            if (currentUser.getRoleId() != 3 && currentUser.getRoleId() != 7 && legalRiskScore >= 8.0 && decision.equals("APPROVED")) {
                 decision = "ESCALATED";
             }
 

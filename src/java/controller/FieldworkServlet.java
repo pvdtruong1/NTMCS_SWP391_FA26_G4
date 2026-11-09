@@ -124,11 +124,76 @@ public class FieldworkServlet extends HttpServlet {
             throws Exception {
         try {
             List<Object[]> auditLogs = auditDAO.getFieldworkNotificationAudit(user.getUserId());
+
+            String export = request.getParameter("export");
+            if ("csv".equalsIgnoreCase(export)) {
+                exportAuditCsv(response, auditLogs, user);
+                return;
+            }
+
             request.setAttribute("auditLogs", auditLogs);
         } catch (IllegalArgumentException e) {
             request.setAttribute("permissionError", e.getMessage());
         }
         request.getRequestDispatcher("/WEB-INF/views/fieldwork/audit.jsp").forward(request, response);
+    }
+
+    private void exportAuditCsv(HttpServletResponse response, List<Object[]> auditLogs, User user) throws IOException {
+        String filename = "NTMCS_Notification_Audit_" + java.time.LocalDate.now() + ".csv";
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+        java.io.OutputStream out = response.getOutputStream();
+        // UTF-8 BOM so Excel on Windows opens Vietnamese characters without mojibake
+        out.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+
+        try (java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.OutputStreamWriter(out, java.nio.charset.StandardCharsets.UTF_8))) {
+            writer.println("Mã thông báo,Loại nguồn,Mức độ,Người gửi,Người nhận,Email người nhận,Phòng ban,Mã đề tài,Tên đề tài,Nội dung thông báo,Thời gian gửi,Trạng thái,Thời gian đọc");
+
+            for (Object[] r : auditLogs) {
+                String notifId = r[0] != null ? r[0].toString() : "";
+                String recipientName = r[2] != null ? r[2].toString() : "";
+                String recipientEmail = r[3] != null ? r[3].toString() : "";
+                String recipientDesk = r[4] != null ? r[4].toString() : "";
+                String topicCode = r[6] != null ? r[6].toString() : "";
+                String topicTitle = r[7] != null ? r[7].toString() : "";
+                String message = r[8] != null ? r[8].toString() : "";
+                boolean isRead = Boolean.TRUE.equals(r[9]);
+                String senderName = r[11] != null ? r[11].toString() : "Hệ thống";
+                String sentAt = r[12] != null ? r[12].toString() : "";
+                String readAt = r[13] != null ? r[13].toString() : "";
+                String sourceType = r[14] != null ? r[14].toString() : "";
+                String urgency = r[15] != null ? r[15].toString() : "";
+
+                writer.println(String.join(",",
+                    csvEscape(notifId),
+                    csvEscape(sourceType),
+                    csvEscape(urgency),
+                    csvEscape(senderName),
+                    csvEscape(recipientName),
+                    csvEscape(recipientEmail),
+                    csvEscape(recipientDesk),
+                    csvEscape(topicCode),
+                    csvEscape(topicTitle),
+                    csvEscape(message),
+                    csvEscape(sentAt),
+                    csvEscape(isRead ? "Đã đọc" : "Chưa đọc"),
+                    csvEscape(readAt)
+                ));
+            }
+            writer.flush();
+        }
+
+        try {
+            new dal.AuditLogDAO().log(user.getUserId(), "EXPORT_NOTIFICATION_AUDIT", "NOTIFICATION", null,
+                "Xuất " + auditLogs.size() + " dòng nhật ký thông báo ra file CSV");
+        } catch (Exception ignored) {}
+    }
+
+    private String csvEscape(String val) {
+        if (val == null) return "\"\"";
+        return "\"" + val.replace("\"", "\"\"") + "\"";
     }
 
     private void renderSLA(HttpServletRequest request, HttpServletResponse response, User user)

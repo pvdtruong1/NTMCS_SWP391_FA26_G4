@@ -59,7 +59,9 @@ request.setAttribute("wf03Active", "requests");
 
 <body>
 <div class="app">
-    <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
+    <jsp:include page="/WEB-INF/views/sidebar.jsp">
+        <jsp:param name="active" value="asset-requests"/>
+    </jsp:include>
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">

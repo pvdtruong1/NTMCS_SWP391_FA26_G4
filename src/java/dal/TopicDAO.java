@@ -546,7 +546,7 @@ public class TopicDAO extends DBContext {
             }
 
             // Defense-in-Depth Guard: TBT cannot escalate to themselves
-            if (evaluatorRoleId == 3 && "ESCALATED".equalsIgnoreCase(decision)) {
+            if ((evaluatorRoleId == 3 || evaluatorRoleId == 7) && "ESCALATED".equalsIgnoreCase(decision)) {
                 conn.rollback();
                 throw new IllegalStateException("Tổng Biên Tập là cấp thẩm quyền cao nhất, không thể chuyển đề tài lên chính mình.");
             }
@@ -558,7 +558,7 @@ public class TopicDAO extends DBContext {
             }
 
             // 1. Insert into Topic_Evaluation (stage is EXECUTIVE_APPROVAL if TBT overrides, otherwise DESK_REVIEW)
-            String evaluationStage = (evaluatorRoleId == 3) ? "EXECUTIVE_APPROVAL" : "DESK_REVIEW";
+            String evaluationStage = (evaluatorRoleId == 3 || evaluatorRoleId == 7) ? "EXECUTIVE_APPROVAL" : "DESK_REVIEW";
             int evalId = 0;
             String insertEvalSql = "INSERT INTO Topic_Evaluation (topic_id, evaluator_user_id, evaluation_stage, decision, comments) " +
                                   "VALUES (?, ?, ?, ?, ?);";

@@ -90,7 +90,9 @@ String baseQuery = "keyword=" + qEnc + "&category=" + catEnc + "&status=" + stat
 <body>
 
 <div class="app">
-    <jsp:include page="/WEB-INF/views/common/sidebar.jsp"/>
+    <jsp:include page="/WEB-INF/views/sidebar.jsp">
+        <jsp:param name="active" value="assets"/>
+    </jsp:include>
 
     <section class="main">
         <jsp:include page="/WEB-INF/views/topbar.jsp">

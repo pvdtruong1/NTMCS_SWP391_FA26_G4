@@ -120,3 +120,87 @@
   text-decoration: underline;
   color: var(--primary2, #2746b5);
 }
+
+
+/* ==========================================================================
+   Modern Table Layout & Executive Dashboard Data Visualizations
+   ========================================================================== */
+.table-compact,
+.grid2 table,
+.grid3 table,
+.card-table {
+  min-width: 100% !important;
+  width: 100% !important;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.table-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll table thead th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  white-space: nowrap;
+}
+
+.table-scroll table tbody td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  vertical-align: middle;
+  font-size: 13.5px;
+  transition: background-color 0.15s ease;
+}
+
+.table-scroll table tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+.table-scroll table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Enhanced Status Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.b-draft { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+.b-submitted { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.b-revision_requested { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+.b-pending_executive_approval { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
+.b-approved { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.b-in_progress { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.b-delivered { background: #f0fdfa; color: #0f766e; border-color: #99f6e4; }
+.b-accepted_ready_for_cms { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.b-rejected { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.b-aborted { background: #fff1f2; color: #9f1239; border-color: #fecdd3; }

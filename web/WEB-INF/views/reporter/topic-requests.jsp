@@ -167,7 +167,7 @@
                         <strong>Thành công!</strong>
                         <c:choose>
                             <c:when test="${param.type eq 'asset'}">
-                                Yêu cầu mượn tài sản đã được tạo thành công và đang chuyển cho Quản lý tài sản thẩm duyệt.
+                                Yêu cầu mượn <strong>${not empty param.count ? param.count : 'các'}</strong> tài sản tác nghiệp đã được gửi thành công. Quản lý tài sản sẽ xem xét và thẩm duyệt từng thiết bị cho bạn.
                             </c:when>
                             <c:when test="${param.type eq 'deadline'}">
                                 Đơn xin gia hạn Deadline đã được chuyển tới Thư ký tòa soạn (Desk Editor) xem xét.
@@ -187,7 +187,24 @@
                 <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 20px;">⚠️</span>
                     <div>
-                        <strong>Trùng lịch sử dụng thiết bị!</strong> Tài sản này đã có phóng viên khác đặt lịch mượn (đang chờ duyệt hoặc đã duyệt) trong khoảng thời gian bạn vừa chọn. Vui lòng chọn khung giờ khác hoặc đổi sang thiết bị tương đương.
+                        <strong>Trùng lịch sử dụng thiết bị!</strong>
+                        <c:choose>
+                            <c:when test="${not empty param.conflictName}">
+                                Thiết bị <strong><c:out value="${param.conflictName}"/></strong> đã có người đăng ký mượn trong khung giờ bạn chọn. Vui lòng kiểm tra lại khung giờ hoặc đổi sang thiết bị tương đương.
+                            </c:when>
+                            <c:otherwise>
+                                Một hoặc nhiều tài sản bạn chọn đã có người khác đăng ký trong khoảng thời gian này. Vui lòng kiểm tra lại.
+                            </c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'noAsset'}">
+                <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">✕</span>
+                    <div>
+                        <strong>Chưa chọn thiết bị!</strong> Vui lòng chọn ít nhất một tài sản hoặc phương tiện cần mượn từ danh sách.
                     </div>
                 </div>
             </c:if>
@@ -343,24 +360,11 @@
                             </c:when>
 
                             <c:otherwise>
-                                <form action="${base}/reporter/requests" method="POST">
+                                <form action="${base}/reporter/requests" method="POST" id="asset-request-form">
                                     <input type="hidden" name="requestType" value="ASSET_REQUEST">
                                     <input type="hidden" name="topicId" value="${topic.topicId}">
 
-                                    <div class="form-row">
-                                        <label for="assetId">Chọn tài sản / thiết bị cần mượn <span style="color: var(--danger);">*</span></label>
-                                        <select id="assetId" name="assetId" required style="width: 100%;">
-                                            <option value="">-- Chọn tài sản khả dụng từ kho --</option>
-                                            <c:forEach var="a" items="${availableAssets}">
-                                                <option value="${a.assetId}">
-                                                    [${a.assetCategory}] ${a.assetName} (${a.assetCode}) - Serial: ${a.serialNumber != null ? a.serialNumber : 'N/A'}
-                                                </option>
-                                            </c:forEach>
-                                        </select>
-                                        <span class="form-hint">Chỉ các tài sản đang ở trạng thái khả dụng (AVAILABLE) mới hiển thị trong danh mục.</span>
-                                    </div>
-
-                                    <div class="form-grid" style="margin-bottom: 18px;">
+                                    <div class="form-grid" style="margin-bottom: 20px;">
                                         <div class="form-row" style="margin-bottom: 0;">
                                             <label for="startTime">Thời gian bắt đầu mượn <span style="color: var(--danger);">*</span></label>
                                             <input type="datetime-local" id="startTime" name="startTime" required>
@@ -371,9 +375,42 @@
                                         </div>
                                     </div>
 
+                                    <div class="form-row">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                            <label style="margin: 0; font-weight: 700; font-size: 14px;">
+                                                Danh sách thiết bị & phương tiện cần mượn <span style="color: var(--danger);">*</span>
+                                            </label>
+                                            <button type="button" class="btn btn-sm" id="btn-add-asset-row" style="background: var(--surface2); border: 1px solid var(--line); font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 8px; cursor: pointer;">
+                                                ➕ Thêm thiết bị khác
+                                            </button>
+                                        </div>
+
+                                        <div id="asset-items-container">
+                                            <!-- Dòng thiết bị đầu tiên -->
+                                            <div class="asset-item-row" style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+                                                <div style="flex: 1;">
+                                                    <select name="assetId" class="asset-select" required style="width: 100%;">
+                                                        <option value="">-- Chọn tài sản / thiết bị khả dụng từ kho --</option>
+                                                        <c:forEach var="a" items="${availableAssets}">
+                                                            <option value="${a.assetId}">
+                                                                [${a.assetCategory}] ${a.assetName} (${a.assetCode}) - Serial: ${a.serialNumber != null ? a.serialNumber : 'N/A'}
+                                                            </option>
+                                                        </c:forEach>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <button type="button" class="btn-remove-asset" style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 8px; padding: 9px 14px; font-size: 12px; font-weight: 700; cursor: pointer;" title="Bỏ thiết bị này">
+                                                        ✕ Xóa
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span class="form-hint">💡 Bạn có thể đăng ký nhiều thiết bị cùng lúc (VD: Máy quay + Xe ô tô tác nghiệp). Người duyệt sẽ xem xét và có thể phê duyệt từng thiết bị độc lập.</span>
+                                    </div>
+
                                     <div style="text-align: right; margin-top: 24px;">
-                                        <button type="submit" class="btn primary" style="padding: 11px 22px; font-size: 14px;">
-                                            <i>📤</i> <span>Gửi yêu cầu mượn thiết bị</span>
+                                        <button type="submit" class="btn primary" style="padding: 11px 24px; font-size: 14px; font-weight: 700;">
+                                            <i>📦</i> <span>Gửi danh sách yêu cầu mượn</span>
                                         </button>
                                     </div>
                                 </form>
@@ -700,6 +737,64 @@
                 }
             });
         }
+
+        // Quản lý danh sách thiết bị mượn động
+        const assetContainer = document.getElementById('asset-items-container');
+        const btnAddAsset = document.getElementById('btn-add-asset-row');
+
+        if (btnAddAsset && assetContainer) {
+            btnAddAsset.addEventListener('click', function() {
+                const rows = assetContainer.querySelectorAll('.asset-item-row');
+                if (rows.length > 0) {
+                    const firstRow = rows[0];
+                    const newRow = firstRow.cloneNode(true);
+                    const select = newRow.querySelector('select');
+                    if (select) {
+                        select.value = '';
+                    }
+                    assetContainer.appendChild(newRow);
+                }
+            });
+
+            assetContainer.addEventListener('click', function(e) {
+                const btn = e.target.closest('.btn-remove-asset');
+                if (btn) {
+                    const rows = assetContainer.querySelectorAll('.asset-item-row');
+                    if (rows.length > 1) {
+                        btn.closest('.asset-item-row').remove();
+                    } else {
+                        const select = rows[0].querySelector('select');
+                        if (select) select.value = '';
+                    }
+                }
+            });
+        }
+
+        // Kiểm tra chống chọn trùng thiết bị trong cùng 1 form
+        document.getElementById('asset-request-form')?.addEventListener('submit', function(e) {
+            const selects = this.querySelectorAll('select[name="assetId"]');
+            const chosen = new Set();
+            let hasSelected = false;
+
+            for (let s of selects) {
+                const val = s.value ? s.value.trim() : '';
+                if (!val) continue;
+                if (chosen.has(val)) {
+                    alert('Bạn đã chọn trùng cùng một thiết bị nhiều lần trong danh sách. Vui lòng chọn các thiết bị khác nhau!');
+                    s.focus();
+                    e.preventDefault();
+                    return false;
+                }
+                chosen.add(val);
+                hasSelected = true;
+            }
+
+            if (!hasSelected) {
+                alert('Vui lòng chọn ít nhất 1 thiết bị cần mượn!');
+                e.preventDefault();
+                return false;
+            }
+        });
     });
 </script>
 </body>

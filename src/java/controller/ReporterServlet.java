@@ -13,6 +13,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -834,7 +836,27 @@ public class ReporterServlet extends HttpServlet {
 
         try {
             if ("ASSET_REQUEST".equalsIgnoreCase(requestType)) {
-                int assetId = Integer.parseInt(request.getParameter("assetId"));
+                String[] assetIdStrs = request.getParameterValues("assetId");
+                List<Integer> selectedAssetIds = new ArrayList<>();
+                if (assetIdStrs != null) {
+                    for (String str : assetIdStrs) {
+                        if (str != null && !str.trim().isEmpty()) {
+                            try {
+                                int aId = Integer.parseInt(str.trim());
+                                if (aId > 0 && !selectedAssetIds.contains(aId)) {
+                                    selectedAssetIds.add(aId);
+                                }
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    }
+                }
+
+                if (selectedAssetIds.isEmpty()) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=noAsset&type=asset");
+                    return;
+                }
+
                 String startTimeStr = request.getParameter("startTime");
                 String endTimeStr = request.getParameter("endTime");
 
@@ -855,21 +877,35 @@ public class ReporterServlet extends HttpServlet {
                     return;
                 }
 
-                if (requestDAO.hasAssetScheduleConflict(assetId, startTime, endTime)) {
-                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                            + "&status=conflict&type=asset");
-                    return;
+                for (int aId : selectedAssetIds) {
+                    if (requestDAO.hasAssetScheduleConflict(aId, startTime, endTime)) {
+                        String conflictName = requestDAO.getAssetName(aId);
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=conflict&type=asset&conflictName=" + URLEncoder.encode(conflictName, StandardCharsets.UTF_8.name()));
+                        return;
+                    }
                 }
 
-                AssetRequest req = new AssetRequest();
-                req.setTopicId(topicId);
-                req.setAssetId(assetId);
-                req.setRequesterUserId(loggedUser.getUserId());
-                req.setStartTime(startTime);
-                req.setEndTime(endTime);
+                List<AssetRequest> requestList = new ArrayList<>();
+                for (int aId : selectedAssetIds) {
+                    AssetRequest req = new AssetRequest();
+                    req.setTopicId(topicId);
+                    req.setAssetId(aId);
+                    req.setRequesterUserId(loggedUser.getUserId());
+                    req.setStartTime(startTime);
+                    req.setEndTime(endTime);
+                    requestList.add(req);
+                }
 
-                success = requestDAO.insertAssetRequest(req);
+                int insertedCount = requestDAO.insertAssetRequests(requestList);
+                success = (insertedCount > 0);
                 type = "asset";
+
+                response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                        + "&status=" + (success ? "success" : "failed")
+                        + "&count=" + insertedCount
+                        + "&type=asset");
+                return;
 
             } else if ("DEADLINE_REQUEST".equalsIgnoreCase(requestType)) {
                 String requestedDeadlineStr = request.getParameter("requestedDeadline");

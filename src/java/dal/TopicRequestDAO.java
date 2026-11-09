@@ -96,6 +96,22 @@ public class TopicRequestDAO extends DBContext {
         return false;
     }
 
+    public String getAssetName(int assetId) {
+        String sql = "SELECT asset_name, asset_code FROM Asset WHERE asset_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, assetId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("asset_name") + " (" + rs.getString("asset_code") + ")";
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to get asset name for asset " + assetId, e);
+        }
+        return "Thiết bị #" + assetId;
+    }
+
     public boolean insertAssetRequest(AssetRequest req) {
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
                    + "VALUES (?, ?, ?, ?, ?, 'PENDING')";
@@ -111,6 +127,33 @@ public class TopicRequestDAO extends DBContext {
             LOGGER.log(Level.SEVERE, "Failed to insert Asset_Request", e);
             return false;
         }
+    }
+
+    public int insertAssetRequests(List<AssetRequest> requests) {
+        if (requests == null || requests.isEmpty()) return 0;
+        String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
+                   + "VALUES (?, ?, ?, ?, ?, 'PENDING')";
+        int count = 0;
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (AssetRequest req : requests) {
+                ps.setInt(1, req.getTopicId());
+                ps.setInt(2, req.getAssetId());
+                ps.setInt(3, req.getRequesterUserId());
+                ps.setTimestamp(4, req.getStartTime());
+                ps.setTimestamp(5, req.getEndTime());
+                ps.addBatch();
+            }
+            int[] results = ps.executeBatch();
+            for (int res : results) {
+                if (res > 0 || res == PreparedStatement.SUCCESS_NO_INFO) {
+                    count++;
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to batch insert Asset_Request", e);
+        }
+        return count;
     }
 
     public List<AssetRequest> getAssetRequestsByTopic(int topicId) {

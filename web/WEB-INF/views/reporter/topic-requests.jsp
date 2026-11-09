@@ -219,6 +219,15 @@
                 </div>
             </c:if>
 
+            <c:if test="${param.status eq 'invalidRole'}">
+                <div style="background: #fff4dd; color: #9a6200; border: 1px solid #fce8b2; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">⚠️</span>
+                    <div>
+                        <strong>Không hợp lệ!</strong> Nhân sự được chọn không phải là Phóng viên hoặc không có quyền tác nghiệp. Chỉ được bổ sung phóng viên vào nhóm đề tài.
+                    </div>
+                </div>
+            </c:if>
+
             <c:if test="${param.status eq 'failed'}">
                 <div style="background: #ffedf0; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 18px;">✕</span>
@@ -453,13 +462,13 @@
                                         </div>
                                     </div>
 
-                                    <!-- Chọn khi THÊM NGƯỜI (danh sách user tòa soạn) -->
+                                    <!-- Chọn khi THÊM NGƯỜI (danh sách phóng viên tòa soạn) -->
                                     <div class="form-row" id="selectAddGroup">
-                                        <label for="targetUserAdd">Chọn nhân sự muốn thêm vào nhóm <span style="color: var(--danger);">*</span></label>
+                                        <label for="targetUserAdd">Chọn phóng viên muốn thêm vào nhóm <span style="color: var(--danger);">*</span></label>
                                         <select id="targetUserAdd" name="targetUserId" required style="width: 100%;">
-                                            <option value="">-- Chọn phóng viên / biên tập viên --</option>
+                                            <option value="">-- Chọn phóng viên tác nghiệp --</option>
                                             <c:forEach var="u" items="${allUsers}">
-                                                <option value="${u.userId}">${u.fullName} (${u.email}) - Vị trí: ${u.roleName}</option>
+                                                <option value="${u.userId}">${u.fullName} (${u.email}) - Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''}</option>
                                             </c:forEach>
                                         </select>
                                     </div>

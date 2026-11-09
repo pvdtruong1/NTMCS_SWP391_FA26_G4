@@ -52,6 +52,49 @@ public class UserDAO extends DBContext {
         return list;
     }
 
+    /**
+     * Get active reporters only (users with role REPORTER)
+     */
+    public List<User> getActiveReporters() {
+        List<User> list = new ArrayList<>();
+        String sql = BASE_SELECT
+                + "WHERE u.active_status = 1 "
+                + "AND r.role_name = 'REPORTER' "
+                + "ORDER BY u.full_name ASC";
+        try (Connection con = getConnection();
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapUser(rs));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    /**
+     * Check if a specific user is an active reporter
+     */
+    public boolean isReporter(int userId) {
+        String sql = "SELECT COUNT(*) FROM [User] u "
+                   + "JOIN Role r ON u.role_id = r.role_id "
+                   + "WHERE u.user_id = ? AND u.active_status = 1 "
+                   + "AND r.role_name = 'REPORTER'";
+        try (Connection con = getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     public User getById(int userId) {
         String sql = BASE_SELECT + "WHERE u.user_id = ?";
         try (Connection con = getConnection();

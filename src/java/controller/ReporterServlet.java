@@ -645,6 +645,7 @@ public class ReporterServlet extends HttpServlet {
         String[] roles = request.getParameterValues("memberRole");
 
         Set<Integer> added = new HashSet<>();
+        UserDAO userDAO = new UserDAO();
         if (userIds != null && roles != null) {
             for (int i = 0; i < userIds.length && i < roles.length; i++) {
                 String uidStr = trim(userIds[i]);
@@ -652,7 +653,7 @@ public class ReporterServlet extends HttpServlet {
                 if (!uidStr.isEmpty()) {
                     try {
                         int uid = Integer.parseInt(uidStr);
-                        if (uid > 0 && !added.contains(uid)) {
+                        if (uid > 0 && !added.contains(uid) && userDAO.isReporter(uid)) {
                             added.add(uid);
                             TopicMember mem = new TopicMember();
                             mem.setUserId(uid);
@@ -770,7 +771,7 @@ public class ReporterServlet extends HttpServlet {
             AssetDAO assetDAO = new AssetDAO();
             UserDAO userDAO = new UserDAO();
             List<Asset> availableAssets = assetDAO.getAvailableAssets();
-            List<User> allUsers = userDAO.getAll();
+            List<User> allUsers = userDAO.getActiveReporters();
             List<TopicMember> currentMembers = null;
             try (TopicDAO topicDAO = new TopicDAO()) {
                 currentMembers = topicDAO.findMembersByTopicId(topicId);
@@ -890,6 +891,13 @@ public class ReporterServlet extends HttpServlet {
                 int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
+
+                UserDAO userDAO = new UserDAO();
+                if ("ADD".equalsIgnoreCase(actionType) && !userDAO.isReporter(targetUserId)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidRole&type=member");
+                    return;
+                }
 
                 success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
                 type = "member";

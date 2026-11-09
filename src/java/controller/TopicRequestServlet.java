@@ -75,7 +75,7 @@ public class TopicRequestServlet extends HttpServlet {
             boolean isApproved = "APPROVED".equalsIgnoreCase(topic.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(topic.getStatus());
 
             List<Asset> availableAssets = assetDAO.getAvailableAssets();
-            List<User> allUsers = userDAO.getAll();
+            List<User> allUsers = userDAO.getActiveReporters();
             List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
             List<AssetRequest> assetRequests = requestDAO.getAssetRequestsByTopic(topicId);
             List<RequestDeadlineExtension> deadlineRequests = requestDAO.getDeadlineRequestsByTopic(topicId);
@@ -206,6 +206,12 @@ public class TopicRequestServlet extends HttpServlet {
                 int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
+
+                if ("ADD".equalsIgnoreCase(actionType) && !userDAO.isReporter(targetUserId)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidRole&type=member");
+                    return;
+                }
 
                 success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
                 type = "member";

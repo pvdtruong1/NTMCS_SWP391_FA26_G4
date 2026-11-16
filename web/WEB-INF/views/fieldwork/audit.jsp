@@ -340,13 +340,12 @@ async function pingUnread(notificationId, recipientUserId, recipientName) {
         });
         const res = await resp.json();
         if (resp.ok) {
-            alert(res.message || 'Đã gửi Ping đôn đốc thành công!');
-            window.location.reload();
+            reloadWithToast(res.message || 'Đã gửi Ping đôn đốc thành công!', 'success');
         } else {
-            alert(res.error || 'Lỗi gửi Ping.');
+            showToast(res.error || 'Lỗi gửi Ping.', 'error');
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     }
 }
 </script>

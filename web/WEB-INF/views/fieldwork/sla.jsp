@@ -220,12 +220,12 @@ async function saveSLA(e) {
 
         const res = await resp.json();
         if (resp.ok) {
-            alert(res.message || 'Lưu cấu hình SLA thành công!');
+            showToast(res.message || 'Lưu cấu hình SLA thành công!', 'success');
         } else {
-            alert(res.error || 'Lỗi lưu cấu hình.');
+            showToast(res.error || 'Lỗi lưu cấu hình.', 'error');
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
     }

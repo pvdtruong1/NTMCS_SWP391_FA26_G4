@@ -2181,7 +2181,7 @@ public class TopicDAO extends DBContext {
     public EditorialDashboardDTO getEditorialDashboardMetrics(int deskId, boolean isExecutive) {
         EditorialDashboardDTO dto = new EditorialDashboardDTO();
         dto.setDeskId(deskId);
-
+//dùng count để đếm, khi submitted/pending thì +1
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ")
            .append("  COUNT(CASE WHEN t.status IN ('SUBMITTED', 'PENDING_EXECUTIVE_APPROVAL') THEN 1 END) AS pending_review, ")
@@ -2223,7 +2223,7 @@ public class TopicDAO extends DBContext {
                 dto.setDeskName("Toàn Tòa Soạn (Chỉ đạo Ban Biên tập)");
             }
 
-            // Calculate approval rate and latency
+            // tính hsuat
             int approvedTotal = dto.getAcceptedCmsCount() + dto.getActiveFieldworkCount();
             int decidedTotal = approvedTotal + dto.getRejectedCount();
             double approvalRate = (decidedTotal > 0) ? ((double) approvedTotal / decidedTotal * 100.0) : 100.0;

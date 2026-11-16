@@ -34,9 +34,6 @@ import java.util.logging.Logger;
 public class DeliverableReviewServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(DeliverableReviewServlet.class.getName());
 
-    private final TopicDAO topicDAO = new TopicDAO();
-    private final FieldworkDeliverableDAO deliverableDAO = new FieldworkDeliverableDAO();
-
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -61,33 +58,37 @@ public class DeliverableReviewServlet extends HttpServlet {
             return;
         }
 
-        // 1. Fetch Topic Deliverable Details & RULE-01 Guard Status
-        TopicDeliverableDTO deliverable = topicDAO.getTopicDeliverableDetail(topicId);
-        if (deliverable == null) {
-            response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=topic_not_found");
-            return;
+        try (TopicDAO topicDAO = new TopicDAO();
+             FieldworkDeliverableDAO deliverableDAO = new FieldworkDeliverableDAO()) {
+
+            // 1. Fetch Topic Deliverable Details & RULE-01 Guard Status
+            TopicDeliverableDTO deliverable = topicDAO.getTopicDeliverableDetail(topicId);
+            if (deliverable == null) {
+                response.sendRedirect(request.getContextPath() + "/editorial/dashboard?error=topic_not_found");
+                return;
+            }
+
+            // 2. Fetch Deliverable Submissions (Files / Links / Notes)
+            List<FieldworkDeliverable> submissions = null;
+            try {
+                submissions = deliverableDAO.getDeliverablesByTopicId(topicId);
+            } catch (SQLException ex) {
+                LOGGER.log(Level.WARNING, "Error loading submissions for topicId: " + topicId, ex);
+            }
+
+            // 3. Fetch Stage 1 Dossier (Initial Rubric Evaluation details for reference)
+            TopicEvaluationDetailDTO stage1Dossier = topicDAO.getTopicDetailForEvaluation(topicId);
+
+            // 4. Fetch Fieldwork Team Members
+            List<TopicMember> fieldMembers = topicDAO.findMembersByTopicId(topicId);
+
+            request.setAttribute("deliverable", deliverable);
+            request.setAttribute("submissions", submissions);
+            request.setAttribute("stage1Dossier", stage1Dossier);
+            request.setAttribute("fieldMembers", fieldMembers);
+            request.setAttribute("isExecutive", isExecutive);
+            request.setAttribute("currentUser", currentUser);
         }
-
-        // 2. Fetch Deliverable Submissions (Files / Links / Notes)
-        List<FieldworkDeliverable> submissions = null;
-        try {
-            submissions = deliverableDAO.getDeliverablesByTopicId(topicId);
-        } catch (SQLException ex) {
-            LOGGER.log(Level.WARNING, "Error loading submissions for topicId: " + topicId, ex);
-        }
-
-        // 3. Fetch Stage 1 Dossier (Initial Rubric Evaluation details for reference)
-        TopicEvaluationDetailDTO stage1Dossier = topicDAO.getTopicDetailForEvaluation(topicId);
-
-        // 4. Fetch Fieldwork Team Members
-        List<TopicMember> fieldMembers = topicDAO.findMembersByTopicId(topicId);
-
-        request.setAttribute("deliverable", deliverable);
-        request.setAttribute("submissions", submissions);
-        request.setAttribute("stage1Dossier", stage1Dossier);
-        request.setAttribute("fieldMembers", fieldMembers);
-        request.setAttribute("isExecutive", isExecutive);
-        request.setAttribute("currentUser", currentUser);
 
         // Flash params
         request.setAttribute("error", request.getParameter("error"));
@@ -122,38 +123,40 @@ public class DeliverableReviewServlet extends HttpServlet {
             return;
         }
 
-        if ("accept_cms".equals(action)) {
-            String note = request.getParameter("acceptanceNote");
-            try {
-                String token = topicDAO.acceptTopicAndMintCmsToken(topicId, editorId, note, null);
-                response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=accepted&code=" + topicId
-                        + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
-            } catch (IllegalStateException | IllegalArgumentException ex) {
-                LOGGER.log(Level.WARNING, "Acceptance validation failed for topic #" + topicId + ": " + ex.getMessage());
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            if ("accept_cms".equals(action)) {
+                String note = request.getParameter("acceptanceNote");
+                try {
+                    String token = topicDAO.acceptTopicAndMintCmsToken(topicId, editorId, note, null);
+                    response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=accepted&code=" + topicId
+                            + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
+                } catch (IllegalStateException | IllegalArgumentException ex) {
+                    LOGGER.log(Level.WARNING, "Acceptance validation failed for topic #" + topicId + ": " + ex.getMessage());
+                    response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
+                            + "&error=" + URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8));
+                } catch (SQLException ex) {
+                    LOGGER.log(Level.SEVERE, "Database error during acceptance for topic #" + topicId, ex);
+                    response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
+                            + "&error=" + URLEncoder.encode("Lỗi cơ sở dữ liệu khi nghiệm thu đề tài.", StandardCharsets.UTF_8));
+                }
+            } else if ("request_revision".equals(action)) {
+                String feedback = request.getParameter("revisionFeedback");
+                try {
+                    topicDAO.requestDeliverableRevision(topicId, editorId, feedback);
+                    response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=revision_requested&code=" + topicId);
+                } catch (IllegalStateException | IllegalArgumentException ex) {
+                    LOGGER.log(Level.WARNING, "Revision request validation failed for topic #" + topicId + ": " + ex.getMessage());
+                    response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
+                            + "&error=" + URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8));
+                } catch (SQLException ex) {
+                    LOGGER.log(Level.SEVERE, "Database error during revision request for topic #" + topicId, ex);
+                    response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
+                            + "&error=" + URLEncoder.encode("Lỗi cơ sở dữ liệu khi gửi yêu cầu chỉnh sửa.", StandardCharsets.UTF_8));
+                }
+            } else {
                 response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
-                        + "&error=" + URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8));
-            } catch (SQLException ex) {
-                LOGGER.log(Level.SEVERE, "Database error during acceptance for topic #" + topicId, ex);
-                response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
-                        + "&error=" + URLEncoder.encode("Lỗi cơ sở dữ liệu khi nghiệm thu đề tài.", StandardCharsets.UTF_8));
+                        + "&error=" + URLEncoder.encode("Hành động không hợp lệ.", StandardCharsets.UTF_8));
             }
-        } else if ("request_revision".equals(action)) {
-            String feedback = request.getParameter("revisionFeedback");
-            try {
-                topicDAO.requestDeliverableRevision(topicId, editorId, feedback);
-                response.sendRedirect(request.getContextPath() + "/editorial/dashboard?msg=revision_requested&code=" + topicId);
-            } catch (IllegalStateException | IllegalArgumentException ex) {
-                LOGGER.log(Level.WARNING, "Revision request validation failed for topic #" + topicId + ": " + ex.getMessage());
-                response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
-                        + "&error=" + URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8));
-            } catch (SQLException ex) {
-                LOGGER.log(Level.SEVERE, "Database error during revision request for topic #" + topicId, ex);
-                response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
-                        + "&error=" + URLEncoder.encode("Lỗi cơ sở dữ liệu khi gửi yêu cầu chỉnh sửa.", StandardCharsets.UTF_8));
-            }
-        } else {
-            response.sendRedirect(request.getContextPath() + "/editorial/deliverable-review?topicId=" + topicId
-                    + "&error=" + URLEncoder.encode("Hành động không hợp lệ.", StandardCharsets.UTF_8));
         }
     }
 }

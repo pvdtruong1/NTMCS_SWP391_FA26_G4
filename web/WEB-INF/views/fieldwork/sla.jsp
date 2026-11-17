@@ -55,12 +55,8 @@
                             ⏱️ Mốc Giờ Giám Sát Hạn Chót (SLA Deadlines)
                         </h3>
 
-                        <div style="margin-bottom:20px; display:flex; align-items:center; gap:10px;">
-                            <input type="checkbox" id="inAppEnabled" name="inAppEnabled" ${slaConfig.inAppEnabled ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;"/>
-                            <label for="inAppEnabled" style="font-weight:600; font-size:13px; cursor:pointer;">
-                                Kích hoạt cảnh báo tự động trong hệ thống ứng dụng (In-App Notification)
-                            </label>
-                        </div>
+                        <%-- Ẩn kích hoạt cảnh báo tự động tại Frontend --%>
+                        <input type="checkbox" id="inAppEnabled" name="inAppEnabled" checked style="display:none;"/>
 
                         <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;">
                             <div>

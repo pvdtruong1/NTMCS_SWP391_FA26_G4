@@ -17,7 +17,9 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Asset;
@@ -84,11 +86,42 @@ public class TopicRequestServlet extends HttpServlet {
             List<RequestDeadlineExtension> deadlineRequests = requestDAO.getDeadlineRequestsByTopic(topicId);
             List<String> memberNotifications = requestDAO.getMemberChangeNotificationsByTopic(topicId);
 
+            // 1. Tập hợp các ID đã có trong nhóm (bao gồm Tác giả/Chủ đề tài + mọi thành viên hiện tại)
+            Set<Integer> existingUserIds = new HashSet<>();
+            existingUserIds.add(topic.getAuthorUserId());
+            if (currentMembers != null) {
+                for (TopicMember m : currentMembers) {
+                    existingUserIds.add(m.getUserId());
+                }
+            }
+
+            // 2. Danh sách nhân sự CÓ THỂ THÊM: Chỉ những phóng viên CHƯA có mặt trong nhóm
+            List<User> availableUsersToAdd = new ArrayList<>();
+            if (allUsers != null) {
+                for (User u : allUsers) {
+                    if (!existingUserIds.contains(u.getUserId())) {
+                        availableUsersToAdd.add(u);
+                    }
+                }
+            }
+
+            // 3. Danh sách thành viên CÓ THỂ RÚT: Loại bỏ Tác giả/Chủ đề tài và Lead Reporter
+            List<TopicMember> removableMembers = new ArrayList<>();
+            if (currentMembers != null) {
+                for (TopicMember m : currentMembers) {
+                    if (m.getUserId() != topic.getAuthorUserId() && !"LEAD_REPORTER".equalsIgnoreCase(m.getRoleInTeam())) {
+                        removableMembers.add(m);
+                    }
+                }
+            }
+
             request.setAttribute("topic", topic);
             request.setAttribute("isApproved", isApproved);
             request.setAttribute("availableAssets", availableAssets);
             request.setAttribute("allUsers", allUsers);
+            request.setAttribute("availableUsersToAdd", availableUsersToAdd);
             request.setAttribute("currentMembers", currentMembers);
+            request.setAttribute("removableMembers", removableMembers);
             request.setAttribute("assetRequests", assetRequests);
             request.setAttribute("deadlineRequests", deadlineRequests);
             request.setAttribute("memberNotifications", memberNotifications);
@@ -286,16 +319,25 @@ public class TopicRequestServlet extends HttpServlet {
                                 + "&status=cannotRemoveAuthor&type=member");
                         return;
                     }
-                    // Kiểm tra nhân sự có thực sự đang nằm trong nhóm hay không
+                    // Kiểm tra nhân sự có thực sự đang nằm trong nhóm hay không và có phải Lead không
                     List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
                     boolean inTeam = false;
+                    boolean isLead = false;
                     if (currentMembers != null) {
                         for (TopicMember m : currentMembers) {
                             if (m.getUserId() == targetUserId) {
                                 inTeam = true;
+                                if ("LEAD_REPORTER".equalsIgnoreCase(m.getRoleInTeam())) {
+                                    isLead = true;
+                                }
                                 break;
                             }
                         }
+                    }
+                    if (isLead) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=cannotRemoveAuthor&type=member");
+                        return;
                     }
                     if (!inTeam) {
                         response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId

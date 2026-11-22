@@ -481,6 +481,22 @@
                             </c:when>
 
                             <c:otherwise>
+                                <div style="background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;">
+                                    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">👥 Tổ tác nghiệp hiện tại của đề tài:</strong>
+                                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6;">
+                                        <li>
+                                            <strong><c:out value="${topic.reporterName}"/></strong> <span class="badge" style="background:#e0e7ff;color:#3730a3;font-size:10.5px;">Phóng viên chủ trì / Tác giả</span>
+                                        </li>
+                                        <c:forEach var="m" items="${currentMembers}">
+                                            <c:if test="${m.userId != topic.authorUserId and m.roleInTeam ne 'LEAD_REPORTER'}">
+                                                <li>
+                                                    <c:out value="${m.userName}"/> (${m.userEmail}) &mdash; <span class="badge" style="font-size:10.5px;"><c:out value="${not empty m.roleInTeamDisplay ? m.roleInTeamDisplay : m.roleInTeam}"/></span>
+                                                </li>
+                                            </c:if>
+                                        </c:forEach>
+                                    </ul>
+                                </div>
+
                                 <form action="${base}/reporter/requests" method="POST">
                                     <input type="hidden" name="requestType" value="MEMBER_REQUEST">
                                     <input type="hidden" name="topicId" value="${topic.topicId}">
@@ -503,26 +519,36 @@
                                         </div>
                                     </div>
 
-                                    <!-- Chọn khi THÊM NGƯỜI (danh sách user tòa soạn) -->
+                                    <!-- Chọn khi THÊM NGƯỜI (chỉ những phóng viên CHƯA có trong nhóm) -->
                                     <div class="field" id="selectAddGroup" style="margin-bottom: 16px;">
                                         <span>CHỌN NHÂN SỰ MUỐN THÊM VÀO NHÓM <em style="color:var(--danger)">*</em></span>
                                         <select id="targetUserAdd" name="targetUserId" required style="padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
                                             <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                            <c:forEach var="u" items="${allUsers}">
+                                            <c:forEach var="u" items="${availableUsersToAdd}">
                                                 <option value="${u.userId}">${u.fullName} (${u.email}) - Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''}</option>
                                             </c:forEach>
                                         </select>
+                                        <c:if test="${empty availableUsersToAdd}">
+                                            <small style="color: var(--warning); display: block; margin-top: 6px; font-weight: 600;">
+                                                💡 Tất cả phóng viên khả dụng trong tòa soạn hiện đều đã có mặt trong tổ tác nghiệp này.
+                                            </small>
+                                        </c:if>
                                     </div>
 
-                                    <!-- Chọn khi RÚT NGƯỜI (chỉ thành viên đang trong nhóm đề tài) -->
+                                    <!-- Chọn khi RÚT NGƯỜI (chỉ thành viên phối hợp, không có Phóng viên chủ trì) -->
                                     <div class="field" id="selectRemoveGroup" style="margin-bottom: 16px; display: none;">
                                         <span>CHỌN THÀNH VIÊN MUỐN RÚT KHỎI NHÓM <em style="color:var(--danger)">*</em></span>
                                         <select id="targetUserRemove" style="padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
-                                            <option value="">-- Chọn thành viên nhóm hiện tại --</option>
-                                            <c:forEach var="m" items="${currentMembers}">
-                                                <option value="${m.userId}">${m.userName} (${m.userEmail}) - Vai trò: ${m.roleInTeam}</option>
+                                            <option value="">-- Chọn thành viên nhóm muốn rút --</option>
+                                            <c:forEach var="m" items="${removableMembers}">
+                                                <option value="${m.userId}">${m.userName} (${m.userEmail}) - Vai trò: ${not empty m.roleInTeamDisplay ? m.roleInTeamDisplay : m.roleInTeam}</option>
                                             </c:forEach>
                                         </select>
+                                        <c:if test="${empty removableMembers}">
+                                            <small style="color: var(--muted); display: block; margin-top: 6px; font-weight: 600;">
+                                                ℹ️ Nhóm hiện tại chỉ có duy nhất Phóng viên chủ trì đề tài, không có thành viên phối hợp nào khác để rút.
+                                            </small>
+                                        </c:if>
                                     </div>
 
                                     <div class="field" style="margin-bottom: 22px;">

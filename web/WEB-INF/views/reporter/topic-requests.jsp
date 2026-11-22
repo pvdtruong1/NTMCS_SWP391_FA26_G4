@@ -192,7 +192,15 @@
                 <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
                     <span style="font-size: 20px;">⚠️</span>
                     <div>
-                        <strong>Thời gian không hợp lệ:</strong> Thời gian bắt đầu mượn không được ở thời điểm trong quá khứ.
+                        <strong>Thời gian không hợp lệ:</strong> 
+                        <c:choose>
+                            <c:when test="${param.type eq 'deadline'}">
+                                Thời hạn gia hạn mới phải sau ngày hôm nay và sau thời hạn nộp hiện tại của đề tài.
+                            </c:when>
+                            <c:otherwise>
+                                Thời gian bắt đầu mượn không được ở thời điểm trong quá khứ.
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                 </div>
             </c:if>
@@ -220,6 +228,33 @@
                     <span style="font-size: 20px;">⚠️</span>
                     <div>
                         <strong>Không hợp lệ!</strong> Nhân sự được chọn không phải là Phóng viên hoặc không có quyền tác nghiệp. Chỉ được bổ sung phóng viên vào nhóm đề tài.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'alreadyMember'}">
+                <div style="background: #fff4dd; color: #9a6200; border: 1px solid #fce8b2; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <strong>Đã có trong nhóm!</strong> Nhân sự này hiện đã là thành viên trong tổ tác nghiệp của đề tài.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'cannotRemoveAuthor'}">
+                <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🚫</span>
+                    <div>
+                        <strong>Không thể rút!</strong> Bạn không thể rút Tác giả / Phóng viên chủ trì ra khỏi đề tài của chính họ.
+                    </div>
+                </div>
+            </c:if>
+
+            <c:if test="${param.status eq 'notInTeam'}">
+                <div style="background: #fff0f2; color: #bd3344; border: 1px solid #f0c8ce; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <div>
+                        <strong>Không tìm thấy!</strong> Nhân sự được chọn hiện không nằm trong danh sách thành viên của đề tài.
                     </div>
                 </div>
             </c:if>
@@ -722,6 +757,17 @@
                     }
                 }
             });
+        }
+
+        // Khởi tạo giới hạn thời gian thực tế cho form xin gia hạn deadline (không được chọn ngày quá khứ)
+        const reqDeadline = document.getElementById('requestedDeadline');
+        if (reqDeadline) {
+            const todayDate = new Date();
+            todayDate.setDate(todayDate.getDate() + 1); // Gia hạn ít nhất từ ngày mai
+            const minDateStr = todayDate.toISOString().slice(0, 10);
+            if (!reqDeadline.min || reqDeadline.min < minDateStr) {
+                reqDeadline.min = minDateStr;
+            }
         }
 
         // Quản lý danh sách thiết bị mượn động

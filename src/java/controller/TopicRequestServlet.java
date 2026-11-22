@@ -224,9 +224,22 @@ public class TopicRequestServlet extends HttpServlet {
                 // 2. Phóng viên xin gia hạn deadline
                 String requestedDeadlineStr = request.getParameter("requestedDeadline");
                 String reason = request.getParameter("reason");
-                Date requestedDeadline = Date.valueOf(requestedDeadlineStr);
+                if (requestedDeadlineStr == null || requestedDeadlineStr.trim().isEmpty()) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidTime&type=deadline");
+                    return;
+                }
+                Date requestedDeadline = Date.valueOf(requestedDeadlineStr.trim());
+                long currentTime = System.currentTimeMillis();
+                Date today = new Date(currentTime - (currentTime % 86400000L)); // Ngày hôm nay (00:00:00)
+                Date currentDeadline = (topic.getDeadline() != null) ? topic.getDeadline() : today;
 
-                Date currentDeadline = (topic.getDeadline() != null) ? topic.getDeadline() : new Date(System.currentTimeMillis());
+                // Chặn tuyệt đối: Không được chọn ngày trong quá khứ hoặc trước hạn nộp hiện tại
+                if (requestedDeadline.before(today) || requestedDeadline.before(currentDeadline)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=pastTime&type=deadline");
+                    return;
+                }
 
                 RequestDeadlineExtension req = new RequestDeadlineExtension();
                 req.setTopicId(topicId);
@@ -239,15 +252,56 @@ public class TopicRequestServlet extends HttpServlet {
                 type = "deadline";
 
             } else if ("MEMBER_REQUEST".equalsIgnoreCase(requestType)) {
-                // 3. Phﾃｳng viﾃｪn xin thay ﾄ黛ｻ品 nhﾃ｢n s盻ｱ
+                // 3. Phóng viên xin thay đổi nhân sự
                 int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
 
-                if ("ADD".equalsIgnoreCase(actionType) && !userDAO.isReporter(targetUserId)) {
-                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                            + "&status=invalidRole&type=member");
-                    return;
+                if ("ADD".equalsIgnoreCase(actionType)) {
+                    if (!userDAO.isReporter(targetUserId)) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=invalidRole&type=member");
+                        return;
+                    }
+                    // Kiểm tra nhân sự đã có trong nhóm hay chưa
+                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
+                    boolean alreadyInTeam = (targetUserId == topic.getAuthorUserId());
+                    if (!alreadyInTeam && currentMembers != null) {
+                        for (TopicMember m : currentMembers) {
+                            if (m.getUserId() == targetUserId) {
+                                alreadyInTeam = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (alreadyInTeam) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=alreadyMember&type=member");
+                        return;
+                    }
+                } else if ("REMOVE".equalsIgnoreCase(actionType)) {
+                    // Không được phép xin rút tác giả / người chủ trì đề tài
+                    if (targetUserId == topic.getAuthorUserId()) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=cannotRemoveAuthor&type=member");
+                        return;
+                    }
+                    // Kiểm tra nhân sự có thực sự đang nằm trong nhóm hay không
+                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
+                    boolean inTeam = false;
+                    if (currentMembers != null) {
+                        for (TopicMember m : currentMembers) {
+                            if (m.getUserId() == targetUserId) {
+                                inTeam = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!inTeam) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=notInTeam&type=member");
+                        return;
+                    }
                 }
 
                 success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);

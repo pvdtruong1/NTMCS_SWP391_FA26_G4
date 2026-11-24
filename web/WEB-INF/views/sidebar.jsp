@@ -44,6 +44,9 @@
                 <a href="${base}/editorial/pending-queue" class="nav-item ${param.active == 'pending-queue' or param.active == 'criteria-scoring' ? 'active' : ''}">
                     <i>📋</i> Hàng đợi chờ thẩm định
                 </a>
+                <a href="${base}/editorial/member-requests" class="nav-item ${param.active == 'member-requests' ? 'active' : ''}">
+                    <i>👥</i> Điều phối kíp tác nghiệp
+                </a>
                 <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' or param.active == 'directive-topic' or param.active == 'reporter-dispatch' ? 'active' : ''}">
                     <i>⚡</i> Đặt hàng đề tài chỉ đạo
                 </a>

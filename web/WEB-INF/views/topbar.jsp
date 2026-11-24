@@ -124,22 +124,33 @@
 
             if (n.topicId) {
                 var detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
-                <c:choose>
-                    <c:when test="${pageContext.request.servletPath.startsWith('/fieldwork') or (not empty sessionScope.permissions and sessionScope.permissions.contains('FIELDWORK_TRACK'))}">
-                        detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
-                    </c:when>
-                    <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
-                        detailUrl = '${base}/editorial/criteria-scoring?topicId=' + n.topicId;
-                    </c:when>
-                    <c:when test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
-                        detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
-                    </c:when>
-                    <c:otherwise>
-                        detailUrl = '${base}/reporter/detail?id=' + n.topicId;
-                    </c:otherwise>
-                </c:choose>
+                if (n.message && (n.message.indexOf('NHÂN SỰ') !== -1 || n.message.indexOf('KÍP TÁC NGHIỆP') !== -1)) {
+                    <c:choose>
+                        <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+                            detailUrl = '${base}/editorial/member-requests';
+                        </c:when>
+                        <c:otherwise>
+                            detailUrl = '${base}/reporter/requests?topicId=' + n.topicId + '#member';
+                        </c:otherwise>
+                    </c:choose>
+                } else {
+                    <c:choose>
+                        <c:when test="${pageContext.request.servletPath.startsWith('/fieldwork') or (not empty sessionScope.permissions and sessionScope.permissions.contains('FIELDWORK_TRACK'))}">
+                            detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
+                        </c:when>
+                        <c:when test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+                            detailUrl = '${base}/editorial/criteria-scoring?topicId=' + n.topicId;
+                        </c:when>
+                        <c:when test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
+                            detailUrl = '${base}/fieldwork/topic-detail?id=' + n.topicId;
+                        </c:when>
+                        <c:otherwise>
+                            detailUrl = '${base}/reporter/detail?id=' + n.topicId;
+                        </c:otherwise>
+                    </c:choose>
+                }
                 html += '<a href="' + detailUrl + '" class="notif-detail-link" onclick="handleDetailClick(event, ' + n.id + ', \x27' + detailUrl + '\x27)">' +
-                    'Xem hồ sơ đề tài #' + n.topicId + ' ↗</a>';
+                    'Xem chi tiết #' + n.topicId + ' ↗</a>';
             } else if (isUnread) {
                 html += '<button type="button" class="btn sm" style="padding: 3px 8px; font-size: 11px;" onclick="markSingleRead(' + n.id + ')">Đánh dấu đã đọc</button>';
             }

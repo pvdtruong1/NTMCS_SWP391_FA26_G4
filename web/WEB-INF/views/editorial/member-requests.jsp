@@ -56,6 +56,48 @@
             color: var(--primary);
             border-color: #d1dcff;
         }
+        .kpi-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 16px !important;
+            margin-bottom: 24px !important;
+        }
+        @media (max-width: 1024px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+        @media (max-width: 640px) {
+            .kpi-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 6px;
+        }
+        .stat-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+        }
         .action-modal-backdrop {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -121,20 +163,20 @@
             </c:if>
 
             <!-- Metrics KPI -->
-            <div class="grid col-4" style="margin-bottom: 24px;">
-                <div class="card" style="border-left: 4px solid #f59e0b;">
+            <div class="kpi-grid">
+                <div class="stat-card" style="border-left: 4px solid #f59e0b;">
                     <div class="stat-value" style="color: #d97706;">${pendingCount}</div>
                     <div class="stat-label">Chờ Trưởng Ban Duyệt</div>
                 </div>
-                <div class="card" style="border-left: 4px solid #10b981;">
+                <div class="stat-card" style="border-left: 4px solid #10b981;">
                     <div class="stat-value" style="color: #059669;">${approvedCount}</div>
                     <div class="stat-label">Đã Phê Duyệt</div>
                 </div>
-                <div class="card" style="border-left: 4px solid #ef4444;">
+                <div class="stat-card" style="border-left: 4px solid #ef4444;">
                     <div class="stat-value" style="color: #dc2626;">${rejectedCount}</div>
                     <div class="stat-label">Đã Từ Chối</div>
                 </div>
-                <div class="card" style="border-left: 4px solid var(--primary);">
+                <div class="stat-card" style="border-left: 4px solid var(--primary);">
                     <div class="stat-value" style="color: var(--primary);">${totalCount}</div>
                     <div class="stat-label">Tổng Số Yêu Cầu</div>
                 </div>

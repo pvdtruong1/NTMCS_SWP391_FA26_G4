@@ -466,7 +466,9 @@ public class TopicRequestDAO extends DBContext {
            .append("JOIN Category c ON t.category_id = c.category_id ")
            .append("JOIN Desk d ON c.desk_id = d.desk_id ")
            .append("LEFT JOIN [User] auth ON t.author_user_id = auth.user_id ")
-           .append("WHERE (n.message LIKE '%[ĐỀ XUẤT%NHÂN SỰ]%' OR n.message LIKE '%[ĐỀ XUẤT NHÂN SỰ]%') ");
+           .append("WHERE (n.message LIKE '%[ĐỀ XUẤT%NHÂN SỰ]%' OR n.message LIKE '%[ĐỀ XUẤT NHÂN SỰ]%') ")
+           .append("  AND n.message NOT LIKE '%Bạn đã gửi đề xuất%' ")
+           .append("  AND n.user_id <> t.author_user_id ");
 
         if (!isExecutive && deskId > 0) {
             sql.append("  AND c.desk_id = ? ");
@@ -479,11 +481,17 @@ public class TopicRequestDAO extends DBContext {
                 ps.setInt(1, deskId);
             }
             try (ResultSet rs = ps.executeQuery()) {
+                java.util.Set<String> seenKeys = new java.util.HashSet<>();
                 while (rs.next()) {
                     String msg = rs.getString("message");
                     dto.MemberChangeRequestDTO dto = parseMemberChangeRequest(rs, msg, conn);
                     if (dto != null) {
-                        list.add(dto);
+                        // Khóa khử trùng lặp: đề tài + thao tác + nhân sự + trạng thái
+                        String dedupeKey = dto.getTopicId() + "_" + dto.getActionType() + "_" + dto.getTargetUserId() + "_" + dto.getStatus();
+                        if (!seenKeys.contains(dedupeKey)) {
+                            seenKeys.add(dedupeKey);
+                            list.add(dto);
+                        }
                     }
                 }
             }

@@ -211,11 +211,13 @@
                                                         <input type="email" name="memberEmail" class="member-email-input"
                                                                value="<c:out value='${m.userEmail}'/>"
                                                                placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
-                                                        <c:if test="${not empty m.userName}">
-                                                            <small style="color:var(--muted);font-size:11px;display:block;margin-top:2px;">
-                                                                ✓ <c:out value="${m.userName}"/>
-                                                            </small>
-                                                        </c:if>
+                                                        <div class="member-schedule-hint" style="font-size: 11.5px; margin-top: 4px;">
+                                                            <c:if test="${not empty m.userName}">
+                                                                <small style="color:var(--muted);font-size:11px;display:block;">
+                                                                    ✓ <c:out value="${m.userName}"/>
+                                                                </small>
+                                                            </c:if>
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <select name="memberRole" required>
@@ -358,6 +360,50 @@
         }
     });
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function checkMemberSchedule(input) {
+        const email = (input.value || '').trim();
+        const parentTd = input.closest('td');
+        const hint = parentTd ? parentTd.querySelector('.member-schedule-hint') : null;
+        if (!hint) return;
+        if (!email) {
+            hint.innerHTML = '';
+            hint.style.display = 'none';
+            return;
+        }
+
+        const currentTopicId = '${topic.topicId != null ? topic.topicId : 0}';
+        const url = '${base}/reporter/check-schedule?email=' + encodeURIComponent(email) + '&topicId=' + currentTopicId;
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.found) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Không tìm thấy phóng viên hợp lệ với email này</span>';
+                    hint.style.display = 'block';
+                } else if (!data.active) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Phóng viên <strong>' + escapeHtml(data.fullName) + '</strong> đang bị khóa tài khoản</span>';
+                    hint.style.display = 'block';
+                } else if (!data.isReporter) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Người dùng <strong>' + escapeHtml(data.fullName) + '</strong> không thuộc vai trò Phóng viên</span>';
+                    hint.style.display = 'block';
+                } else if (data.busy) {
+                    hint.innerHTML = '<span style="color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; line-height: 1.4;">⚠️ <strong>' + escapeHtml(data.fullName) + '</strong> đang tham gia ' + data.count + ' đề tài khác: ' + escapeHtml(data.topics.join(', ')) + '</span>';
+                    hint.style.display = 'block';
+                } else {
+                    hint.innerHTML = '<span style="color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;">✓ <strong>' + escapeHtml(data.fullName) + '</strong> &mdash; Lịch trống (sẵn sàng tác nghiệp)</span>';
+                    hint.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                hint.style.display = 'none';
+            });
+    }
+
     // Thêm dòng nhập email thành viên tổ tác nghiệp
     document.getElementById('btn-add-member')?.addEventListener('click', function() {
         const tbody = document.getElementById('member-table-body');
@@ -366,6 +412,7 @@
         tr.innerHTML = `
             <td>
                 <input type="email" name="memberEmail" class="member-email-input" placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
+                <div class="member-schedule-hint" style="font-size: 11.5px; margin-top: 4px;"></div>
             </td>
             <td>
                 <select name="memberRole" required>
@@ -380,6 +427,20 @@
             </td>
         `;
         tbody.appendChild(tr);
+        const newInput = tr.querySelector('.member-email-input');
+        if (newInput) {
+            newInput.focus();
+            newInput.addEventListener('blur', function() { checkMemberSchedule(this); });
+            newInput.addEventListener('change', function() { checkMemberSchedule(this); });
+        }
+    });
+
+    document.querySelectorAll('.member-email-input').forEach(function(inp) {
+        inp.addEventListener('blur', function() { checkMemberSchedule(this); });
+        inp.addEventListener('change', function() { checkMemberSchedule(this); });
+        if (inp.value && inp.value.trim()) {
+            checkMemberSchedule(inp);
+        }
     });
 
     document.getElementById('member-table-body')?.addEventListener('click', function(e) {

@@ -579,6 +579,7 @@ public class ReporterServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
         String uidStr = trim(request.getParameter("userId"));
         String tidStr = trim(request.getParameter("topicId"));
+        String email = trim(request.getParameter("email"));
         int userId = 0;
         int topicId = 0;
         try {
@@ -590,13 +591,36 @@ public class ReporterServlet extends HttpServlet {
             }
         } catch (NumberFormatException ignored) {}
 
-        List<String> busyTopics;
-        try (TopicDAO topicDAO = new TopicDAO()) {
-            busyTopics = topicDAO.getUserBusyTopics(userId, topicId);
+        User targetUser = null;
+        UserDAO userDAO = new UserDAO();
+        if (userId > 0) {
+            targetUser = userDAO.getById(userId);
+        } else if (!email.isEmpty()) {
+            targetUser = userDAO.getActiveReporterByEmail(email);
+            if (targetUser != null) {
+                userId = targetUser.getUserId();
+            } else {
+                targetUser = userDAO.getByEmail(email);
+            }
+        }
+
+        List<String> busyTopics = new ArrayList<>();
+        if (userId > 0) {
+            try (TopicDAO topicDAO = new TopicDAO()) {
+                busyTopics = topicDAO.getUserBusyTopics(userId, topicId);
+            }
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"userId\":").append(userId);
+        sb.append("{");
+        sb.append("\"found\":").append(targetUser != null);
+        sb.append(",\"userId\":").append(userId);
+        if (targetUser != null) {
+            sb.append(",\"fullName\":\"").append(escapeJson(targetUser.getFullName())).append("\"");
+            sb.append(",\"email\":\"").append(escapeJson(targetUser.getEmail())).append("\"");
+            sb.append(",\"active\":").append(targetUser.isActiveStatus());
+            sb.append(",\"isReporter\":").append("REPORTER".equalsIgnoreCase(targetUser.getRoleName()));
+        }
         sb.append(",\"busy\":").append(!busyTopics.isEmpty());
         sb.append(",\"count\":").append(busyTopics.size());
         sb.append(",\"topics\":[");

@@ -552,20 +552,26 @@
                                             <c:choose>
                                                 <c:when test="${not empty formEmails}">
                                                     <c:forEach var="em" items="${formEmails}">
-                                                        <div class="req-email-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-                                                            <input type="email" name="targetUserEmail" class="req-email-input" value="<c:out value="${em}"/>" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
-                                                            <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
-                                                                ✕ Xóa
-                                                            </button>
+                                                        <div class="req-email-entry" style="margin-bottom: 8px;">
+                                                            <div class="req-email-row" style="display: flex; gap: 8px; align-items: center;">
+                                                                <input type="email" name="targetUserEmail" class="req-email-input" value="<c:out value="${em}"/>" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
+                                                                <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
+                                                                    ✕ Xóa
+                                                                </button>
+                                                            </div>
+                                                            <div class="req-email-schedule-hint" style="font-size: 11.5px; margin-top: 4px; display: none;"></div>
                                                         </div>
                                                     </c:forEach>
                                                 </c:when>
                                                 <c:otherwise>
-                                                    <div class="req-email-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-                                                        <input type="email" name="targetUserEmail" class="req-email-input" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
-                                                        <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
-                                                            ✕ Xóa
-                                                        </button>
+                                                    <div class="req-email-entry" style="margin-bottom: 8px;">
+                                                        <div class="req-email-row" style="display: flex; gap: 8px; align-items: center;">
+                                                            <input type="email" name="targetUserEmail" class="req-email-input" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
+                                                            <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
+                                                                    ✕ Xóa
+                                                            </button>
+                                                        </div>
+                                                        <div class="req-email-schedule-hint" style="font-size: 11.5px; margin-top: 4px; display: none;"></div>
                                                     </div>
                                                 </c:otherwise>
                                             </c:choose>
@@ -899,34 +905,99 @@
             }
         });
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function checkReqEmailSchedule(input) {
+            const email = (input.value || '').trim();
+            const parentEntry = input.closest('.req-email-entry');
+            const hint = parentEntry ? parentEntry.querySelector('.req-email-schedule-hint') : null;
+            if (!hint) return;
+            if (!email) {
+                hint.innerHTML = '';
+                hint.style.display = 'none';
+                return;
+            }
+
+            const currentTopicId = '${topic.topicId != null ? topic.topicId : 0}';
+            const url = '${base}/reporter/check-schedule?email=' + encodeURIComponent(email) + '&topicId=' + currentTopicId;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.found) {
+                        hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Không tìm thấy tài khoản với email này</span>';
+                        hint.style.display = 'block';
+                    } else if (!data.active) {
+                        hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Phóng viên <strong>' + escapeHtml(data.fullName) + '</strong> đang bị khóa tài khoản</span>';
+                        hint.style.display = 'block';
+                    } else if (!data.isReporter) {
+                        hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Người dùng <strong>' + escapeHtml(data.fullName) + '</strong> không thuộc vai trò Phóng viên</span>';
+                        hint.style.display = 'block';
+                    } else if (data.busy) {
+                        hint.innerHTML = '<span style="color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; line-height: 1.4;">⚠️ <strong>' + escapeHtml(data.fullName) + '</strong> đang tham gia ' + data.count + ' đề tài khác: ' + escapeHtml(data.topics.join(', ')) + '</span>';
+                        hint.style.display = 'block';
+                    } else {
+                        hint.innerHTML = '<span style="color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;">✓ <strong>' + escapeHtml(data.fullName) + '</strong> &mdash; Lịch trống (sẵn sàng tác nghiệp)</span>';
+                        hint.style.display = 'block';
+                    }
+                })
+                .catch(() => {
+                    hint.style.display = 'none';
+                });
+        }
+
         // Quản lý danh sách email phóng viên đề xuất bổ sung động
         const reqEmailsContainer = document.getElementById('request-emails-container');
         const btnAddReqEmail = document.getElementById('btn-add-req-email');
 
         if (btnAddReqEmail && reqEmailsContainer) {
             btnAddReqEmail.addEventListener('click', function() {
-                const newRow = document.createElement('div');
-                newRow.className = 'req-email-row';
-                newRow.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px;';
-                newRow.innerHTML = 
+                const newEntry = document.createElement('div');
+                newEntry.className = 'req-email-entry';
+                newEntry.style.cssText = 'margin-bottom: 8px;';
+                newEntry.innerHTML = 
+                    '<div class="req-email-row" style="display: flex; gap: 8px; align-items: center;">' +
                     '<input type="email" name="targetUserEmail" class="req-email-input" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">' +
                     '<button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">' +
                     '✕ Xóa' +
-                    '</button>';
-                reqEmailsContainer.appendChild(newRow);
-                newRow.querySelector('input').focus();
+                    '</button>' +
+                    '</div>' +
+                    '<div class="req-email-schedule-hint" style="font-size: 11.5px; margin-top: 4px; display: none;"></div>';
+                reqEmailsContainer.appendChild(newEntry);
+                const newInput = newEntry.querySelector('.req-email-input');
+                if (newInput) {
+                    newInput.focus();
+                    newInput.addEventListener('blur', function() { checkReqEmailSchedule(this); });
+                    newInput.addEventListener('change', function() { checkReqEmailSchedule(this); });
+                }
             });
 
             reqEmailsContainer.addEventListener('click', function(e) {
                 const btn = e.target.closest('.btn-remove-req-email');
                 if (btn) {
-                    const rows = reqEmailsContainer.querySelectorAll('.req-email-row');
-                    if (rows.length > 1) {
-                        btn.closest('.req-email-row').remove();
+                    const entries = reqEmailsContainer.querySelectorAll('.req-email-entry');
+                    if (entries.length > 1) {
+                        btn.closest('.req-email-entry').remove();
                     } else {
-                        const input = rows[0].querySelector('input');
+                        const input = entries[0].querySelector('input');
                         if (input) input.value = '';
+                        const hint = entries[0].querySelector('.req-email-schedule-hint');
+                        if (hint) {
+                            hint.innerHTML = '';
+                            hint.style.display = 'none';
+                        }
                     }
+                }
+            });
+
+            document.querySelectorAll('.req-email-input').forEach(function(inp) {
+                inp.addEventListener('blur', function() { checkReqEmailSchedule(this); });
+                inp.addEventListener('change', function() { checkReqEmailSchedule(this); });
+                if (inp.value && inp.value.trim()) {
+                    checkReqEmailSchedule(inp);
                 }
             });
         }

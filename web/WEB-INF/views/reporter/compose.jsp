@@ -101,7 +101,7 @@
 
                             <div class="field">
                                 <label for="deadline">Thời hạn hoàn thành dự kiến <span style="color:var(--danger)">*</span></label>
-                                <input id="deadline" name="deadline" type="date" value="${formTopic.deadline}" min="${today}" required>
+                                <input id="deadline" name="deadline" type="date" value="${formTopic.deadline}" min="${tomorrow}" required>
                             </div>
 
                             <div class="field">
@@ -457,7 +457,29 @@
         window.open('${base}/reporter/duplicate-search?keyword=' + titleVal, '_blank');
     });
 
+    // Thiết lập giới hạn ngày hoàn thành dự kiến phải từ ngày mai trở đi
+    const deadlineInput = document.getElementById('deadline');
+    if (deadlineInput) {
+        const tmr = new Date();
+        tmr.setDate(tmr.getDate() + 1);
+        const tmrStr = tmr.toISOString().split('T')[0];
+        if (!deadlineInput.min || deadlineInput.min < tmrStr) {
+            deadlineInput.min = tmrStr;
+        }
+    }
+
     document.getElementById('pitch-form')?.addEventListener('submit', function(e) {
+        const dlInput = document.getElementById('deadline');
+        if (dlInput && dlInput.value) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (dlInput.value <= todayStr) {
+                e.preventDefault();
+                alert('Thời hạn hoàn thành dự kiến (Deadline) phải là một ngày trong tương lai (từ ngày mai trở đi)!');
+                dlInput.focus();
+                return false;
+            }
+        }
+
         const emailInputs = document.querySelectorAll('.member-email-input');
         const seen = new Set();
         let dup = '';

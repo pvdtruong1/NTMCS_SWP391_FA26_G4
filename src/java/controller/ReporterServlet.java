@@ -209,6 +209,7 @@ public class ReporterServlet extends HttpServlet {
 
     private void populateFormOptions(HttpServletRequest request) {
         request.setAttribute("today", LocalDate.now());
+        request.setAttribute("tomorrow", LocalDate.now().plusDays(1));
         CategoryDAO catDAO = new CategoryDAO();
         request.setAttribute("categories", catDAO.getAll());
 
@@ -340,8 +341,9 @@ public class ReporterServlet extends HttpServlet {
 
         if (!deadline.isEmpty()) {
             try {
-                if (LocalDate.parse(deadline).isBefore(LocalDate.now())) {
-                    return "Deadline không được nằm trong quá khứ.";
+                LocalDate deadlineDate = LocalDate.parse(deadline);
+                if (!deadlineDate.isAfter(LocalDate.now())) {
+                    return "Thời hạn hoàn thành dự kiến (Deadline) phải là một ngày trong tương lai (từ ngày mai trở đi).";
                 }
             } catch (DateTimeParseException e) {
                 return "Định dạng ngày deadline không hợp lệ.";

@@ -17,7 +17,9 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Asset;
@@ -43,6 +45,15 @@ public class TopicRequestServlet extends HttpServlet {
     private final UserDAO userDAO = new UserDAO();
     private final TopicRequestDAO requestDAO = new TopicRequestDAO();
 
+    /**
+     * Xử lý điều hướng các yêu cầu GET của Phân hệ Đề Xuất & Xin Hỗ Trợ Đề Tài (Topic Requests):
+     * 1. Khi KHÔNG truyền topicId: Hiển thị danh sách các đề tài đã APPROVED/IN_PROGRESS của phóng viên (topic-requests-list.jsp).
+     * 2. Khi CÓ truyền topicId: Mở form phiếu đề xuất (topic-requests.jsp) gồm 3 tab chức năng:
+     *    - Tab 1: Mượn trang thiết bị / phương tiện tác nghiệp (Asset Request).
+     *    - Tab 2: Xin gia hạn thời hạn nộp bài (Deadline Extension Request).
+     *    - Tab 3: Đề xuất điều chỉnh nhân sự tổ tác nghiệp (bổ sung qua email hoặc rút bớt thành viên).
+     *    - Tab 4: Lịch sử các đề xuất đã gửi.
+     */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -84,11 +95,59 @@ public class TopicRequestServlet extends HttpServlet {
             List<RequestDeadlineExtension> deadlineRequests = requestDAO.getDeadlineRequestsByTopic(topicId);
             List<String> memberNotifications = requestDAO.getMemberChangeNotificationsByTopic(topicId);
 
+            // 1. Tập hợp các ID đã có trong nhóm (bao gồm Tác giả/Chủ đề tài + mọi thành viên hiện tại)
+            Set<Integer> existingUserIds = new HashSet<>();
+            existingUserIds.add(topic.getAuthorUserId());
+            if (currentMembers != null) {
+                for (TopicMember m : currentMembers) {
+                    existingUserIds.add(m.getUserId());
+                }
+            }
+
+            // 2. Danh sách nhân sự CÓ THỂ THÊM: Chỉ những phóng viên CHƯA có mặt trong nhóm
+            List<User> availableUsersToAdd = new ArrayList<>();
+            if (allUsers != null) {
+                for (User u : allUsers) {
+                    if (!existingUserIds.contains(u.getUserId())) {
+                        availableUsersToAdd.add(u);
+                    }
+                }
+            }
+
+            // 3. Danh sách thành viên CÓ THỂ RÚT: Loại bỏ Tác giả/Chủ đề tài và Lead Reporter
+            List<TopicMember> removableMembers = new ArrayList<>();
+            if (currentMembers != null) {
+                for (TopicMember m : currentMembers) {
+                    if (m.getUserId() != topic.getAuthorUserId() && !"LEAD_REPORTER".equalsIgnoreCase(m.getRoleInTeam())) {
+                        removableMembers.add(m);
+                    }
+                }
+            }
+
+            String flashError = (String) request.getSession().getAttribute("flashError");
+            if (flashError != null) {
+                request.setAttribute("error", flashError);
+                request.getSession().removeAttribute("flashError");
+            }
+            @SuppressWarnings("unchecked")
+            List<String> flashEmails = (List<String>) request.getSession().getAttribute("flashEmails");
+            if (flashEmails != null) {
+                request.setAttribute("formEmails", flashEmails);
+                request.getSession().removeAttribute("flashEmails");
+            }
+            String flashReason = (String) request.getSession().getAttribute("flashReason");
+            if (flashReason != null) {
+                request.setAttribute("formReason", flashReason);
+                request.getSession().removeAttribute("flashReason");
+            }
+
             request.setAttribute("topic", topic);
             request.setAttribute("isApproved", isApproved);
             request.setAttribute("availableAssets", availableAssets);
             request.setAttribute("allUsers", allUsers);
+            request.setAttribute("availableUsersToAdd", availableUsersToAdd);
             request.setAttribute("currentMembers", currentMembers);
+            request.setAttribute("removableMembers", removableMembers);
             request.setAttribute("assetRequests", assetRequests);
             request.setAttribute("deadlineRequests", deadlineRequests);
             request.setAttribute("memberNotifications", memberNotifications);
@@ -101,6 +160,17 @@ public class TopicRequestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Xử lý tiếp nhận và xác thực dữ liệu POST của các loại đề xuất (requestType):
+     * 1. ASSET_REQUEST: Đề xuất mượn 1 hoặc nhiều trang thiết bị (kiểm tra xung đột lịch mượn,
+     *    thời gian bắt đầu/kết thúc không ở quá khứ, lưu vào bảng Asset_Request).
+     * 2. DEADLINE_REQUEST: Xin gia hạn hạn nộp bài (kiểm tra hạn mới phải sau hôm nay và sau hạn cũ,
+     *    lưu vào Request_Deadline_Extension).
+     * 3. MEMBER_REQUEST: Đề xuất thay đổi nhân sự nhóm tác nghiệp:
+     *    - Action "ADD": Bổ sung phóng viên theo danh sách email (kiểm tra email tồn tại, active, role REPORTER,
+     *      không trùng chính mình, không trùng người đã trong nhóm, gửi thông báo [PENDING] và ghi audit log).
+     *    - Action "REMOVE": Rút thành viên (chặn rút tác giả/chủ đề tài hoặc Lead Reporter, gửi thông báo [PENDING]).
+     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -224,9 +294,22 @@ public class TopicRequestServlet extends HttpServlet {
                 // 2. Phóng viên xin gia hạn deadline
                 String requestedDeadlineStr = request.getParameter("requestedDeadline");
                 String reason = request.getParameter("reason");
-                Date requestedDeadline = Date.valueOf(requestedDeadlineStr);
+                if (requestedDeadlineStr == null || requestedDeadlineStr.trim().isEmpty()) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=invalidTime&type=deadline");
+                    return;
+                }
+                Date requestedDeadline = Date.valueOf(requestedDeadlineStr.trim());
+                long currentTime = System.currentTimeMillis();
+                Date today = new Date(currentTime - (currentTime % 86400000L)); // Ngày hôm nay (00:00:00)
+                Date currentDeadline = (topic.getDeadline() != null) ? topic.getDeadline() : today;
 
-                Date currentDeadline = (topic.getDeadline() != null) ? topic.getDeadline() : new Date(System.currentTimeMillis());
+                // Chặn tuyệt đối: Không được chọn ngày trong quá khứ hoặc trước hạn nộp hiện tại
+                if (requestedDeadline.before(today) || requestedDeadline.before(currentDeadline)) {
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=pastTime&type=deadline");
+                    return;
+                }
 
                 RequestDeadlineExtension req = new RequestDeadlineExtension();
                 req.setTopicId(topicId);
@@ -239,19 +322,151 @@ public class TopicRequestServlet extends HttpServlet {
                 type = "deadline";
 
             } else if ("MEMBER_REQUEST".equalsIgnoreCase(requestType)) {
-                // 3. Phﾃｳng viﾃｪn xin thay ﾄ黛ｻ品 nhﾃ｢n s盻ｱ
-                int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
+                // 3. Phóng viên xin thay đổi nhân sự
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
 
-                if ("ADD".equalsIgnoreCase(actionType) && !userDAO.isReporter(targetUserId)) {
+                if ("ADD".equalsIgnoreCase(actionType)) {
+                    String[] emailValues = request.getParameterValues("targetUserEmail");
+                    List<String> rawEmailList = new ArrayList<>();
+                    if (emailValues != null) {
+                        for (String em : emailValues) {
+                            if (em != null && !em.trim().isEmpty()) {
+                                rawEmailList.add(em.trim());
+                            }
+                        }
+                    }
+
+                    if (rawEmailList.isEmpty()) {
+                        request.getSession().setAttribute("flashError", "Vui lòng nhập ít nhất một địa chỉ email phóng viên muốn bổ sung.");
+                        request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                        return;
+                    }
+
+                    // Lấy danh sách thành viên hiện tại của đề tài
+                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
+                    Set<Integer> currentMemberUserIds = new HashSet<>();
+                    currentMemberUserIds.add(topic.getAuthorUserId());
+                    if (currentMembers != null) {
+                        for (TopicMember m : currentMembers) {
+                            currentMemberUserIds.add(m.getUserId());
+                        }
+                    }
+
+                    Set<String> seenEmails = new HashSet<>();
+                    List<User> validTargetUsers = new ArrayList<>();
+
+                    for (String em : rawEmailList) {
+                        String lower = em.toLowerCase();
+                        if (seenEmails.contains(lower)) {
+                            request.getSession().setAttribute("flashError", "Email '" + em + "' bị nhập trùng lặp nhiều lần trong danh sách.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+                        seenEmails.add(lower);
+
+                        // Không được thêm chính mình
+                        if (loggedUser.getEmail() != null && lower.equalsIgnoreCase(loggedUser.getEmail())) {
+                            request.getSession().setAttribute("flashError", "Bạn (" + em + ") là người tạo yêu cầu, không thể tự thêm chính mình vào danh sách xin bổ sung.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        // Kiểm tra trong DB: tồn tại, active, role REPORTER
+                        User u = userDAO.getActiveReporterByEmail(em);
+                        if (u == null) {
+                            User existingUser = userDAO.getByEmail(em);
+                            String detailMsg;
+                            if (existingUser == null) {
+                                detailMsg = "Không tìm thấy người dùng với email '" + em + "'.";
+                            } else if (!existingUser.isActiveStatus()) {
+                                detailMsg = "Tài khoản phóng viên '" + em + "' đang bị vô hiệu hóa (INACTIVE).";
+                            } else {
+                                detailMsg = "Người dùng '" + em + "' không có vai trò Phóng viên (REPORTER).";
+                            }
+                            request.getSession().setAttribute("flashError", detailMsg);
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        // Kiểm tra xem đã có trong nhóm chưa
+                        if (currentMemberUserIds.contains(u.getUserId())) {
+                            request.getSession().setAttribute("flashError", "Phóng viên " + u.getFullName() + " (" + em + ") đã có mặt trong ekip đề tài này rồi.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        validTargetUsers.add(u);
+                    }
+
+                    success = requestDAO.sendMultiMemberAddNotification(topicId, loggedUser.getUserId(), validTargetUsers, reason);
+                    type = "member";
                     response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                            + "&status=invalidRole&type=member");
+                            + "&status=" + (success ? "success" : "failed")
+                            + "&type=" + type + "#member");
+                    return;
+
+                } else if ("REMOVE".equalsIgnoreCase(actionType)) {
+                    int targetUserId = 0;
+                    try {
+                        targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
+                    } catch (NumberFormatException ignored) {}
+
+                    if (targetUserId <= 0) {
+                        request.getSession().setAttribute("flashError", "Vui lòng chọn thành viên cần rút khỏi ekip.");
+                        request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                        return;
+                    }
+
+                    // Không được phép xin rút tác giả / người chủ trì đề tài
+                    if (targetUserId == topic.getAuthorUserId()) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=cannotRemoveAuthor&type=member#member");
+                        return;
+                    }
+                    // Kiểm tra nhân sự có thực sự đang nằm trong nhóm hay không và có phải Lead không
+                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
+                    boolean inTeam = false;
+                    boolean isLead = false;
+                    if (currentMembers != null) {
+                        for (TopicMember m : currentMembers) {
+                            if (m.getUserId() == targetUserId) {
+                                inTeam = true;
+                                if ("LEAD_REPORTER".equalsIgnoreCase(m.getRoleInTeam())) {
+                                    isLead = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (isLead) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=cannotRemoveAuthor&type=member#member");
+                        return;
+                    }
+                    if (!inTeam) {
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                                + "&status=notInTeam&type=member#member");
+                        return;
+                    }
+
+                    success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
+                    type = "member";
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=" + (success ? "success" : "failed")
+                            + "&type=" + type + "#member");
                     return;
                 }
-
-                success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
-                type = "member";
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error processing Topic request: " + requestType, e);

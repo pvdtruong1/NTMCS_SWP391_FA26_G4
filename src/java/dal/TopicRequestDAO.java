@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import model.AssetRequest;
 import model.RequestDeadlineExtension;
 import model.Topic;
+import model.User;
 
 /**
  * Data Access Object for handling Reporter Topic requests:
@@ -70,6 +71,12 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 1. ASSET REQUEST (Xin mượn tài sản)
     // ==========================================
+
+    /**
+     * Kiểm tra xung đột lịch mượn trang thiết bị / phương tiện:
+     * Trả về true nếu thiết bị đó đã có đơn mượn khác ở trạng thái APPROVED hoặc PENDING
+     * bị trùng khung thời gian [startTime, endTime].
+     */
     public boolean hasAssetScheduleConflict(int assetId, Timestamp startTime, Timestamp endTime) {
         String sql = "SELECT COUNT(*) FROM Asset_Request "
                    + "WHERE asset_id = ? "
@@ -91,6 +98,9 @@ public class TopicRequestDAO extends DBContext {
         return false;
     }
 
+    /**
+     * Lấy tên đầy đủ kèm mã tài sản để hiển thị thông báo lỗi khi phát hiện xung đột lịch.
+     */
     public String getAssetName(int assetId) {
         String sql = "SELECT asset_name, asset_code FROM Asset WHERE asset_id = ?";
         try (Connection conn = getConnection();
@@ -107,6 +117,9 @@ public class TopicRequestDAO extends DBContext {
         return "Thiết bị #" + assetId;
     }
 
+    /**
+     * Lưu một đơn yêu cầu mượn thiết bị đơn lẻ vào bảng Asset_Request với trạng thái PENDING.
+     */
     public boolean insertAssetRequest(AssetRequest req) {
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
                    + "VALUES (?, ?, ?, ?, ?, 'PENDING')";
@@ -124,6 +137,10 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lưu danh sách nhiều yêu cầu mượn thiết bị cùng lúc sử dụng Transaction và JDBC Batch.
+     * Trả về số lượng thiết bị đã gửi yêu cầu mượn thành công.
+     */
     public int insertAssetRequests(List<AssetRequest> requests) {
         if (requests == null || requests.isEmpty()) return 0;
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
@@ -171,6 +188,9 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lấy danh sách toàn bộ các yêu cầu mượn thiết bị đã gửi của một đề tài cụ thể.
+     */
     public List<AssetRequest> getAssetRequestsByTopic(int topicId) {
         List<AssetRequest> list = new ArrayList<>();
         String sql = "SELECT ar.request_id, ar.topic_id, ar.asset_id, ar.requester_user_id, "
@@ -210,6 +230,10 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 2. DEADLINE EXTENSION (Xin gia hạn Deadline)
     // ==========================================
+
+    /**
+     * Thêm yêu cầu xin gia hạn Deadline đề tài vào bảng Request_Deadline_Extension với trạng thái PENDING.
+     */
     public boolean insertDeadlineExtensionRequest(RequestDeadlineExtension req) {
         String sql = "INSERT INTO Request_Deadline_Extension "
                    + "(topic_id, requested_by_user_id, current_deadline, requested_deadline, reason, status) "
@@ -228,6 +252,9 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lấy danh sách lịch sử các yêu cầu xin gia hạn Deadline của một đề tài.
+     */
     public List<RequestDeadlineExtension> getDeadlineRequestsByTopic(int topicId) {
         List<RequestDeadlineExtension> list = new ArrayList<>();
         String sql = "SELECT dr.request_id, dr.topic_id, dr.requested_by_user_id, dr.current_deadline, "
@@ -262,6 +289,13 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 3. MEMBER CHANGE PROPOSAL (Thay đổi nhân sự)
     // ==========================================
+
+    /**
+     * Gửi đề xuất điều chỉnh nhân sự đơn lẻ (thêm hoặc rút 1 thành viên) qua hệ thống Notification:
+     * - Gửi thông báo kèm tag [PENDING] tới Desk Editor phụ trách ban chuyên môn của đề tài.
+     * - Lưu thông báo xác nhận cho chính phóng viên gửi đề xuất.
+     * - Ghi vết kiểm toán vào bảng Audit_Log.
+     */
     public boolean sendMemberChangeNotification(int topicId, int requesterId, int targetUserId, String actionType, String reason) {
         // Tìm Desk Editor phụ trách chuyên mục của Đề tài
         String sqlFindEditor = "SELECT TOP 1 u.user_id FROM [User] u "
@@ -309,7 +343,7 @@ public class TopicRequestDAO extends DBContext {
             }
 
             String actionText = "ADD".equalsIgnoreCase(actionType) ? "THÊM" : "RÚT KHỎI NHÓM";
-            String msg = "[ĐỀ XUẤT NHÂN SỰ] Phóng viên đề xuất " + actionText + " nhân sự: " 
+            String msg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Phóng viên đề xuất " + actionText + " nhân sự: " 
                        + targetName + " cho đề tài. Lý do: " + reason;
 
             // Gửi thông báo cho Desk Editor / Ban Biên Tập
@@ -322,7 +356,7 @@ public class TopicRequestDAO extends DBContext {
 
             // Đồng thời lưu 1 bản ghi thông báo xác nhận cho chính phóng viên
             if (requesterId != editorId) {
-                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] Bạn đã gửi đề xuất " + actionText + " nhân sự: " 
+                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Bạn đã gửi đề xuất " + actionText + " nhân sự: " 
                                    + targetName + " cho đề tài #" + topicId + ". Lý do: " + reason;
                 try (PreparedStatement psNoti2 = conn.prepareStatement(sqlInsertNoti)) {
                     psNoti2.setInt(1, requesterId);
@@ -331,6 +365,13 @@ public class TopicRequestDAO extends DBContext {
                     psNoti2.executeUpdate();
                 }
             }
+
+            // Ghi nhận vào Audit_Log
+            try {
+                new AuditLogDAO().log(requesterId, "PROPOSE_CHANGE_MEMBER", "TOPIC", topicId,
+                        "Đề xuất " + actionText + " nhân sự: " + targetName + ". Lý do: " + reason);
+            } catch (Exception ignored) {}
+
             return true;
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Failed to send member change notification", e);
@@ -338,6 +379,95 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Gửi đề xuất THÊM nhiều nhân sự bằng danh sách User (đã validate email)
+     * Lưu vào Notification và Audit_Log với trạng thái PENDING
+     */
+    public boolean sendMultiMemberAddNotification(int topicId, int requesterId, List<User> targetUsers, String reason) {
+        if (targetUsers == null || targetUsers.isEmpty()) {
+            return false;
+        }
+        String sqlFindEditor = "SELECT TOP 1 u.user_id FROM [User] u "
+                             + "INNER JOIN Category c ON u.desk_id = c.desk_id "
+                             + "INNER JOIN Topic t ON t.category_id = c.category_id "
+                             + "INNER JOIN Role r ON u.role_id = r.role_id "
+                             + "WHERE t.topic_id = ? AND r.role_name IN ('DESK_EDITOR', 'MANAGING_EDITOR') ";
+
+        String sqlInsertNoti = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
+
+        try (Connection conn = getConnection()) {
+            int editorId = 0;
+            try (PreparedStatement ps = conn.prepareStatement(sqlFindEditor)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        editorId = rs.getInt("user_id");
+                    }
+                }
+            }
+
+            if (editorId == 0) {
+                String sqlAdmin = "SELECT TOP 1 u.user_id FROM [User] u "
+                                + "JOIN Role r ON u.role_id = r.role_id "
+                                + "WHERE r.role_name IN ('MANAGING_EDITOR', 'SYSTEM_ADMINISTRATOR', 'ADMIN') "
+                                + "ORDER BY u.user_id ASC";
+                try (PreparedStatement psAdmin = conn.prepareStatement(sqlAdmin);
+                     ResultSet rsAdmin = psAdmin.executeQuery()) {
+                    if (rsAdmin.next()) {
+                        editorId = rsAdmin.getInt("user_id");
+                    }
+                }
+            }
+
+            StringBuilder userDetails = new StringBuilder();
+            for (int i = 0; i < targetUsers.size(); i++) {
+                User u = targetUsers.get(i);
+                if (i > 0) userDetails.append(", ");
+                userDetails.append(u.getFullName()).append(" (").append(u.getEmail()).append(")");
+            }
+
+            String msg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Phóng viên đề xuất THÊM " + targetUsers.size() 
+                       + " nhân sự vào tổ tác nghiệp: " + userDetails.toString() 
+                       + ". Lý do: " + (reason != null ? reason.trim() : "");
+
+            // Gửi thông báo cho Desk Editor / Ban Biên Tập
+            try (PreparedStatement psNoti = conn.prepareStatement(sqlInsertNoti)) {
+                psNoti.setInt(1, editorId);
+                psNoti.setInt(2, topicId);
+                psNoti.setString(3, msg);
+                psNoti.executeUpdate();
+            }
+
+            // Gửi thông báo xác nhận cho chính phóng viên
+            if (requesterId != editorId) {
+                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Bạn đã gửi đề xuất THÊM nhân sự: " 
+                                   + userDetails.toString() + " cho đề tài #" + topicId 
+                                   + ". Lý do: " + (reason != null ? reason.trim() : "");
+                try (PreparedStatement psNoti2 = conn.prepareStatement(sqlInsertNoti)) {
+                    psNoti2.setInt(1, requesterId);
+                    psNoti2.setInt(2, topicId);
+                    psNoti2.setString(3, reporterMsg);
+                    psNoti2.executeUpdate();
+                }
+            }
+
+            // Lưu vào Audit_Log
+            try {
+                new AuditLogDAO().log(requesterId, "PROPOSE_ADD_MEMBERS", "TOPIC", topicId,
+                        "Đề xuất thêm nhân sự: " + userDetails + ". Lý do: " + reason);
+            } catch (Exception ignored) {}
+
+            return true;
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to send multi-member add notification", e);
+            return false;
+        }
+    }
+
+    /**
+     * Lấy danh sách các thông báo đề xuất thay đổi nhân sự đã gửi cho một đề tài,
+     * phục vụ hiển thị lịch sử đề xuất trên form topic-requests.jsp.
+     */
     public List<String> getMemberChangeNotificationsByTopic(int topicId) {
         List<String> list = new ArrayList<>();
         String sql = "SELECT message FROM Notification "

@@ -35,7 +35,6 @@ import java.util.logging.Logger;
 @WebServlet(name = "EditorialDashboardServlet", urlPatterns = {"/editorial/dashboard", "/editorial/editorial-dashboard"})
 public class EditorialDashboardServlet extends HttpServlet {
     private static final Logger LOGGER = Logger.getLogger(EditorialDashboardServlet.class.getName());
-    private final TopicDAO topicDAO = new TopicDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -75,32 +74,34 @@ public class EditorialDashboardServlet extends HttpServlet {
             }
         }
 
-        // 3. Fetch KPI Metrics
-        EditorialDashboardDTO metrics = topicDAO.getEditorialDashboardMetrics(selectedDeskId, isExecutive);
+        try (TopicDAO topicDAO = new TopicDAO()) {
+            // 3. Fetch KPI Metrics
+            EditorialDashboardDTO metrics = topicDAO.getEditorialDashboardMetrics(selectedDeskId, isExecutive);
 
-        // 4. Fetch Pending Deliverables (DELIVERED topics awaiting acceptance review)
-        List<TopicDeliverableDTO> pendingDeliverables = topicDAO.getPendingDeliverables(selectedDeskId, isExecutive);
+            // 4. Fetch Pending Deliverables (DELIVERED topics awaiting acceptance review)
+            List<TopicDeliverableDTO> pendingDeliverables = topicDAO.getPendingDeliverables(selectedDeskId, isExecutive);
 
-        // 4b. Fetch Pending Pitches (SUBMITTED topics awaiting evaluation)
-        int filterDesk = (selectedDeskId > 0) ? selectedDeskId : 1;
-        List<TopicPendingDTO> pendingPitches = topicDAO.getPendingTopics(filterDesk, "SUBMITTED", null, 1, 5);
+            // 4b. Fetch Pending Pitches (SUBMITTED topics awaiting evaluation)
+            int filterDesk = (selectedDeskId > 0) ? selectedDeskId : 1;
+            List<TopicPendingDTO> pendingPitches = topicDAO.getPendingTopics(filterDesk, "SUBMITTED", null, 1, 5);
 
-        // 5. Fetch Recent CMS Handover Records (Audit Trail)
-        List<CmsHandoverRecordDTO> recentHandovers = topicDAO.getRecentCmsHandovers(selectedDeskId, isExecutive, 10);
+            // 5. Fetch Recent CMS Handover Records (Audit Trail)
+            List<CmsHandoverRecordDTO> recentHandovers = topicDAO.getRecentCmsHandovers(selectedDeskId, isExecutive, 10);
 
-        // 6. Fetch all desks for TBT scope switcher
-        List<Desk> deskList = topicDAO.getAllDesks();
+            // 6. Fetch all desks for TBT scope switcher
+            List<Desk> deskList = topicDAO.getAllDesks();
 
-        // 7. Pass context to JSP
-        request.setAttribute("metrics", metrics);
-        request.setAttribute("pendingDeliverables", pendingDeliverables);
-        request.setAttribute("deliverables", pendingDeliverables);
-        request.setAttribute("pendingPitches", pendingPitches);
-        request.setAttribute("recentHandovers", recentHandovers);
-        request.setAttribute("deskList", deskList);
-        request.setAttribute("selectedDeskId", selectedDeskId);
-        request.setAttribute("isExecutive", isExecutive);
-        request.setAttribute("currentUser", currentUser);
+            // 7. Pass context to JSP
+            request.setAttribute("metrics", metrics);
+            request.setAttribute("pendingDeliverables", pendingDeliverables);
+            request.setAttribute("deliverables", pendingDeliverables);
+            request.setAttribute("pendingPitches", pendingPitches);
+            request.setAttribute("recentHandovers", recentHandovers);
+            request.setAttribute("deskList", deskList);
+            request.setAttribute("selectedDeskId", selectedDeskId);
+            request.setAttribute("isExecutive", isExecutive);
+            request.setAttribute("currentUser", currentUser);
+        }
 
         // Forward flash feedback parameters from PRG
         String msg = request.getParameter("msg");
@@ -146,7 +147,7 @@ public class EditorialDashboardServlet extends HttpServlet {
             return;
         }
 
-        try {
+        try (TopicDAO topicDAO = new TopicDAO()) {
             if ("accept_cms".equalsIgnoreCase(action)) {
                 // Execute RULE-02 Acceptance Handover & HMAC-SHA256 Token Minting
                 String reviewNote = request.getParameter("note");

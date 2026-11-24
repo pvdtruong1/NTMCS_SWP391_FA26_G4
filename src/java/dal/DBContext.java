@@ -32,7 +32,7 @@ public class DBContext implements AutoCloseable {
             Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
             Thread warmupThread = new Thread(() -> {
                 try {
-                    for (int i = 0; i < 4; i++) {
+                    for (int i = 0; i < 2; i++) {
                         Connection conn = DriverManager.getConnection(URL, USER, PASS);
                         if (!POOL.offer(conn)) {
                             conn.close();
@@ -49,24 +49,37 @@ public class DBContext implements AutoCloseable {
     }
 
     /**
+     * Helper to verify connection is alive with 1-second timeout.
+     */
+    private static boolean isAlive(Connection conn) {
+        if (conn == null) return false;
+        try {
+            return !conn.isClosed() && conn.isValid(1);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Acquire an active connection from the pool, or establish a new connection if the pool is empty.
      */
     public Connection getConnection() throws SQLException {
-        if (connection != null && !connection.isClosed()) {
-            return connection;
+        if (connection != null) {
+            if (isAlive(connection)) {
+                return connection;
+            }
+            try { connection.close(); } catch (Exception ignore) {}
+            connection = null;
         }
 
         Connection conn = POOL.poll();
         while (conn != null) {
-            try {
-                if (!conn.isClosed()) {
-                    this.connection = conn;
-                    this.borrowedFromPool = true;
-                    return this.connection;
-                }
-            } catch (SQLException ignored) {
-                try { conn.close(); } catch (Exception ignore) {}
+            if (isAlive(conn)) {
+                this.connection = conn;
+                this.borrowedFromPool = true;
+                return this.connection;
             }
+            try { conn.close(); } catch (Exception ignore) {}
             conn = POOL.poll();
         }
 

@@ -329,12 +329,12 @@ async function updateTaskStatus(taskId, status) {
         });
         const res = await resp.json();
         if (resp.ok) {
-            window.location.reload();
+            reloadWithToast('Cập nhật trạng thái thành công!', 'success');
         } else {
-            alert(res.error || 'Cập nhật trạng thái thất bại.');
+            showToast(res.error || 'Cập nhật trạng thái thất bại.', 'error');
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     }
 }
 
@@ -352,14 +352,13 @@ async function submitDeliverable(e) {
         });
         const res = await resp.json();
         if (resp.ok) {
-            alert(res.message || 'Nộp sản phẩm thành công!');
-            window.location.reload();
+            reloadWithToast(res.message || 'Nộp sản phẩm thành công!', 'success');
         } else {
-            alert(res.error || 'Nộp sản phẩm thất bại.');
+            showToast(res.error || 'Nộp sản phẩm thất bại.', 'error');
             btn.disabled = false;
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
         btn.disabled = false;
     }
 }
@@ -381,16 +380,16 @@ async function submitEmergency(e) {
         });
         const res = await resp.json();
         if (resp.ok) {
-            alert(res.message || 'Đã phát báo động khẩn cấp thành công!');
+            showToast(res.message || 'Đã phát báo động khẩn cấp thành công!', 'success');
             closeModal('emergencyModal');
             document.getElementById('emergencyDescription').value = '';
             btn.disabled = false;
         } else {
-            alert(res.error || 'Gửi báo động thất bại.');
+            showToast(res.error || 'Gửi báo động thất bại.', 'error');
             btn.disabled = false;
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
         btn.disabled = false;
     }
 }

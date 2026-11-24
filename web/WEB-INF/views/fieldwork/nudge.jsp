@@ -250,17 +250,17 @@ async function submitNudge(e) {
         });
         const res = await resp.json();
         if (resp.ok) {
-            alert(res.message || 'Đã gửi lời nhắc đôn đốc thành công!');
+            showToast(res.message || 'Đã gửi lời nhắc đôn đốc thành công!', 'success');
             document.getElementById('nudgeTitle').value = '';
             document.getElementById('nudgeMessage').value = '';
             document.getElementById('nudgeSelect').value = '';
             document.getElementById('nudgeTopicId').value = '';
             document.getElementById('nudgeReporterId').value = '';
         } else {
-            alert(res.error || 'Gửi đôn đốc thất bại.');
+            showToast(res.error || 'Gửi đôn đốc thất bại.', 'error');
         }
     } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
+        showToast('Lỗi kết nối: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
     }

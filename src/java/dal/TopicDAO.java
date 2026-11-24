@@ -409,6 +409,33 @@ public class TopicDAO extends DBContext {
                 }
                 dto.setEstimates(estimates);
 
+                // Fetch Assigned Team Members
+                String memberSql = "SELECT tm.member_id, tm.topic_id, tm.user_id, tm.role_in_team, "
+                                 + "       u.full_name, u.email, r.role_name "
+                                 + "FROM Topic_Member tm "
+                                 + "JOIN [User] u ON tm.user_id = u.user_id "
+                                 + "JOIN Role r ON u.role_id = r.role_id "
+                                 + "WHERE tm.topic_id = ? "
+                                 + "ORDER BY tm.member_id ASC;";
+                List<TopicMember> members = new ArrayList<>();
+                try (PreparedStatement psMem = conn.prepareStatement(memberSql)) {
+                    psMem.setInt(1, topicId);
+                    try (ResultSet rsMem = psMem.executeQuery()) {
+                        while (rsMem.next()) {
+                            TopicMember tm = new TopicMember();
+                            tm.setMemberId(rsMem.getInt("member_id"));
+                            tm.setTopicId(rsMem.getInt("topic_id"));
+                            tm.setUserId(rsMem.getInt("user_id"));
+                            tm.setRoleInTeam(rsMem.getString("role_in_team"));
+                            tm.setUserName(rsMem.getString("full_name"));
+                            tm.setUserEmail(rsMem.getString("email"));
+                            tm.setUserRole(rsMem.getString("role_name"));
+                            members.add(tm);
+                        }
+                    }
+                }
+                dto.setMembers(members);
+
                 // Fetch Criteria Configs
                 dto.setCriteriaList(getCriteriaConfigs());
 
@@ -707,6 +734,52 @@ public class TopicDAO extends DBContext {
                 }
             }
 
+            // 5. If APPROVED, dispatch assignment notifications to all assigned team members in Topic_Member
+            if ("APPROVED".equals(newStatus)) {
+                String findMembersSql = "SELECT user_id, role_in_team FROM Topic_Member WHERE topic_id = ?;";
+                try (PreparedStatement psMem = conn.prepareStatement(findMembersSql)) {
+                    psMem.setInt(1, topicId);
+                    try (ResultSet rsMem = psMem.executeQuery()) {
+                        String insertMemberNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+                        try (PreparedStatement psNotifMem = conn.prepareStatement(insertMemberNotifSql)) {
+                            boolean hasBatch = false;
+                            while (rsMem.next()) {
+                                int memberUserId = rsMem.getInt("user_id");
+                                if (memberUserId <= 0 || memberUserId == authorId) {
+                                    continue; // Author already notified in step 4
+                                }
+                                String roleInTeam = rsMem.getString("role_in_team");
+                                String roleDisplay;
+                                if ("LEAD_REPORTER".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Trưởng nhóm tác nghiệp";
+                                } else if ("PHOTO_REPORTER".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Phóng viên ảnh";
+                                } else if ("CAMERAMAN".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Quay phim";
+                                } else if ("ASSISTANT".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Trợ lý tác nghiệp";
+                                } else {
+                                    roleDisplay = (roleInTeam != null && !roleInTeam.trim().isEmpty()) ? roleInTeam.trim() : "Thành viên kíp tác nghiệp";
+                                }
+
+                                String approverTitle = (evaluatorRoleId == 3) ? "Tổng Biên Tập" : "Trưởng ban";
+                                String memberNotifMsg = "[PHÂN CÔNG TÁC NGHIỆP] Bạn vừa được " + approverTitle
+                                        + " phê duyệt tham gia đề tài \"" + evalTopicTitle
+                                        + "\" (" + topicCode + ") với vai trò: " + roleDisplay + ".";
+                                psNotifMem.setInt(1, memberUserId);
+                                psNotifMem.setInt(2, topicId);
+                                psNotifMem.setString(3, memberNotifMsg);
+                                psNotifMem.addBatch();
+                                hasBatch = true;
+                            }
+                            if (hasBatch) {
+                                psNotifMem.executeBatch();
+                            }
+                        }
+                    }
+                }
+            }
+
             conn.commit();
             return true;
         } catch (SQLException ex) {
@@ -850,6 +923,50 @@ public class TopicDAO extends DBContext {
                     psNotifDesk.setInt(2, topicId);
                     psNotifDesk.setString(3, deskMsg);
                     psNotifDesk.executeUpdate();
+                }
+            }
+
+            // 7. If APPROVED by Executive Editor, dispatch assignment notifications to all assigned team members in Topic_Member
+            if ("APPROVED".equals(normDecision)) {
+                String findMembersSql = "SELECT user_id, role_in_team FROM Topic_Member WHERE topic_id = ?;";
+                try (PreparedStatement psMem = conn.prepareStatement(findMembersSql)) {
+                    psMem.setInt(1, topicId);
+                    try (ResultSet rsMem = psMem.executeQuery()) {
+                        String insertMemberNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+                        try (PreparedStatement psNotifMem = conn.prepareStatement(insertMemberNotifSql)) {
+                            boolean hasBatch = false;
+                            while (rsMem.next()) {
+                                int memberUserId = rsMem.getInt("user_id");
+                                if (memberUserId <= 0 || memberUserId == authorId) {
+                                    continue; // Author already notified in step 5
+                                }
+                                String roleInTeam = rsMem.getString("role_in_team");
+                                String roleDisplay;
+                                if ("LEAD_REPORTER".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Trưởng nhóm tác nghiệp";
+                                } else if ("PHOTO_REPORTER".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Phóng viên ảnh";
+                                } else if ("CAMERAMAN".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Quay phim";
+                                } else if ("ASSISTANT".equalsIgnoreCase(roleInTeam)) {
+                                    roleDisplay = "Trợ lý tác nghiệp";
+                                } else {
+                                    roleDisplay = (roleInTeam != null && !roleInTeam.trim().isEmpty()) ? roleInTeam.trim() : "Thành viên kíp tác nghiệp";
+                                }
+
+                                String memberNotifMsg = "[PHÂN CÔNG TÁC NGHIỆP] Tổng Biên Tập đã phê duyệt đề tài \""
+                                        + execTopicTitle + "\" (" + topicCode + "). Bạn được phân công tham gia với vai trò: " + roleDisplay + ".";
+                                psNotifMem.setInt(1, memberUserId);
+                                psNotifMem.setInt(2, topicId);
+                                psNotifMem.setString(3, memberNotifMsg);
+                                psNotifMem.addBatch();
+                                hasBatch = true;
+                            }
+                            if (hasBatch) {
+                                psNotifMem.executeBatch();
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1899,6 +2016,74 @@ public class TopicDAO extends DBContext {
                 }
             }
 
+            // 4. Trigger In-App Notification to Desk Editor(s) when pitch is SUBMITTED
+            if ("SUBMITTED".equalsIgnoreCase(topic.getStatus())) {
+                List<Integer> editorIds = new ArrayList<>();
+                String authorName = (topic.getReporterName() != null && !topic.getReporterName().trim().isEmpty())
+                        ? topic.getReporterName().trim() : "Phóng viên";
+
+                String findEditorSql = "SELECT u.user_id, auth.full_name AS author_name "
+                                     + "FROM Category c "
+                                     + "JOIN Desk d ON c.desk_id = d.desk_id "
+                                     + "JOIN [User] u ON u.desk_id = d.desk_id "
+                                     + "JOIN Role r ON u.role_id = r.role_id "
+                                     + "LEFT JOIN [User] auth ON auth.user_id = ? "
+                                     + "WHERE c.category_id = ? "
+                                     + "  AND r.role_name = 'DESK_EDITOR' "
+                                     + "  AND u.active_status = 1;";
+                try (PreparedStatement psEd = conn.prepareStatement(findEditorSql)) {
+                    psEd.setInt(1, topic.getAuthorUserId());
+                    psEd.setInt(2, topic.getCategoryId());
+                    try (ResultSet rsEd = psEd.executeQuery()) {
+                        while (rsEd.next()) {
+                            editorIds.add(rsEd.getInt("user_id"));
+                            String dbAuthor = rsEd.getString("author_name");
+                            if (dbAuthor != null && !dbAuthor.trim().isEmpty()) {
+                                authorName = dbAuthor.trim();
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: If no desk editor is assigned specifically to this desk, notify active desk/executive editors
+                if (editorIds.isEmpty()) {
+                    String fallbackSql = "SELECT u.user_id, auth.full_name AS author_name "
+                                       + "FROM [User] u "
+                                       + "JOIN Role r ON u.role_id = r.role_id "
+                                       + "LEFT JOIN [User] auth ON auth.user_id = ? "
+                                       + "WHERE r.role_name IN ('DESK_EDITOR', 'EXECUTIVE_EDITOR') "
+                                       + "  AND u.active_status = 1;";
+                    try (PreparedStatement psFb = conn.prepareStatement(fallbackSql)) {
+                        psFb.setInt(1, topic.getAuthorUserId());
+                        try (ResultSet rsFb = psFb.executeQuery()) {
+                            while (rsFb.next()) {
+                                editorIds.add(rsFb.getInt("user_id"));
+                                String dbAuthor = rsFb.getString("author_name");
+                                if (dbAuthor != null && !dbAuthor.trim().isEmpty()) {
+                                    authorName = dbAuthor.trim();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!editorIds.isEmpty()) {
+                    String notifMsg = "[ĐỀ TÀI CHỜ DUYỆT] Phóng viên " + authorName
+                                    + " vừa nộp đề xuất đề tài: \"" + topic.getTitle().trim()
+                                    + "\". Vui lòng thẩm định tại Hàng đợi.";
+                    String insertNotifSql = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0);";
+                    try (PreparedStatement psNotif = conn.prepareStatement(insertNotifSql)) {
+                        for (int editorId : editorIds) {
+                            psNotif.setInt(1, editorId);
+                            psNotif.setInt(2, topic.getTopicId());
+                            psNotif.setString(3, notifMsg);
+                            psNotif.addBatch();
+                        }
+                        psNotif.executeBatch();
+                    }
+                }
+            }
+
             conn.commit();
             return topic;
         } catch (SQLException | RuntimeException ex) {
@@ -2228,7 +2413,7 @@ public class TopicDAO extends DBContext {
     public EditorialDashboardDTO getEditorialDashboardMetrics(int deskId, boolean isExecutive) {
         EditorialDashboardDTO dto = new EditorialDashboardDTO();
         dto.setDeskId(deskId);
-
+//dùng count để đếm, khi submitted/pending thì +1
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ")
            .append("  COUNT(CASE WHEN t.status IN ('SUBMITTED', 'PENDING_EXECUTIVE_APPROVAL') THEN 1 END) AS pending_review, ")
@@ -2270,7 +2455,7 @@ public class TopicDAO extends DBContext {
                 dto.setDeskName("Toàn Tòa Soạn (Chỉ đạo Ban Biên tập)");
             }
 
-            // Calculate approval rate and latency
+            // tính hsuat
             int approvedTotal = dto.getAcceptedCmsCount() + dto.getActiveFieldworkCount();
             int decidedTotal = approvedTotal + dto.getRejectedCount();
             double approvalRate = (decidedTotal > 0) ? ((double) approvedTotal / decidedTotal * 100.0) : 100.0;

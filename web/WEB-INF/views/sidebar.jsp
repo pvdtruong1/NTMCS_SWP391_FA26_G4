@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <c:set var="base" value="${pageContext.request.contextPath}" />
+<c:set var="isSysAdmin" value="${sessionScope.loggedUser.roleId == 7 or sessionScope.user.roleId == 7 or sessionScope.loggedUser.roleName == 'SYSTEM_ADMINISTRATOR' or sessionScope.user.roleName == 'SYSTEM_ADMINISTRATOR'}" />
 <aside id="sidebar">
     <div class="brand">
         <div class="brand-logo">N</div>
@@ -11,7 +12,8 @@
     </div>
     <nav>
 
-        <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_PITCH')}">
+        <%-- PHÂN HỆ PHÓNG VIÊN (WF-01) - Ẩn với System Admin --%>
+        <c:if test="${not isSysAdmin and not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_PITCH')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ PHÓNG VIÊN (WF-01)</div>
                 <a href="${base}/reporter/dashboard" class="nav-item ${param.active == 'reporter-dashboard' ? 'active' : ''}">
@@ -32,7 +34,8 @@
             </div>
         </c:if>
 
-        <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
+        <%-- PHÂN HỆ BTV CHUYÊN MÔN (WF-02) - Ẩn với System Admin --%>
+        <c:if test="${not isSysAdmin and not empty sessionScope.permissions and sessionScope.permissions.contains('TOPIC_EVALUATE')}">
             <div class="nav-group">
                 <div class="nav-label">PHÂN HỆ BTV CHUYÊN MÔN (WF-02)</div>
                 <a href="${base}/editorial/dashboard" class="nav-item ${param.active == 'editorial-dashboard' ? 'active' : ''}">
@@ -40,6 +43,9 @@
                 </a>
                 <a href="${base}/editorial/pending-queue" class="nav-item ${param.active == 'pending-queue' or param.active == 'criteria-scoring' ? 'active' : ''}">
                     <i>📋</i> Hàng đợi chờ thẩm định
+                </a>
+                <a href="${base}/editorial/member-requests" class="nav-item ${param.active == 'member-requests' ? 'active' : ''}">
+                    <i>👥</i> Điều phối kíp tác nghiệp
                 </a>
                 <a href="${base}/editorial/directive-creation" class="nav-item ${param.active == 'directive-creation' or param.active == 'directive-topic' or param.active == 'reporter-dispatch' ? 'active' : ''}">
                     <i>⚡</i> Đặt hàng đề tài chỉ đạo
@@ -50,7 +56,8 @@
             </div>
         </c:if>
 
-        <c:if test="${sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or sessionScope.loggedUser.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.user.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.loggedUser.roleId == 7 or sessionScope.user.roleId == 7 or sessionScope.loggedUser.roleName == 'SYSTEM_ADMINISTRATOR' or sessionScope.user.roleName == 'SYSTEM_ADMINISTRATOR' or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE'))}">
+        <%-- HẬU CẦN & THIẾT BỊ (WF-03) - Ẩn với System Admin --%>
+        <c:if test="${not isSysAdmin and (sessionScope.loggedUser.roleId == 4 or sessionScope.user.roleId == 4 or sessionScope.loggedUser.roleName == 'LOGISTICS_COORDINATOR' or sessionScope.user.roleName == 'LOGISTICS_COORDINATOR' or (not empty sessionScope.permissions and sessionScope.permissions.contains('LOGISTICS_MANAGE')))}">
             <div class="nav-group">
                 <div class="nav-label">HẬU CẦN &amp; THIẾT BỊ (WF-03)</div>
                 <a href="${base}/assets" class="nav-item ${(param.active == 'assets' and empty param.action and empty param.status) ? 'active' : ''}">
@@ -74,7 +81,8 @@
             </div>
         </c:if>
 
-        <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('TOPIC_EVALUATE'))}">
+        <%-- HIỆN TRƯỜNG & ĐIỀU PHỐI (WF-04) - Ẩn với System Admin --%>
+        <c:if test="${not isSysAdmin and not empty sessionScope.permissions and (sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('TOPIC_EVALUATE'))}">
             <div class="nav-group">
                 <div class="nav-label">HIỆN TRƯỜNG &amp; ĐIỀU PHỐI (WF-04)</div>
                 <c:if test="${sessionScope.permissions.contains('FIELDWORK_TRACK') or sessionScope.permissions.contains('TOPIC_EVALUATE')}">
@@ -82,7 +90,7 @@
                         <i>📌</i> Bảng Kanban tác nghiệp
                     </a>
                 </c:if>
-                <c:if test="${sessionScope.permissions.contains('TOPIC_PITCH') or sessionScope.permissions.contains('FIELDWORK_TRACK')}">
+                <c:if test="${sessionScope.loggedUser.roleId == 1 or sessionScope.user.roleId == 1 or sessionScope.loggedUser.roleName == 'REPORTER' or sessionScope.user.roleName == 'REPORTER'}">
                     <a href="${base}/fieldwork/todo" class="nav-item ${param.active == 'fieldwork-todo' ? 'active' : ''}">
                         <i>✅</i> Việc hiện trường của tôi
                     </a>
@@ -101,20 +109,21 @@
             </div>
         </c:if>
 
-        <c:if test="${not empty sessionScope.permissions and (sessionScope.permissions.contains('USER_MANAGE') or sessionScope.permissions.contains('RBAC_MANAGE') or sessionScope.permissions.contains('AUDIT_VIEW'))}">
+        <%-- QUẢN TRỊ HỆ THỐNG (WF-05) - DÀNH CHO SYSTEM ADMIN --%>
+        <c:if test="${isSysAdmin or (not empty sessionScope.permissions and (sessionScope.permissions.contains('USER_MANAGE') or sessionScope.permissions.contains('RBAC_MANAGE') or sessionScope.permissions.contains('AUDIT_VIEW')))}">
             <div class="nav-group">
                 <div class="nav-label">QUẢN TRỊ HỆ THỐNG (WF-05)</div>
-                <c:if test="${sessionScope.permissions.contains('USER_MANAGE')}">
+                <c:if test="${isSysAdmin or sessionScope.permissions.contains('USER_MANAGE')}">
                     <a href="${base}/users" class="nav-item ${param.active == 'users' ? 'active' : ''}">
                         <i>👥</i> Tài khoản người dùng
                     </a>
                 </c:if>
-                <c:if test="${sessionScope.permissions.contains('RBAC_MANAGE')}">
+                <c:if test="${isSysAdmin or sessionScope.permissions.contains('RBAC_MANAGE')}">
                     <a href="${base}/rbac" class="nav-item ${param.active == 'rbac' ? 'active' : ''}">
                         <i>🛡️</i> Ma trận quyền (RBAC)
                     </a>
                 </c:if>
-                <c:if test="${sessionScope.permissions.contains('AUDIT_VIEW')}">
+                <c:if test="${isSysAdmin or sessionScope.permissions.contains('AUDIT_VIEW')}">
                     <a href="${base}/audit-log" class="nav-item ${param.active == 'audit' ? 'active' : ''}">
                         <i>📜</i> Nhật ký hệ thống (Audit)
                     </a>
@@ -122,7 +131,8 @@
             </div>
         </c:if>
 
-        <c:if test="${not empty sessionScope.permissions and sessionScope.permissions.contains('QUOTA_MANAGE')}">
+        <%-- ĐIỀU HÀNH & CHỈ TIÊU (WF-05) - Dành riêng cho Business Admin, ẩn với System Admin --%>
+        <c:if test="${not isSysAdmin and not empty sessionScope.permissions and sessionScope.permissions.contains('QUOTA_MANAGE')}">
             <div class="nav-group">
                 <div class="nav-label">ĐIỀU HÀNH &amp; CHỈ TIÊU (WF-05)</div>
                 <a href="${base}/dashboard" class="nav-item ${param.active == 'dashboard' ? 'active' : ''}">

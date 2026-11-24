@@ -499,7 +499,7 @@
     function copyTokenToClipboard(tokenText) {
         if (!tokenText) return;
         navigator.clipboard.writeText(tokenText).then(() => {
-            alert('Đã sao chép HMAC-SHA256 Token vào clipboard:\n' + tokenText);
+            showToast('Đã sao chép HMAC-SHA256 Token vào clipboard: ' + tokenText, 'success');
         }).catch(err => {
             prompt('Sao chép mã Token tại đây:', tokenText);
         });

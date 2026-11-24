@@ -308,6 +308,65 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Fieldwork Crew Members Card -->
+                    <div class="card" style="margin-top: 16px;">
+                        <div class="card-title">
+                            <h2>👥 Kíp Tác Nghiệp Đề Xuất (Fieldwork Crew)</h2>
+                            <span class="tag">${empty members ? 0 : members.size()} nhân sự</span>
+                        </div>
+
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Nhân sự</th>
+                                    <th>Vai trò đề xuất</th>
+                                    <th>Email liên hệ</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <c:choose>
+                                    <c:when test="${not empty members}">
+                                        <c:forEach items="${members}" var="m" varStatus="loop">
+                                            <tr>
+                                                <td>${loop.index + 1}</td>
+                                                <td>
+                                                    <b>${m.userName}</b>
+                                                </td>
+                                                <td>
+                                                    <c:choose>
+                                                        <c:when test="${m.roleInTeam == 'LEAD_REPORTER'}">
+                                                            <span class="badge" style="background: rgba(37,99,235,0.15); color: #2563eb; font-weight: 700;">Trưởng nhóm tác nghiệp</span>
+                                                        </c:when>
+                                                        <c:when test="${m.roleInTeam == 'PHOTO_REPORTER'}">
+                                                            <span class="badge" style="background: rgba(16,185,129,0.15); color: #059669; font-weight: 700;">Phóng viên ảnh</span>
+                                                        </c:when>
+                                                        <c:when test="${m.roleInTeam == 'CAMERAMAN'}">
+                                                            <span class="badge" style="background: rgba(245,158,11,0.15); color: #d97706; font-weight: 700;">Quay phim</span>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <span class="badge" style="background: rgba(100,116,139,0.15); color: #475569;">Trợ lý tác nghiệp</span>
+                                                        </c:otherwise>
+                                                    </c:choose>
+                                                </td>
+                                                <td style="color: var(--muted); font-size: 13px;">${m.userEmail}</td>
+                                            </tr>
+                                        </c:forEach>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <tr>
+                                            <td colspan="4" style="text-align: center; color: var(--muted); padding: 18px;">
+                                                Chưa đăng ký kíp tác nghiệp đi cùng. Tác giả (${topic.authorName}) sẽ trực tiếp tác nghiệp độc lập.
+                                            </td>
+                                        </tr>
+                                    </c:otherwise>
+                                </c:choose>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- RIGHT COLUMN: Rubric Scoring Desk & Decision Panel -->

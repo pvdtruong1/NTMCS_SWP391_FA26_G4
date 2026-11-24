@@ -2,6 +2,7 @@ package dto;
 
 import model.CriteriaConfig;
 import model.TopicEstimate;
+import model.TopicMember;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -29,6 +30,7 @@ public class TopicEvaluationDetailDTO implements Serializable {
     private String authorEmail;
 
     private List<TopicEstimate> estimates = new ArrayList<>();
+    private List<TopicMember> members = new ArrayList<>();
     private BigDecimal totalEstimateAmount = BigDecimal.ZERO;
     private List<CriteriaConfig> criteriaList = new ArrayList<>();
 
@@ -284,5 +286,13 @@ public class TopicEvaluationDetailDTO implements Serializable {
 
     public void setEvaluatedComments(java.util.Map<Integer, String> evaluatedComments) {
         this.evaluatedComments = evaluatedComments;
+    }
+
+    public List<TopicMember> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<TopicMember> members) {
+        this.members = (members != null) ? members : new ArrayList<>();
     }
 }

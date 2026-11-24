@@ -70,6 +70,7 @@ public class CriteriaScoringServlet extends HttpServlet {
         request.setAttribute("criteriaList", topicDetail.getCriteriaList());
         request.setAttribute("estimates", topicDetail.getEstimates());
         request.setAttribute("totalEstimate", topicDetail.getTotalEstimateAmount());
+        request.setAttribute("members", topicDetail.getMembers());
 
         boolean isExecReviewer = (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 7) && "PENDING_EXECUTIVE_APPROVAL".equalsIgnoreCase(topicDetail.getStatus());
         request.setAttribute("isExecReviewer", isExecReviewer);

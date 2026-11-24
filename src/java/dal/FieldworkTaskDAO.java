@@ -25,6 +25,7 @@ public class FieldworkTaskDAO extends DBContext {
                    + "FROM Fieldwork_Task ft "
                    + "JOIN Topic t ON ft.topic_id = t.topic_id "
                    + "JOIN [User] u ON ft.assignee_user_id = u.user_id "
+                   + "WHERE t.status IN ('APPROVED', 'IN_PROGRESS', 'DELIVERED') "
                    + "ORDER BY ft.task_id DESC";
 
         try (Connection connection = getConnection();
@@ -90,6 +91,7 @@ public class FieldworkTaskDAO extends DBContext {
                    + "JOIN Topic t ON ft.topic_id = t.topic_id "
                    + "JOIN [User] u ON ft.assignee_user_id = u.user_id "
                    + "WHERE ft.assignee_user_id = ? "
+                   + "  AND t.status IN ('APPROVED', 'IN_PROGRESS', 'DELIVERED') "
                    + "ORDER BY ft.task_id DESC";
 
         try (Connection connection = getConnection();

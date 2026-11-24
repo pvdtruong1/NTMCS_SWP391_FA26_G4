@@ -79,10 +79,21 @@ public class TopicRequestServlet extends HttpServlet {
         // 2. Nếu CÓ topicId -> Mở form đề xuất cho đề tài đó
         try {
             int topicId = Integer.parseInt(topicIdStr.trim());
-            Topic topic = topicDAO.getTopicById(topicId);
+            Topic topic = topicDAO.getTopicDetailForReporter(topicId, loggedUser.getUserId());
+            if (topic == null) {
+                topic = topicDAO.getTopicById(topicId);
+            }
             if (topic == null) {
                 response.sendRedirect(request.getContextPath() + "/reporter/requests?error=topicNotFound");
                 return;
+            }
+
+            if (topic.getReporterName() == null || topic.getReporterName().trim().isEmpty()) {
+                User author = userDAO.getById(topic.getAuthorUserId());
+                if (author != null) {
+                    topic.setReporterName(author.getFullName());
+                    topic.setReporterEmail(author.getEmail());
+                }
             }
 
             // Kiểm tra trạng thái duyệt của đề tài (chỉ duy nhất APPROVED đang trong giai đoạn tác nghiệp)

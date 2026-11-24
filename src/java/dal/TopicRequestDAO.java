@@ -430,11 +430,12 @@ public class TopicRequestDAO extends DBContext {
     public List<String> getMemberChangeNotificationsByTopic(int topicId) {
         List<String> list = new ArrayList<>();
         String sql = "SELECT message FROM Notification "
-                   + "WHERE topic_id = ? AND (message LIKE '%ĐỀ XUẤT%NHÂN SỰ%') "
+                   + "WHERE topic_id = ? AND message LIKE ? "
                    + "ORDER BY notification_id DESC";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, topicId);
+            ps.setString(2, "%ĐỀ XUẤT%NHÂN SỰ%");
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(rs.getString("message"));

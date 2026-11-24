@@ -494,7 +494,11 @@
                                     <strong style="font-size: 13px; display: block; margin-bottom: 8px;">👥 Tổ tác nghiệp hiện tại của đề tài:</strong>
                                     <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6;">
                                         <li>
-                                            <strong><c:out value="${topic.reporterName}"/></strong> <span class="badge" style="background:#e0e7ff;color:#3730a3;font-size:10.5px;">Phóng viên chủ trì / Tác giả</span>
+                                            <strong><c:out value="${not empty topic.reporterName ? topic.reporterName : 'Phóng viên chủ trì'}"/></strong>
+                                            <c:if test="${not empty topic.reporterEmail}">
+                                                (<c:out value="${topic.reporterEmail}"/>)
+                                            </c:if>
+                                            &mdash; <span class="badge" style="background:#e0e7ff;color:#3730a3;font-size:10.5px;">Phóng viên chủ trì / Tác giả</span>
                                         </li>
                                         <c:forEach var="m" items="${currentMembers}">
                                             <c:if test="${m.userId != topic.authorUserId and m.roleInTeam ne 'LEAD_REPORTER'}">

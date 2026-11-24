@@ -71,6 +71,12 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 1. ASSET REQUEST (Xin mượn tài sản)
     // ==========================================
+
+    /**
+     * Kiểm tra xung đột lịch mượn trang thiết bị / phương tiện:
+     * Trả về true nếu thiết bị đó đã có đơn mượn khác ở trạng thái APPROVED hoặc PENDING
+     * bị trùng khung thời gian [startTime, endTime].
+     */
     public boolean hasAssetScheduleConflict(int assetId, Timestamp startTime, Timestamp endTime) {
         String sql = "SELECT COUNT(*) FROM Asset_Request "
                    + "WHERE asset_id = ? "
@@ -92,6 +98,9 @@ public class TopicRequestDAO extends DBContext {
         return false;
     }
 
+    /**
+     * Lấy tên đầy đủ kèm mã tài sản để hiển thị thông báo lỗi khi phát hiện xung đột lịch.
+     */
     public String getAssetName(int assetId) {
         String sql = "SELECT asset_name, asset_code FROM Asset WHERE asset_id = ?";
         try (Connection conn = getConnection();
@@ -108,6 +117,9 @@ public class TopicRequestDAO extends DBContext {
         return "Thiết bị #" + assetId;
     }
 
+    /**
+     * Lưu một đơn yêu cầu mượn thiết bị đơn lẻ vào bảng Asset_Request với trạng thái PENDING.
+     */
     public boolean insertAssetRequest(AssetRequest req) {
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
                    + "VALUES (?, ?, ?, ?, ?, 'PENDING')";
@@ -125,6 +137,10 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lưu danh sách nhiều yêu cầu mượn thiết bị cùng lúc sử dụng Transaction và JDBC Batch.
+     * Trả về số lượng thiết bị đã gửi yêu cầu mượn thành công.
+     */
     public int insertAssetRequests(List<AssetRequest> requests) {
         if (requests == null || requests.isEmpty()) return 0;
         String sql = "INSERT INTO Asset_Request (topic_id, asset_id, requester_user_id, start_time, end_time, status) "
@@ -172,6 +188,9 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lấy danh sách toàn bộ các yêu cầu mượn thiết bị đã gửi của một đề tài cụ thể.
+     */
     public List<AssetRequest> getAssetRequestsByTopic(int topicId) {
         List<AssetRequest> list = new ArrayList<>();
         String sql = "SELECT ar.request_id, ar.topic_id, ar.asset_id, ar.requester_user_id, "
@@ -211,6 +230,10 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 2. DEADLINE EXTENSION (Xin gia hạn Deadline)
     // ==========================================
+
+    /**
+     * Thêm yêu cầu xin gia hạn Deadline đề tài vào bảng Request_Deadline_Extension với trạng thái PENDING.
+     */
     public boolean insertDeadlineExtensionRequest(RequestDeadlineExtension req) {
         String sql = "INSERT INTO Request_Deadline_Extension "
                    + "(topic_id, requested_by_user_id, current_deadline, requested_deadline, reason, status) "
@@ -229,6 +252,9 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lấy danh sách lịch sử các yêu cầu xin gia hạn Deadline của một đề tài.
+     */
     public List<RequestDeadlineExtension> getDeadlineRequestsByTopic(int topicId) {
         List<RequestDeadlineExtension> list = new ArrayList<>();
         String sql = "SELECT dr.request_id, dr.topic_id, dr.requested_by_user_id, dr.current_deadline, "
@@ -263,6 +289,13 @@ public class TopicRequestDAO extends DBContext {
     // ==========================================
     // 3. MEMBER CHANGE PROPOSAL (Thay đổi nhân sự)
     // ==========================================
+
+    /**
+     * Gửi đề xuất điều chỉnh nhân sự đơn lẻ (thêm hoặc rút 1 thành viên) qua hệ thống Notification:
+     * - Gửi thông báo kèm tag [PENDING] tới Desk Editor phụ trách ban chuyên môn của đề tài.
+     * - Lưu thông báo xác nhận cho chính phóng viên gửi đề xuất.
+     * - Ghi vết kiểm toán vào bảng Audit_Log.
+     */
     public boolean sendMemberChangeNotification(int topicId, int requesterId, int targetUserId, String actionType, String reason) {
         // Tìm Desk Editor phụ trách chuyên mục của Đề tài
         String sqlFindEditor = "SELECT TOP 1 u.user_id FROM [User] u "
@@ -431,6 +464,10 @@ public class TopicRequestDAO extends DBContext {
         }
     }
 
+    /**
+     * Lấy danh sách các thông báo đề xuất thay đổi nhân sự đã gửi cho một đề tài,
+     * phục vụ hiển thị lịch sử đề xuất trên form topic-requests.jsp.
+     */
     public List<String> getMemberChangeNotificationsByTopic(int topicId) {
         List<String> list = new ArrayList<>();
         String sql = "SELECT message FROM Notification "

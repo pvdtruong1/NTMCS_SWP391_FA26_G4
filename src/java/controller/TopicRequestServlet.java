@@ -45,6 +45,15 @@ public class TopicRequestServlet extends HttpServlet {
     private final UserDAO userDAO = new UserDAO();
     private final TopicRequestDAO requestDAO = new TopicRequestDAO();
 
+    /**
+     * Xử lý điều hướng các yêu cầu GET của Phân hệ Đề Xuất & Xin Hỗ Trợ Đề Tài (Topic Requests):
+     * 1. Khi KHÔNG truyền topicId: Hiển thị danh sách các đề tài đã APPROVED/IN_PROGRESS của phóng viên (topic-requests-list.jsp).
+     * 2. Khi CÓ truyền topicId: Mở form phiếu đề xuất (topic-requests.jsp) gồm 3 tab chức năng:
+     *    - Tab 1: Mượn trang thiết bị / phương tiện tác nghiệp (Asset Request).
+     *    - Tab 2: Xin gia hạn thời hạn nộp bài (Deadline Extension Request).
+     *    - Tab 3: Đề xuất điều chỉnh nhân sự tổ tác nghiệp (bổ sung qua email hoặc rút bớt thành viên).
+     *    - Tab 4: Lịch sử các đề xuất đã gửi.
+     */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -151,6 +160,17 @@ public class TopicRequestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Xử lý tiếp nhận và xác thực dữ liệu POST của các loại đề xuất (requestType):
+     * 1. ASSET_REQUEST: Đề xuất mượn 1 hoặc nhiều trang thiết bị (kiểm tra xung đột lịch mượn,
+     *    thời gian bắt đầu/kết thúc không ở quá khứ, lưu vào bảng Asset_Request).
+     * 2. DEADLINE_REQUEST: Xin gia hạn hạn nộp bài (kiểm tra hạn mới phải sau hôm nay và sau hạn cũ,
+     *    lưu vào Request_Deadline_Extension).
+     * 3. MEMBER_REQUEST: Đề xuất thay đổi nhân sự nhóm tác nghiệp:
+     *    - Action "ADD": Bổ sung phóng viên theo danh sách email (kiểm tra email tồn tại, active, role REPORTER,
+     *      không trùng chính mình, không trùng người đã trong nhóm, gửi thông báo [PENDING] và ghi audit log).
+     *    - Action "REMOVE": Rút thành viên (chặn rút tác giả/chủ đề tài hoặc Lead Reporter, gửi thông báo [PENDING]).
+     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {

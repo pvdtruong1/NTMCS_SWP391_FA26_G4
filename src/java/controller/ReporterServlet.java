@@ -37,6 +37,18 @@ public class ReporterServlet extends HttpServlet {
 
     private static final Logger LOGGER = Logger.getLogger(ReporterServlet.class.getName());
 
+    /**
+     * Xử lý điều hướng các yêu cầu GET của Phân hệ Phóng viên (WF-01):
+     * - /dashboard: Màn hình tổng quan số liệu thống kê đề tài.
+     * - /topics: Danh sách đề tài của phóng viên kèm bộ lọc trạng thái và tìm kiếm.
+     * - /compose: Form tạo mới hoặc chỉnh sửa đề xuất đề tài.
+     * - /detail: Màn hình xem chi tiết đề tài, tiến độ workflow, thành viên và dự toán.
+     * - /check-schedule: API kiểm tra lịch bận/trùng lịch tác nghiệp của đồng nghiệp.
+     * - /duplicate-search: Tìm kiếm đề tài tương tự để tránh trùng lặp ý tưởng.
+     * - /delete: Xóa bản nháp đề tài.
+     * - /quick-submit: Nộp nhanh đề tài từ danh sách.
+     * - /notifications: Lấy danh sách thông báo hệ thống của phóng viên.
+     */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -82,6 +94,12 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Xử lý các yêu cầu POST của Phân hệ Phóng viên (WF-01):
+     * - Lưu nháp đề tài (DRAFT) hoặc Nộp chính thức lên BTV (SUBMITTED).
+     * - Lưu dự toán chi phí (Topic_Estimate) và danh sách thành viên tổ tác nghiệp (Topic_Member).
+     * - Điều hướng xử lý xóa nháp (/delete), nộp nhanh (/quick-submit), cập nhật thông báo (/notifications).
+     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -191,6 +209,11 @@ public class ReporterServlet extends HttpServlet {
         response.sendRedirect(request.getContextPath() + "/reporter/topics?message=" + message);
     }
 
+    /**
+     * Thiết lập các thuộc tính người dùng đang đăng nhập vào request
+     * (ID, họ tên, email, vai trò, ban chuyên môn, avatar, số thông báo chưa đọc)
+     * để hiển thị trên giao diện Topbar và Sidebar.
+     */
     private void setUserAttributes(HttpServletRequest request, User loggedUser) {
         if (loggedUser == null) {
             return;
@@ -207,6 +230,10 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Tải các tùy chọn danh mục, thể loại báo chí, mức độ ưu tiên, danh sách phóng viên
+     * và lịch bận của nhân sự phục vụ hiển thị trên form đề xuất đề tài (compose.jsp).
+     */
     private void populateFormOptions(HttpServletRequest request) {
         request.setAttribute("today", LocalDate.now());
         request.setAttribute("tomorrow", LocalDate.now().plusDays(1));
@@ -235,6 +262,11 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Tìm nạp đề tài từ cơ sở dữ liệu khi phóng viên chỉnh sửa bản nháp,
+     * hoặc tạo mới đối tượng Topic nếu là tạo mới đề xuất.
+     * Kiểm tra quyền sở hữu để tránh phóng viên sửa đề tài của người khác.
+     */
     private Topic requestTopic(HttpServletRequest request, User loggedUser) {
         String idText = trim(request.getParameter("topicId"));
         if (idText.isEmpty() || "0".equals(idText)) {
@@ -262,6 +294,12 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Khởi tạo đối tượng Topic mặc định với các giá trị ban đầu cho form tạo mới:
+     * - Độ ưu tiên: NORMAL (Bình thường)
+     * - Thể loại: Tin nhanh
+     * - Deadline mặc định: 7 ngày kể từ hôm nay.
+     */
     private Topic createFormTopic() {
         Topic topic = new Topic();
         topic.setPriority("NORMAL");
@@ -275,6 +313,10 @@ public class ReporterServlet extends HttpServlet {
         return topic;
     }
 
+    /**
+     * Gán các giá trị người dùng nhập từ form (tiêu đề, tóm tắt, góc nhìn, chuyên mục,
+     * thể loại, độ ưu tiên, deadline) vào đối tượng Topic.
+     */
     private void fillTopicFromForm(Topic topic, String title, String summary,
             String angle, int categoryId, String categoryName, String genre, String priority,
             String deadlineText) {
@@ -298,6 +340,10 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Chuyển hướng người dùng về lại trang soạn thảo (compose.jsp) kèm theo thông báo lỗi,
+     * đồng thời giữ lại nguyên vẹn các thông tin đề tài, bảng dự toán và thành viên đã nhập.
+     */
     private void forwardComposeWithError(HttpServletRequest request,
             HttpServletResponse response, String error, Topic topic,
             List<TopicEstimate> estimates, List<TopicMember> members)
@@ -314,6 +360,13 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp").forward(request, response);
     }
 
+    /**
+     * Xác thực dữ liệu đầu vào của đề xuất đề tài:
+     * - Tiêu đề bắt buộc có.
+     * - Khi nộp (submit): bắt buộc có tóm tắt ý tưởng, góc tiếp cận, chuyên mục, deadline.
+     * - Chuyên mục phải tồn tại trong cơ sở dữ liệu.
+     * - Deadline bắt buộc phải từ ngày mai trở đi (trong tương lai).
+     */
     private String validate(String title, String summary, String angle,
             int categoryId, String genre, String priority, String deadline,
             String action) {
@@ -352,11 +405,19 @@ public class ReporterServlet extends HttpServlet {
         return null;
     }
 
+    /**
+     * Kiểm tra chuyên mục có tồn tại trong cơ sở dữ liệu hay không.
+     */
     private boolean isValidCategory(int categoryId) {
         Category cat = new CategoryDAO().getById(categoryId);
         return cat != null;
     }
 
+    /**
+     * Màn hình Dashboard phóng viên: Thống kê số lượng đề tài theo từng trạng thái
+     * (Bản nháp DRAFT, Đã nộp SUBMITTED, Đã duyệt APPROVED, Đang tác nghiệp IN_PROGRESS,
+     * Cần chỉnh sửa REVISION_REQUESTED, Sẵn sàng CMS).
+     */
     private void showDashboard(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         List<Topic> topics;
@@ -402,6 +463,10 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/dashboard.jsp").forward(request, response);
     }
 
+    /**
+     * Hiển thị danh sách đề tài của phóng viên với bộ lọc theo trạng thái (status)
+     * và tìm kiếm theo từ khóa tiêu đề (keyword).
+     */
     private void showTopics(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         String status = trim(request.getParameter("status"));
@@ -421,6 +486,10 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/topics.jsp").forward(request, response);
     }
 
+    /**
+     * Chuẩn bị dữ liệu hiển thị giao diện Tạo mới hoặc Chỉnh sửa đề xuất đề tài (compose.jsp).
+     * Nếu có tham số id -> tải đề tài, bảng dự toán kinh phí và thành viên nhóm từ cơ sở dữ liệu.
+     */
     private void showCompose(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         populateFormOptions(request);
@@ -463,6 +532,11 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/compose.jsp").forward(request, response);
     }
 
+    /**
+     * Màn hình xem chi tiết đề tài của phóng viên:
+     * Tải thông tin tổng quan, trạng thái, bước tiến độ workflow (stepRank),
+     * bảng dự toán chi phí và danh sách thành viên ekip tham gia tác nghiệp.
+     */
     private void showDetail(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws ServletException, IOException {
         Topic topic = null;
@@ -491,6 +565,10 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/detail.jsp").forward(request, response);
     }
 
+    /**
+     * Chuyển đổi trạng thái đề tài thành thứ hạng bước trong quy trình (1 đến 7)
+     * để hiển thị thanh tiến trình trực quan trên giao diện chi tiết.
+     */
     private int calculateWorkflowRank(String status) {
         if ("DRAFT".equals(status)) return 1;
         if ("SUBMITTED".equals(status)) return 2;
@@ -502,6 +580,10 @@ public class ReporterServlet extends HttpServlet {
         return 1;
     }
 
+    /**
+     * Tìm kiếm các đề tài tương tự trong hệ thống theo từ khóa tiêu đề,
+     * giúp phóng viên rà soát tránh trùng lặp ý tưởng trước khi chính thức nộp.
+     */
     private void searchDuplicates(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
         String keyword = trim(request.getParameter("keyword"));
@@ -516,6 +598,10 @@ public class ReporterServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/views/reporter/duplicate-search.jsp").forward(request, response);
     }
 
+    /**
+     * Xử lý xóa bản nháp đề tài (DRAFT).
+     * Chỉ cho phép xóa khi đề tài đang ở trạng thái nháp và người gọi là tác giả đề tài.
+     */
     private void handleDelete(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws IOException {
         String idText = trim(request.getParameter("id"));
@@ -539,6 +625,11 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Xử lý nộp nhanh đề tài từ màn hình danh sách đề tài.
+     * Áp dụng cho đề tài đang ở trạng thái DRAFT hoặc REVISION_REQUESTED/REVISION_REQUIRED,
+     * chuyển ngay sang trạng thái SUBMITTED để gửi lên BTV.
+     */
     private void handleQuickSubmit(HttpServletRequest request,
             HttpServletResponse response, User loggedUser) throws IOException {
         String idText = trim(request.getParameter("id"));
@@ -567,15 +658,27 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Trích xuất thông báo lỗi an toàn từ Exception, nếu rỗng thì trả về thông báo dự phòng (fallback).
+     */
     private String safeMessage(Exception exception, String fallback) {
         String message = exception.getMessage();
         return message == null || message.trim().isEmpty() ? fallback : message;
     }
 
+    /**
+     * Hàm tiện ích loại bỏ khoảng trắng thừa đầu/cuối của chuỗi, tránh NullPointerException.
+     */
     private String trim(String value) {
         return value == null ? "" : value.trim();
     }
 
+    /**
+     * API kiểm tra tình trạng lịch bận / trùng lịch tác nghiệp của nhân sự:
+     * Nhận tham số userId hoặc email của phóng viên cùng với ID đề tài hiện tại.
+     * Trả về JSON chứa: tồn tại (found), họ tên, email, trạng thái kích hoạt,
+     * vai trò phóng viên, cờ báo bận (busy), số đề tài và danh sách đề tài đang tham gia.
+     */
     private void handleCheckSchedule(HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         response.setContentType("application/json;charset=UTF-8");
@@ -634,6 +737,10 @@ public class ReporterServlet extends HttpServlet {
         response.getWriter().write(sb.toString());
     }
 
+    /**
+     * Đọc và phân tích danh sách dự toán kinh phí tác nghiệp (Topic_Estimate)
+     * từ request form gồm mảng tên khoản mục chi phí (costItem) và số tiền (amount).
+     */
     private List<TopicEstimate> parseEstimatesFromRequest(HttpServletRequest request) {
         List<TopicEstimate> list = new ArrayList<>();
         String[] costItems = request.getParameterValues("costItem");
@@ -661,6 +768,10 @@ public class ReporterServlet extends HttpServlet {
         return list;
     }
 
+    /**
+     * Đọc danh sách thô các thành viên tổ tác nghiệp từ form soạn thảo
+     * dựa trên mảng email (memberEmail) và vai trò (memberRole).
+     */
     private List<TopicMember> parseRawMembersFromRequest(HttpServletRequest request) {
         List<TopicMember> list = new ArrayList<>();
         String[] emails = request.getParameterValues("memberEmail");
@@ -681,6 +792,15 @@ public class ReporterServlet extends HttpServlet {
         return list;
     }
 
+    /**
+     * Kiểm tra tính hợp lệ của từng thành viên trong danh sách tổ tác nghiệp:
+     * 1. Không trùng lặp email trong cùng một danh sách.
+     * 2. Không được nhập email của chính người tạo đề tài.
+     * 3. Email phải tồn tại trong DB, tài khoản phải đang ACTIVE (active_status = 1),
+     *    và phải có vai trò Phóng viên (Role = 'REPORTER').
+     * Nếu hợp lệ -> thêm vào danh sách outValidMembers kèm đầy đủ userId, tên và vai trò để lưu DB.
+     * Nếu có lỗi -> trả về chuỗi thông báo lỗi chi tiết.
+     */
     private String validateMembers(List<TopicMember> rawMembers, User loggedUser, List<TopicMember> outValidMembers) {
         if (rawMembers == null || rawMembers.isEmpty()) {
             return null; // Đề tài có thể chỉ có 1 mình phóng viên chủ trì
@@ -733,6 +853,10 @@ public class ReporterServlet extends HttpServlet {
         return null;
     }
 
+    /**
+     * Chuyển đổi Map danh sách lịch bận của các phóng viên thành chuỗi JSON
+     * để nhúng sẵn vào trang JSP hỗ trợ kiểm tra nhanh phía client.
+     */
     private String toScheduleJson(Map<Integer, List<String>> map) {
         if (map == null || map.isEmpty()) {
             return "{}";
@@ -755,6 +879,9 @@ public class ReporterServlet extends HttpServlet {
         return sb.toString();
     }
 
+    /**
+     * API GET trả về danh sách các thông báo của phóng viên và số lượng thông báo chưa đọc dưới dạng JSON.
+     */
     private void handleGetNotifications(HttpServletRequest request, HttpServletResponse response, User loggedUser)
             throws IOException {
         response.setContentType("application/json;charset=UTF-8");
@@ -787,6 +914,11 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * API POST xử lý cập nhật trạng thái thông báo:
+     * - markAllRead: Đánh dấu tất cả thông báo của phóng viên là đã đọc.
+     * - markRead: Đánh dấu một thông báo cụ thể là đã đọc.
+     */
     private void handlePostNotifications(HttpServletRequest request, HttpServletResponse response, User loggedUser)
             throws IOException {
         response.setContentType("application/json;charset=UTF-8");
@@ -807,6 +939,9 @@ public class ReporterServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Hàm tiện ích escape các ký tự đặc biệt (\, ", xuống dòng) để đảm bảo chuỗi JSON hợp lệ.
+     */
     private String escapeJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\")

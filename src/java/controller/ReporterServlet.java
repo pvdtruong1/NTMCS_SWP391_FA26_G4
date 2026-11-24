@@ -140,7 +140,9 @@ public class ReporterServlet extends HttpServlet {
         } catch (NumberFormatException ignored) {}
 
         List<TopicEstimate> estimates = parseEstimatesFromRequest(request);
-        List<TopicMember> members = parseMembersFromRequest(request);
+        List<TopicMember> rawMembers = parseRawMembersFromRequest(request);
+        List<TopicMember> validMembers = new ArrayList<>();
+        String memberError = validateMembers(rawMembers, loggedUser, validMembers);
 
         Topic topic;
         try {
@@ -149,16 +151,19 @@ public class ReporterServlet extends HttpServlet {
             Topic formTopic = createFormTopic();
             fillTopicFromForm(formTopic, title, summary, angle, categoryId, null,
                     genre, priority, deadlineText);
-            forwardComposeWithError(request, response, e.getMessage(), formTopic, estimates, members);
+            forwardComposeWithError(request, response, memberError != null ? memberError : e.getMessage(), formTopic, estimates, rawMembers);
             return;
         }
 
         String error = validate(title, summary, angle, categoryId, genre,
                 priority, deadlineText, action);
+        if (error == null && memberError != null) {
+            error = memberError;
+        }
         if (error != null) {
             fillTopicFromForm(topic, title, summary, angle, categoryId, null,
                     genre, priority, deadlineText);
-            forwardComposeWithError(request, response, error, topic, estimates, members);
+            forwardComposeWithError(request, response, error, topic, estimates, rawMembers);
             return;
         }
 
@@ -174,11 +179,11 @@ public class ReporterServlet extends HttpServlet {
         }
 
         try (TopicDAO topicDAO = new TopicDAO()) {
-            topicDAO.saveTopicPitch(topic, estimates, members);
+            topicDAO.saveTopicPitch(topic, estimates, validMembers);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Lỗi khi lưu đề xuất đề tài", e);
             forwardComposeWithError(request, response,
-                    safeMessage(e, "Không thể lưu đề tài. Vui lòng thử lại."), topic, estimates, members);
+                    safeMessage(e, "Không thể lưu đề tài. Vui lòng thử lại."), topic, estimates, rawMembers);
             return;
         }
 
@@ -630,32 +635,76 @@ public class ReporterServlet extends HttpServlet {
         return list;
     }
 
-    private List<TopicMember> parseMembersFromRequest(HttpServletRequest request) {
+    private List<TopicMember> parseRawMembersFromRequest(HttpServletRequest request) {
         List<TopicMember> list = new ArrayList<>();
-        String[] userIds = request.getParameterValues("memberUserId");
+        String[] emails = request.getParameterValues("memberEmail");
         String[] roles = request.getParameterValues("memberRole");
 
-        Set<Integer> added = new HashSet<>();
-        UserDAO userDAO = new UserDAO();
-        if (userIds != null && roles != null) {
-            for (int i = 0; i < userIds.length && i < roles.length; i++) {
-                String uidStr = trim(userIds[i]);
+        if (emails != null && roles != null) {
+            for (int i = 0; i < emails.length && i < roles.length; i++) {
+                String emailStr = trim(emails[i]);
                 String role = trim(roles[i]);
-                if (!uidStr.isEmpty()) {
-                    try {
-                        int uid = Integer.parseInt(uidStr);
-                        if (uid > 0 && !added.contains(uid) && userDAO.isReporter(uid)) {
-                            added.add(uid);
-                            TopicMember mem = new TopicMember();
-                            mem.setUserId(uid);
-                            mem.setRoleInTeam(role.isEmpty() ? "ASSISTANT" : role);
-                            list.add(mem);
-                        }
-                    } catch (NumberFormatException ignored) {}
+                if (!emailStr.isEmpty()) {
+                    TopicMember mem = new TopicMember();
+                    mem.setUserEmail(emailStr);
+                    mem.setRoleInTeam(role.isEmpty() ? "ASSISTANT" : role);
+                    list.add(mem);
                 }
             }
         }
         return list;
+    }
+
+    private String validateMembers(List<TopicMember> rawMembers, User loggedUser, List<TopicMember> outValidMembers) {
+        if (rawMembers == null || rawMembers.isEmpty()) {
+            return null; // Đề tài có thể chỉ có 1 mình phóng viên chủ trì
+        }
+        Set<String> seen = new HashSet<>();
+        UserDAO userDAO = new UserDAO();
+
+        for (TopicMember raw : rawMembers) {
+            String email = raw.getUserEmail();
+            if (email == null || email.trim().isEmpty()) {
+                continue;
+            }
+            email = email.trim();
+            String lower = email.toLowerCase();
+
+            // 1. Kiểm tra trùng lặp trong form
+            if (seen.contains(lower)) {
+                return "Email '" + email + "' bị nhập trùng lặp nhiều lần trong danh sách tổ tác nghiệp.";
+            }
+            seen.add(lower);
+
+            // 2. Không được trùng với chính người đang tạo
+            if (loggedUser != null && lower.equalsIgnoreCase(loggedUser.getEmail())) {
+                return "Bạn không thể tự thêm chính mình (" + email + ") vào danh sách thành viên tác nghiệp (bạn đã là Tác giả/Chủ đề tài).";
+            }
+
+            // 3. Kiểm tra user trong DB (email khớp chính xác, role = 'REPORTER', status = 'ACTIVE')
+            User u = userDAO.getActiveReporterByEmail(email);
+            if (u == null) {
+                User existingU = userDAO.getByEmail(email);
+                if (existingU == null) {
+                    return "Email '" + email + "' không tồn tại trong hệ thống tòa soạn.";
+                } else if (!existingU.isActiveStatus()) {
+                    return "Tài khoản '" + email + "' (" + existingU.getFullName() + ") hiện đang bị vô hiệu hóa (INACTIVE).";
+                } else if (!"REPORTER".equalsIgnoreCase(existingU.getRoleName())) {
+                    return "Tài khoản '" + email + "' (" + existingU.getFullName() + ") không có vai trò Phóng viên (Role hiện tại: " + existingU.getRoleName() + ").";
+                } else {
+                    return "Email '" + email + "' không hợp lệ hoặc không phải là phóng viên đang hoạt động.";
+                }
+            }
+
+            // Hợp lệ -> gán đầy đủ thông tin để lưu vào Topic_Member
+            TopicMember validMem = new TopicMember();
+            validMem.setUserId(u.getUserId());
+            validMem.setUserEmail(u.getEmail());
+            validMem.setUserName(u.getFullName());
+            validMem.setRoleInTeam(raw.getRoleInTeam() != null && !raw.getRoleInTeam().isEmpty() ? raw.getRoleInTeam() : "ASSISTANT");
+            outValidMembers.add(validMem);
+        }
+        return null;
     }
 
     private String toScheduleJson(Map<Integer, List<String>> map) {

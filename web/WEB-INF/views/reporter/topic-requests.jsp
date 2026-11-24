@@ -138,6 +138,15 @@
             </div>
 
             <!-- THÔNG BÁO FLASH FEEDBACK TỪ PRG -->
+            <c:if test="${not empty error}">
+                <div style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size: 20px;">❌</span>
+                    <div>
+                        <strong>Lỗi:</strong> <c:out value="${error}"/>
+                    </div>
+                </div>
+            </c:if>
+
             <c:if test="${param.status eq 'success'}">
                 <div style="background: #e8f7ef; color: var(--success); border: 1px solid #ccebdd; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-weight: 600; display:flex; align-items:center; gap:10px;">
                     <span style="font-size: 20px;">✅</span>
@@ -497,9 +506,18 @@
                                     </ul>
                                 </div>
 
-                                <form action="${base}/reporter/requests" method="POST">
+                                <form action="${base}/reporter/requests" method="POST" id="member-request-form">
                                     <input type="hidden" name="requestType" value="MEMBER_REQUEST">
                                     <input type="hidden" name="topicId" value="${topic.topicId}">
+
+                                    <c:if test="${not empty error}">
+                                        <div style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-weight: 600; display:flex; align-items:center; gap:10px; font-size: 13px;">
+                                            <span style="font-size: 18px;">❌</span>
+                                            <div>
+                                                <strong>Lỗi đề xuất nhân sự:</strong> <c:out value="${error}"/>
+                                            </div>
+                                        </div>
+                                    </c:if>
 
                                     <div class="field" style="margin-bottom: 16px;">
                                         <span>LOẠI HÀNH ĐỘNG <em style="color:var(--danger)">*</em></span>
@@ -519,20 +537,39 @@
                                         </div>
                                     </div>
 
-                                    <!-- Chọn khi THÊM NGƯỜI (chỉ những phóng viên CHƯA có trong nhóm) -->
+                                    <!-- Nhập email khi THÊM NGƯỜI (Cho phép nhập 1 hoặc nhiều email phóng viên) -->
                                     <div class="field" id="selectAddGroup" style="margin-bottom: 16px;">
-                                        <span>CHỌN NHÂN SỰ MUỐN THÊM VÀO NHÓM <em style="color:var(--danger)">*</em></span>
-                                        <select id="targetUserAdd" name="targetUserId" required style="padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
-                                            <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                            <c:forEach var="u" items="${availableUsersToAdd}">
-                                                <option value="${u.userId}">${u.fullName} (${u.email}) - Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''}</option>
-                                            </c:forEach>
-                                        </select>
-                                        <c:if test="${empty availableUsersToAdd}">
-                                            <small style="color: var(--warning); display: block; margin-top: 6px; font-weight: 600;">
-                                                💡 Tất cả phóng viên khả dụng trong tòa soạn hiện đều đã có mặt trong tổ tác nghiệp này.
-                                            </small>
-                                        </c:if>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                            <span>ĐỊA CHỈ EMAIL ĐỒNG NGHIỆP CẦN BỔ SUNG <em style="color:var(--danger)">*</em></span>
+                                            <button type="button" class="btn sm" id="btn-add-req-email" style="font-size: 12px; padding: 4px 10px; cursor: pointer;">
+                                                ➕ Thêm email
+                                            </button>
+                                        </div>
+                                        <small style="color: var(--muted); display: block; margin-bottom: 8px;">
+                                            Nhập chính xác email của đồng nghiệp (phải có vai trò Phóng viên và tài khoản đang hoạt động). Không nhập email của chính bạn hoặc người đã có trong ekip.
+                                        </small>
+                                        <div id="request-emails-container">
+                                            <c:choose>
+                                                <c:when test="${not empty formEmails}">
+                                                    <c:forEach var="em" items="${formEmails}">
+                                                        <div class="req-email-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                                                            <input type="email" name="targetUserEmail" class="req-email-input" value="<c:out value="${em}"/>" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
+                                                            <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
+                                                                ✕ Xóa
+                                                            </button>
+                                                        </div>
+                                                    </c:forEach>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <div class="req-email-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                                                        <input type="email" name="targetUserEmail" class="req-email-input" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">
+                                                        <button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">
+                                                            ✕ Xóa
+                                                        </button>
+                                                    </div>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </div>
                                     </div>
 
                                     <!-- Chọn khi RÚT NGƯỜI (chỉ thành viên phối hợp, không có Phóng viên chủ trì) -->
@@ -553,7 +590,7 @@
 
                                     <div class="field" style="margin-bottom: 22px;">
                                         <span>LÝ DO ĐỀ XUẤT <em style="color:var(--danger)">*</em></span>
-                                        <textarea id="memberReason" name="reason" rows="3" placeholder="Nêu rõ lý do cần bổ sung thêm người hoặc rút thành viên khỏi đề tài..." required></textarea>
+                                        <textarea id="memberReason" name="reason" rows="3" placeholder="Nêu rõ lý do cần bổ sung thêm người hoặc rút thành viên khỏi đề tài..." required><c:out value="${not empty formReason ? formReason : ''}"/></textarea>
                                     </div>
 
                                     <div style="text-align: right;">
@@ -738,23 +775,31 @@
     function toggleMemberSelect(type) {
         const addGroup = document.getElementById('selectAddGroup');
         const removeGroup = document.getElementById('selectRemoveGroup');
-        const addSelect = document.getElementById('targetUserAdd');
+        const emailInputs = document.querySelectorAll('.req-email-input');
         const removeSelect = document.getElementById('targetUserRemove');
 
         if (type === 'ADD') {
             addGroup.style.display = 'block';
             removeGroup.style.display = 'none';
-            addSelect.setAttribute('name', 'targetUserId');
-            addSelect.setAttribute('required', 'required');
-            removeSelect.removeAttribute('name');
-            removeSelect.removeAttribute('required');
+            emailInputs.forEach(input => {
+                input.setAttribute('name', 'targetUserEmail');
+                input.setAttribute('required', 'required');
+            });
+            if (removeSelect) {
+                removeSelect.removeAttribute('name');
+                removeSelect.removeAttribute('required');
+            }
         } else {
             addGroup.style.display = 'none';
             removeGroup.style.display = 'block';
-            removeSelect.setAttribute('name', 'targetUserId');
-            removeSelect.setAttribute('required', 'required');
-            addSelect.removeAttribute('name');
-            addSelect.removeAttribute('required');
+            if (removeSelect) {
+                removeSelect.setAttribute('name', 'targetUserId');
+                removeSelect.setAttribute('required', 'required');
+            }
+            emailInputs.forEach(input => {
+                input.removeAttribute('name');
+                input.removeAttribute('required');
+            });
         }
     }
 
@@ -851,6 +896,67 @@
                 alert('Vui lòng chọn ít nhất 1 thiết bị cần mượn!');
                 e.preventDefault();
                 return false;
+            }
+        });
+
+        // Quản lý danh sách email phóng viên đề xuất bổ sung động
+        const reqEmailsContainer = document.getElementById('request-emails-container');
+        const btnAddReqEmail = document.getElementById('btn-add-req-email');
+
+        if (btnAddReqEmail && reqEmailsContainer) {
+            btnAddReqEmail.addEventListener('click', function() {
+                const newRow = document.createElement('div');
+                newRow.className = 'req-email-row';
+                newRow.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px;';
+                newRow.innerHTML = 
+                    '<input type="email" name="targetUserEmail" class="req-email-input" placeholder="ví dụ: reporter@toasoan.vn" required style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);">' +
+                    '<button type="button" class="btn-remove-req-email" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px;" title="Xóa dòng email này">' +
+                    '✕ Xóa' +
+                    '</button>';
+                reqEmailsContainer.appendChild(newRow);
+                newRow.querySelector('input').focus();
+            });
+
+            reqEmailsContainer.addEventListener('click', function(e) {
+                const btn = e.target.closest('.btn-remove-req-email');
+                if (btn) {
+                    const rows = reqEmailsContainer.querySelectorAll('.req-email-row');
+                    if (rows.length > 1) {
+                        btn.closest('.req-email-row').remove();
+                    } else {
+                        const input = rows[0].querySelector('input');
+                        if (input) input.value = '';
+                    }
+                }
+            });
+        }
+
+        // Kiểm tra chống nhập trùng email trước khi submit form đề xuất nhân sự
+        document.getElementById('member-request-form')?.addEventListener('submit', function(e) {
+            const actionAdd = document.getElementById('actionAdd');
+            if (actionAdd && actionAdd.checked) {
+                const inputs = this.querySelectorAll('.req-email-input');
+                const seen = new Set();
+                let hasVal = false;
+
+                for (let inp of inputs) {
+                    const val = inp.value ? inp.value.trim().toLowerCase() : '';
+                    if (!val) continue;
+                    hasVal = true;
+                    if (seen.has(val)) {
+                        alert('Email "' + val + '" đã được nhập nhiều lần trong danh sách. Vui lòng không nhập trùng lặp!');
+                        inp.focus();
+                        e.preventDefault();
+                        return false;
+                    }
+                    seen.add(val);
+                }
+
+                if (!hasVal) {
+                    alert('Vui lòng nhập ít nhất một địa chỉ email phóng viên muốn bổ sung!');
+                    e.preventDefault();
+                    return false;
+                }
             }
         });
     });

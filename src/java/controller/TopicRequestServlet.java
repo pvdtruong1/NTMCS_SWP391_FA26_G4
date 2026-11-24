@@ -115,6 +115,23 @@ public class TopicRequestServlet extends HttpServlet {
                 }
             }
 
+            String flashError = (String) request.getSession().getAttribute("flashError");
+            if (flashError != null) {
+                request.setAttribute("error", flashError);
+                request.getSession().removeAttribute("flashError");
+            }
+            @SuppressWarnings("unchecked")
+            List<String> flashEmails = (List<String>) request.getSession().getAttribute("flashEmails");
+            if (flashEmails != null) {
+                request.setAttribute("formEmails", flashEmails);
+                request.getSession().removeAttribute("flashEmails");
+            }
+            String flashReason = (String) request.getSession().getAttribute("flashReason");
+            if (flashReason != null) {
+                request.setAttribute("formReason", flashReason);
+                request.getSession().removeAttribute("flashReason");
+            }
+
             request.setAttribute("topic", topic);
             request.setAttribute("isApproved", isApproved);
             request.setAttribute("availableAssets", availableAssets);
@@ -286,37 +303,115 @@ public class TopicRequestServlet extends HttpServlet {
 
             } else if ("MEMBER_REQUEST".equalsIgnoreCase(requestType)) {
                 // 3. Phóng viên xin thay đổi nhân sự
-                int targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
                 String actionType = request.getParameter("actionType");
                 String reason = request.getParameter("reason");
 
                 if ("ADD".equalsIgnoreCase(actionType)) {
-                    if (!userDAO.isReporter(targetUserId)) {
-                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                                + "&status=invalidRole&type=member");
-                        return;
-                    }
-                    // Kiểm tra nhân sự đã có trong nhóm hay chưa
-                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
-                    boolean alreadyInTeam = (targetUserId == topic.getAuthorUserId());
-                    if (!alreadyInTeam && currentMembers != null) {
-                        for (TopicMember m : currentMembers) {
-                            if (m.getUserId() == targetUserId) {
-                                alreadyInTeam = true;
-                                break;
+                    String[] emailValues = request.getParameterValues("targetUserEmail");
+                    List<String> rawEmailList = new ArrayList<>();
+                    if (emailValues != null) {
+                        for (String em : emailValues) {
+                            if (em != null && !em.trim().isEmpty()) {
+                                rawEmailList.add(em.trim());
                             }
                         }
                     }
-                    if (alreadyInTeam) {
-                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                                + "&status=alreadyMember&type=member");
+
+                    if (rawEmailList.isEmpty()) {
+                        request.getSession().setAttribute("flashError", "Vui lòng nhập ít nhất một địa chỉ email phóng viên muốn bổ sung.");
+                        request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
                         return;
                     }
+
+                    // Lấy danh sách thành viên hiện tại của đề tài
+                    List<TopicMember> currentMembers = topicDAO.findMembersByTopicId(topicId);
+                    Set<Integer> currentMemberUserIds = new HashSet<>();
+                    currentMemberUserIds.add(topic.getAuthorUserId());
+                    if (currentMembers != null) {
+                        for (TopicMember m : currentMembers) {
+                            currentMemberUserIds.add(m.getUserId());
+                        }
+                    }
+
+                    Set<String> seenEmails = new HashSet<>();
+                    List<User> validTargetUsers = new ArrayList<>();
+
+                    for (String em : rawEmailList) {
+                        String lower = em.toLowerCase();
+                        if (seenEmails.contains(lower)) {
+                            request.getSession().setAttribute("flashError", "Email '" + em + "' bị nhập trùng lặp nhiều lần trong danh sách.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+                        seenEmails.add(lower);
+
+                        // Không được thêm chính mình
+                        if (loggedUser.getEmail() != null && lower.equalsIgnoreCase(loggedUser.getEmail())) {
+                            request.getSession().setAttribute("flashError", "Bạn (" + em + ") là người tạo yêu cầu, không thể tự thêm chính mình vào danh sách xin bổ sung.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        // Kiểm tra trong DB: tồn tại, active, role REPORTER
+                        User u = userDAO.getActiveReporterByEmail(em);
+                        if (u == null) {
+                            User existingUser = userDAO.getByEmail(em);
+                            String detailMsg;
+                            if (existingUser == null) {
+                                detailMsg = "Không tìm thấy người dùng với email '" + em + "'.";
+                            } else if (!existingUser.isActiveStatus()) {
+                                detailMsg = "Tài khoản phóng viên '" + em + "' đang bị vô hiệu hóa (INACTIVE).";
+                            } else {
+                                detailMsg = "Người dùng '" + em + "' không có vai trò Phóng viên (REPORTER).";
+                            }
+                            request.getSession().setAttribute("flashError", detailMsg);
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        // Kiểm tra xem đã có trong nhóm chưa
+                        if (currentMemberUserIds.contains(u.getUserId())) {
+                            request.getSession().setAttribute("flashError", "Phóng viên " + u.getFullName() + " (" + em + ") đã có mặt trong ekip đề tài này rồi.");
+                            request.getSession().setAttribute("flashEmails", rawEmailList);
+                            request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                            response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                            return;
+                        }
+
+                        validTargetUsers.add(u);
+                    }
+
+                    success = requestDAO.sendMultiMemberAddNotification(topicId, loggedUser.getUserId(), validTargetUsers, reason);
+                    type = "member";
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=" + (success ? "success" : "failed")
+                            + "&type=" + type + "#member");
+                    return;
+
                 } else if ("REMOVE".equalsIgnoreCase(actionType)) {
+                    int targetUserId = 0;
+                    try {
+                        targetUserId = Integer.parseInt(request.getParameter("targetUserId"));
+                    } catch (NumberFormatException ignored) {}
+
+                    if (targetUserId <= 0) {
+                        request.getSession().setAttribute("flashError", "Vui lòng chọn thành viên cần rút khỏi ekip.");
+                        request.getSession().setAttribute("flashReason", reason != null ? reason.trim() : "");
+                        response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId + "#member");
+                        return;
+                    }
+
                     // Không được phép xin rút tác giả / người chủ trì đề tài
                     if (targetUserId == topic.getAuthorUserId()) {
                         response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                                + "&status=cannotRemoveAuthor&type=member");
+                                + "&status=cannotRemoveAuthor&type=member#member");
                         return;
                     }
                     // Kiểm tra nhân sự có thực sự đang nằm trong nhóm hay không và có phải Lead không
@@ -336,18 +431,22 @@ public class TopicRequestServlet extends HttpServlet {
                     }
                     if (isLead) {
                         response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                                + "&status=cannotRemoveAuthor&type=member");
+                                + "&status=cannotRemoveAuthor&type=member#member");
                         return;
                     }
                     if (!inTeam) {
                         response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
-                                + "&status=notInTeam&type=member");
+                                + "&status=notInTeam&type=member#member");
                         return;
                     }
-                }
 
-                success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
-                type = "member";
+                    success = requestDAO.sendMemberChangeNotification(topicId, loggedUser.getUserId(), targetUserId, actionType, reason);
+                    type = "member";
+                    response.sendRedirect(request.getContextPath() + "/reporter/requests?topicId=" + topicId
+                            + "&status=" + (success ? "success" : "failed")
+                            + "&type=" + type + "#member");
+                    return;
+                }
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error processing Topic request: " + requestType, e);

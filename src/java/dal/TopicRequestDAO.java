@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import model.AssetRequest;
 import model.RequestDeadlineExtension;
 import model.Topic;
+import model.User;
 
 /**
  * Data Access Object for handling Reporter Topic requests:
@@ -309,7 +310,7 @@ public class TopicRequestDAO extends DBContext {
             }
 
             String actionText = "ADD".equalsIgnoreCase(actionType) ? "THÊM" : "RÚT KHỎI NHÓM";
-            String msg = "[ĐỀ XUẤT NHÂN SỰ] Phóng viên đề xuất " + actionText + " nhân sự: " 
+            String msg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Phóng viên đề xuất " + actionText + " nhân sự: " 
                        + targetName + " cho đề tài. Lý do: " + reason;
 
             // Gửi thông báo cho Desk Editor / Ban Biên Tập
@@ -322,7 +323,7 @@ public class TopicRequestDAO extends DBContext {
 
             // Đồng thời lưu 1 bản ghi thông báo xác nhận cho chính phóng viên
             if (requesterId != editorId) {
-                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] Bạn đã gửi đề xuất " + actionText + " nhân sự: " 
+                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Bạn đã gửi đề xuất " + actionText + " nhân sự: " 
                                    + targetName + " cho đề tài #" + topicId + ". Lý do: " + reason;
                 try (PreparedStatement psNoti2 = conn.prepareStatement(sqlInsertNoti)) {
                     psNoti2.setInt(1, requesterId);
@@ -331,9 +332,101 @@ public class TopicRequestDAO extends DBContext {
                     psNoti2.executeUpdate();
                 }
             }
+
+            // Ghi nhận vào Audit_Log
+            try {
+                new AuditLogDAO().log(requesterId, "PROPOSE_CHANGE_MEMBER", "TOPIC", topicId,
+                        "Đề xuất " + actionText + " nhân sự: " + targetName + ". Lý do: " + reason);
+            } catch (Exception ignored) {}
+
             return true;
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Failed to send member change notification", e);
+            return false;
+        }
+    }
+
+    /**
+     * Gửi đề xuất THÊM nhiều nhân sự bằng danh sách User (đã validate email)
+     * Lưu vào Notification và Audit_Log với trạng thái PENDING
+     */
+    public boolean sendMultiMemberAddNotification(int topicId, int requesterId, List<User> targetUsers, String reason) {
+        if (targetUsers == null || targetUsers.isEmpty()) {
+            return false;
+        }
+        String sqlFindEditor = "SELECT TOP 1 u.user_id FROM [User] u "
+                             + "INNER JOIN Category c ON u.desk_id = c.desk_id "
+                             + "INNER JOIN Topic t ON t.category_id = c.category_id "
+                             + "INNER JOIN Role r ON u.role_id = r.role_id "
+                             + "WHERE t.topic_id = ? AND r.role_name IN ('DESK_EDITOR', 'MANAGING_EDITOR') ";
+
+        String sqlInsertNoti = "INSERT INTO Notification (user_id, topic_id, message, is_read) VALUES (?, ?, ?, 0)";
+
+        try (Connection conn = getConnection()) {
+            int editorId = 0;
+            try (PreparedStatement ps = conn.prepareStatement(sqlFindEditor)) {
+                ps.setInt(1, topicId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        editorId = rs.getInt("user_id");
+                    }
+                }
+            }
+
+            if (editorId == 0) {
+                String sqlAdmin = "SELECT TOP 1 u.user_id FROM [User] u "
+                                + "JOIN Role r ON u.role_id = r.role_id "
+                                + "WHERE r.role_name IN ('MANAGING_EDITOR', 'SYSTEM_ADMINISTRATOR', 'ADMIN') "
+                                + "ORDER BY u.user_id ASC";
+                try (PreparedStatement psAdmin = conn.prepareStatement(sqlAdmin);
+                     ResultSet rsAdmin = psAdmin.executeQuery()) {
+                    if (rsAdmin.next()) {
+                        editorId = rsAdmin.getInt("user_id");
+                    }
+                }
+            }
+
+            StringBuilder userDetails = new StringBuilder();
+            for (int i = 0; i < targetUsers.size(); i++) {
+                User u = targetUsers.get(i);
+                if (i > 0) userDetails.append(", ");
+                userDetails.append(u.getFullName()).append(" (").append(u.getEmail()).append(")");
+            }
+
+            String msg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Phóng viên đề xuất THÊM " + targetUsers.size() 
+                       + " nhân sự vào tổ tác nghiệp: " + userDetails.toString() 
+                       + ". Lý do: " + (reason != null ? reason.trim() : "");
+
+            // Gửi thông báo cho Desk Editor / Ban Biên Tập
+            try (PreparedStatement psNoti = conn.prepareStatement(sqlInsertNoti)) {
+                psNoti.setInt(1, editorId);
+                psNoti.setInt(2, topicId);
+                psNoti.setString(3, msg);
+                psNoti.executeUpdate();
+            }
+
+            // Gửi thông báo xác nhận cho chính phóng viên
+            if (requesterId != editorId) {
+                String reporterMsg = "[ĐỀ XUẤT NHÂN SỰ] [PENDING] Bạn đã gửi đề xuất THÊM nhân sự: " 
+                                   + userDetails.toString() + " cho đề tài #" + topicId 
+                                   + ". Lý do: " + (reason != null ? reason.trim() : "");
+                try (PreparedStatement psNoti2 = conn.prepareStatement(sqlInsertNoti)) {
+                    psNoti2.setInt(1, requesterId);
+                    psNoti2.setInt(2, topicId);
+                    psNoti2.setString(3, reporterMsg);
+                    psNoti2.executeUpdate();
+                }
+            }
+
+            // Lưu vào Audit_Log
+            try {
+                new AuditLogDAO().log(requesterId, "PROPOSE_ADD_MEMBERS", "TOPIC", topicId,
+                        "Đề xuất thêm nhân sự: " + userDetails + ". Lý do: " + reason);
+            } catch (Exception ignored) {}
+
+            return true;
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Failed to send multi-member add notification", e);
             return false;
         }
     }

@@ -197,7 +197,7 @@
                             <table class="nested-form-table" id="member-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 58%;">NHÂN SỰ</th>
+                                        <th style="width: 58%;">EMAIL PHÓNG VIÊN ĐỒNG NGHIỆP</th>
                                         <th style="width: 28%;">VAI TRÒ TRONG NHÓM</th>
                                         <th style="width: 14%; text-align: center;">THAO TÁC</th>
                                     </tr>
@@ -208,22 +208,21 @@
                                             <c:forEach var="m" items="${formMembers}">
                                                 <tr class="member-row">
                                                     <td>
-                                                        <select name="memberUserId" class="user-select-box" required>
-                                                            <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                                            <c:forEach var="u" items="${activeUsers}">
-                                                                <option value="${u.userId}" ${m.userId == u.userId ? 'selected' : ''}>
-                                                                    ${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})
-                                                                </option>
-                                                            </c:forEach>
-                                                        </select>
-                                                        <div class="schedule-feedback-box"></div>
+                                                        <input type="email" name="memberEmail" class="member-email-input"
+                                                               value="<c:out value='${m.userEmail}'/>"
+                                                               placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
+                                                        <c:if test="${not empty m.userName}">
+                                                            <small style="color:var(--muted);font-size:11px;display:block;margin-top:2px;">
+                                                                ✓ <c:out value="${m.userName}"/>
+                                                            </small>
+                                                        </c:if>
                                                     </td>
                                                     <td>
                                                         <select name="memberRole" required>
-                                                            <option value="LEAD_REPORTER" ${m.roleInTeam eq 'LEAD_REPORTER' ? 'selected' : ''}>Phóng viên chính</option>
                                                             <option value="PHOTO_REPORTER" ${m.roleInTeam eq 'PHOTO_REPORTER' ? 'selected' : ''}>Phóng viên ảnh</option>
                                                             <option value="CAMERAMAN" ${m.roleInTeam eq 'CAMERAMAN' ? 'selected' : ''}>Quay phim</option>
-                                                            <option value="ASSISTANT" ${m.roleInTeam eq 'ASSISTANT' ? 'selected' : ''}>Trợ lý</option>
+                                                            <option value="ASSISTANT" ${empty m.roleInTeam or m.roleInTeam eq 'ASSISTANT' ? 'selected' : ''}>Trợ lý</option>
+                                                            <option value="LEAD_REPORTER" ${m.roleInTeam eq 'LEAD_REPORTER' ? 'selected' : ''}>Phóng viên chính</option>
                                                         </select>
                                                     </td>
                                                     <td style="text-align: center;">
@@ -233,37 +232,19 @@
                                             </c:forEach>
                                         </c:when>
                                         <c:otherwise>
-                                            <tr class="member-row">
-                                                <td>
-                                                    <select name="memberUserId" class="user-select-box">
-                                                        <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                                        <c:forEach var="u" items="${activeUsers}">
-                                                            <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
-                                                        </c:forEach>
-                                                    </select>
-                                                    <div class="schedule-feedback-box"></div>
-                                                </td>
-                                                <td>
-                                                    <select name="memberRole">
-                                                        <option value="LEAD_REPORTER">Phóng viên chính</option>
-                                                        <option value="PHOTO_REPORTER">Phóng viên ảnh</option>
-                                                        <option value="CAMERAMAN">Quay phim</option>
-                                                        <option value="ASSISTANT">Trợ lý</option>
-                                                    </select>
-                                                </td>
-                                                <td style="text-align: center;">
-                                                    <button type="button" class="btn-danger-sm btn-del-member">Xóa</button>
-                                                </td>
-                                            </tr>
+                                            <!-- Mặc định khi chưa có thành viên, bấm '+ Thêm email' để thêm -->
                                         </c:otherwise>
                                     </c:choose>
                                 </tbody>
                             </table>
 
-                            <div>
+                            <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                                 <button type="button" class="btn sm" id="btn-add-member">
-                                    + Thêm thành viên
+                                    ➕ Thêm email
                                 </button>
+                                <small style="color: var(--muted); font-size: 11.5px;">
+                                    💡 Bạn (tác giả) đã là Phóng viên chủ trì đề tài. Chỉ nhập thêm email nếu đề tài có đồng nghiệp cùng tác nghiệp.
+                                </small>
                             </div>
                         </div>
 
@@ -328,18 +309,8 @@
     </div>
 </div>
 
-<!-- Template options for JavaScript dynamic rows -->
-<div id="user-options-template" style="display:none;">
-    <option value="">-- Chọn phóng viên tác nghiệp --</option>
-    <c:forEach var="u" items="${activeUsers}">
-        <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
-    </c:forEach>
-</div>
-
 <script>
 (function() {
-    const BUSY_SCHEDULES = ${not empty userBusySchedulesJson ? userBusySchedulesJson : '{}'};
-
     function calculateEstimateTotal() {
         let total = 0;
         const inputs = document.querySelectorAll('.estimate-amount-input');
@@ -387,79 +358,21 @@
         }
     });
 
-    function updateScheduleFeedback(selectEl) {
-        const userId = selectEl.value;
-        const parentCell = selectEl.closest('td');
-        const feedbackBox = parentCell.querySelector('.schedule-feedback-box');
-        if (!feedbackBox) return;
-
-        if (!userId) {
-            feedbackBox.innerHTML = '';
-            return;
-        }
-
-        const allSelects = document.querySelectorAll('.user-select-box');
-        let duplicateCount = 0;
-        allSelects.forEach(function(s) {
-            if (s.value === userId) duplicateCount++;
-        });
-
-        if (duplicateCount > 1) {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-busy">
-                    <span style="font-weight:bold">⚠ Cảnh báo:</span> Nhân sự này đã được thêm trong nhóm tác nghiệp!
-                </div>
-            `;
-            return;
-        }
-
-        const busyTopics = BUSY_SCHEDULES[userId];
-        if (busyTopics && busyTopics.length > 0) {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-busy">
-                    <span style="font-weight:bold">⚠ Bận lịch (Đề tài):</span> ` + busyTopics.join('; ') + `
-                </div>
-            `;
-        } else {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-free">
-                    <span style="font-weight:bold">✓ Lịch tác nghiệp trống:</span> Sẵn sàng nhận nhiệm vụ
-                </div>
-            `;
-        }
-    }
-
-    function refreshAllFeedbacks() {
-        const selects = document.querySelectorAll('.user-select-box');
-        selects.forEach(function(sel) {
-            updateScheduleFeedback(sel);
-        });
-    }
-
-    document.getElementById('member-table-body')?.addEventListener('change', function(e) {
-        if (e.target.classList.contains('user-select-box')) {
-            refreshAllFeedbacks();
-        }
-    });
-
+    // Thêm dòng nhập email thành viên tổ tác nghiệp
     document.getElementById('btn-add-member')?.addEventListener('click', function() {
         const tbody = document.getElementById('member-table-body');
-        const userOptionsHtml = document.getElementById('user-options-template')?.innerHTML || '';
         const tr = document.createElement('tr');
         tr.className = 'member-row';
         tr.innerHTML = `
             <td>
-                <select name="memberUserId" class="user-select-box" required>
-                    ` + userOptionsHtml + `
-                </select>
-                <div class="schedule-feedback-box"></div>
+                <input type="email" name="memberEmail" class="member-email-input" placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
             </td>
             <td>
                 <select name="memberRole" required>
-                    <option value="LEAD_REPORTER">Phóng viên chính</option>
                     <option value="PHOTO_REPORTER">Phóng viên ảnh</option>
                     <option value="CAMERAMAN">Quay phim</option>
                     <option value="ASSISTANT" selected>Trợ lý</option>
+                    <option value="LEAD_REPORTER">Phóng viên chính</option>
                 </select>
             </td>
             <td style="text-align: center;">
@@ -474,7 +387,6 @@
             const row = e.target.closest('tr');
             if (row) {
                 row.remove();
-                refreshAllFeedbacks();
             }
         }
     });
@@ -485,28 +397,28 @@
     });
 
     document.getElementById('pitch-form')?.addEventListener('submit', function(e) {
-        const allSelects = document.querySelectorAll('.user-select-box');
-        const userIds = new Set();
-        let hasDuplicate = false;
+        const emailInputs = document.querySelectorAll('.member-email-input');
+        const seen = new Set();
+        let dup = '';
 
-        allSelects.forEach(function(s) {
-            if (s.value) {
-                if (userIds.has(s.value)) {
-                    hasDuplicate = true;
+        emailInputs.forEach(function(input) {
+            const val = (input.value || '').trim().toLowerCase();
+            if (val) {
+                if (seen.has(val)) {
+                    dup = val;
                 }
-                userIds.add(s.value);
+                seen.add(val);
             }
         });
 
-        if (hasDuplicate) {
+        if (dup) {
             e.preventDefault();
-            alert('Có nhân sự bị thêm trùng lặp nhiều lần trong danh sách tổ tác nghiệp. Vui lòng kiểm tra lại!');
+            alert('Email "' + dup + '" bị nhập trùng lặp nhiều lần trong danh sách tổ tác nghiệp. Vui lòng kiểm tra lại!');
             return false;
         }
     });
 
     calculateEstimateTotal();
-    refreshAllFeedbacks();
 })();
 </script>
 </body>

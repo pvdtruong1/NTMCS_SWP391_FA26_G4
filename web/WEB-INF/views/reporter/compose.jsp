@@ -101,7 +101,7 @@
 
                             <div class="field">
                                 <label for="deadline">Thời hạn hoàn thành dự kiến <span style="color:var(--danger)">*</span></label>
-                                <input id="deadline" name="deadline" type="date" value="${formTopic.deadline}" min="${today}" required>
+                                <input id="deadline" name="deadline" type="date" value="${formTopic.deadline}" min="${tomorrow}" required>
                             </div>
 
                             <div class="field">
@@ -197,7 +197,7 @@
                             <table class="nested-form-table" id="member-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 58%;">NHÂN SỰ</th>
+                                        <th style="width: 58%;">EMAIL PHÓNG VIÊN ĐỒNG NGHIỆP</th>
                                         <th style="width: 28%;">VAI TRÒ TRONG NHÓM</th>
                                         <th style="width: 14%; text-align: center;">THAO TÁC</th>
                                     </tr>
@@ -208,22 +208,23 @@
                                             <c:forEach var="m" items="${formMembers}">
                                                 <tr class="member-row">
                                                     <td>
-                                                        <select name="memberUserId" class="user-select-box" required>
-                                                            <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                                            <c:forEach var="u" items="${activeUsers}">
-                                                                <option value="${u.userId}" ${m.userId == u.userId ? 'selected' : ''}>
-                                                                    ${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})
-                                                                </option>
-                                                            </c:forEach>
-                                                        </select>
-                                                        <div class="schedule-feedback-box"></div>
+                                                        <input type="email" name="memberEmail" class="member-email-input"
+                                                               value="<c:out value='${m.userEmail}'/>"
+                                                               placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
+                                                        <div class="member-schedule-hint" style="font-size: 11.5px; margin-top: 4px;">
+                                                            <c:if test="${not empty m.userName}">
+                                                                <small style="color:var(--muted);font-size:11px;display:block;">
+                                                                    ✓ <c:out value="${m.userName}"/>
+                                                                </small>
+                                                            </c:if>
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <select name="memberRole" required>
-                                                            <option value="LEAD_REPORTER" ${m.roleInTeam eq 'LEAD_REPORTER' ? 'selected' : ''}>Phóng viên chính</option>
                                                             <option value="PHOTO_REPORTER" ${m.roleInTeam eq 'PHOTO_REPORTER' ? 'selected' : ''}>Phóng viên ảnh</option>
                                                             <option value="CAMERAMAN" ${m.roleInTeam eq 'CAMERAMAN' ? 'selected' : ''}>Quay phim</option>
-                                                            <option value="ASSISTANT" ${m.roleInTeam eq 'ASSISTANT' ? 'selected' : ''}>Trợ lý</option>
+                                                            <option value="ASSISTANT" ${empty m.roleInTeam or m.roleInTeam eq 'ASSISTANT' ? 'selected' : ''}>Trợ lý</option>
+                                                            <option value="LEAD_REPORTER" ${m.roleInTeam eq 'LEAD_REPORTER' ? 'selected' : ''}>Phóng viên chính</option>
                                                         </select>
                                                     </td>
                                                     <td style="text-align: center;">
@@ -233,37 +234,19 @@
                                             </c:forEach>
                                         </c:when>
                                         <c:otherwise>
-                                            <tr class="member-row">
-                                                <td>
-                                                    <select name="memberUserId" class="user-select-box">
-                                                        <option value="">-- Chọn phóng viên tác nghiệp --</option>
-                                                        <c:forEach var="u" items="${activeUsers}">
-                                                            <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
-                                                        </c:forEach>
-                                                    </select>
-                                                    <div class="schedule-feedback-box"></div>
-                                                </td>
-                                                <td>
-                                                    <select name="memberRole">
-                                                        <option value="LEAD_REPORTER">Phóng viên chính</option>
-                                                        <option value="PHOTO_REPORTER">Phóng viên ảnh</option>
-                                                        <option value="CAMERAMAN">Quay phim</option>
-                                                        <option value="ASSISTANT">Trợ lý</option>
-                                                    </select>
-                                                </td>
-                                                <td style="text-align: center;">
-                                                    <button type="button" class="btn-danger-sm btn-del-member">Xóa</button>
-                                                </td>
-                                            </tr>
+                                            <!-- Mặc định khi chưa có thành viên, bấm '+ Thêm email' để thêm -->
                                         </c:otherwise>
                                     </c:choose>
                                 </tbody>
                             </table>
 
-                            <div>
+                            <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                                 <button type="button" class="btn sm" id="btn-add-member">
-                                    + Thêm thành viên
+                                    ➕ Thêm email
                                 </button>
+                                <small style="color: var(--muted); font-size: 11.5px;">
+                                    💡 Bạn (tác giả) đã là Phóng viên chủ trì đề tài. Chỉ nhập thêm email nếu đề tài có đồng nghiệp cùng tác nghiệp.
+                                </small>
                             </div>
                         </div>
 
@@ -328,18 +311,8 @@
     </div>
 </div>
 
-<!-- Template options for JavaScript dynamic rows -->
-<div id="user-options-template" style="display:none;">
-    <option value="">-- Chọn phóng viên tác nghiệp --</option>
-    <c:forEach var="u" items="${activeUsers}">
-        <option value="${u.userId}">${u.fullName} (Phóng viên${not empty u.deskName ? ' - ' += u.deskName : ''})</option>
-    </c:forEach>
-</div>
-
 <script>
 (function() {
-    const BUSY_SCHEDULES = ${not empty userBusySchedulesJson ? userBusySchedulesJson : '{}'};
-
     function calculateEstimateTotal() {
         let total = 0;
         const inputs = document.querySelectorAll('.estimate-amount-input');
@@ -387,79 +360,66 @@
         }
     });
 
-    function updateScheduleFeedback(selectEl) {
-        const userId = selectEl.value;
-        const parentCell = selectEl.closest('td');
-        const feedbackBox = parentCell.querySelector('.schedule-feedback-box');
-        if (!feedbackBox) return;
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 
-        if (!userId) {
-            feedbackBox.innerHTML = '';
+    function checkMemberSchedule(input) {
+        const email = (input.value || '').trim();
+        const parentTd = input.closest('td');
+        const hint = parentTd ? parentTd.querySelector('.member-schedule-hint') : null;
+        if (!hint) return;
+        if (!email) {
+            hint.innerHTML = '';
+            hint.style.display = 'none';
             return;
         }
 
-        const allSelects = document.querySelectorAll('.user-select-box');
-        let duplicateCount = 0;
-        allSelects.forEach(function(s) {
-            if (s.value === userId) duplicateCount++;
-        });
+        const currentTopicId = '${topic.topicId != null ? topic.topicId : 0}';
+        const url = '${base}/reporter/check-schedule?email=' + encodeURIComponent(email) + '&topicId=' + currentTopicId;
 
-        if (duplicateCount > 1) {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-busy">
-                    <span style="font-weight:bold">⚠ Cảnh báo:</span> Nhân sự này đã được thêm trong nhóm tác nghiệp!
-                </div>
-            `;
-            return;
-        }
-
-        const busyTopics = BUSY_SCHEDULES[userId];
-        if (busyTopics && busyTopics.length > 0) {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-busy">
-                    <span style="font-weight:bold">⚠ Bận lịch (Đề tài):</span> ` + busyTopics.join('; ') + `
-                </div>
-            `;
-        } else {
-            feedbackBox.innerHTML = `
-                <div class="schedule-status status-free">
-                    <span style="font-weight:bold">✓ Lịch tác nghiệp trống:</span> Sẵn sàng nhận nhiệm vụ
-                </div>
-            `;
-        }
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.found) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Không tìm thấy phóng viên hợp lệ với email này</span>';
+                    hint.style.display = 'block';
+                } else if (!data.active) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Phóng viên <strong>' + escapeHtml(data.fullName) + '</strong> đang bị khóa tài khoản</span>';
+                    hint.style.display = 'block';
+                } else if (!data.isReporter) {
+                    hint.innerHTML = '<span style="color: #b91c1c; font-size: 11px;">⚠️ Người dùng <strong>' + escapeHtml(data.fullName) + '</strong> không thuộc vai trò Phóng viên</span>';
+                    hint.style.display = 'block';
+                } else if (data.busy) {
+                    hint.innerHTML = '<span style="color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; line-height: 1.4;">⚠️ <strong>' + escapeHtml(data.fullName) + '</strong> đang tham gia ' + data.count + ' đề tài khác: ' + escapeHtml(data.topics.join(', ')) + '</span>';
+                    hint.style.display = 'block';
+                } else {
+                    hint.innerHTML = '<span style="color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;">✓ <strong>' + escapeHtml(data.fullName) + '</strong> &mdash; Lịch trống (sẵn sàng tác nghiệp)</span>';
+                    hint.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                hint.style.display = 'none';
+            });
     }
 
-    function refreshAllFeedbacks() {
-        const selects = document.querySelectorAll('.user-select-box');
-        selects.forEach(function(sel) {
-            updateScheduleFeedback(sel);
-        });
-    }
-
-    document.getElementById('member-table-body')?.addEventListener('change', function(e) {
-        if (e.target.classList.contains('user-select-box')) {
-            refreshAllFeedbacks();
-        }
-    });
-
+    // Thêm dòng nhập email thành viên tổ tác nghiệp
     document.getElementById('btn-add-member')?.addEventListener('click', function() {
         const tbody = document.getElementById('member-table-body');
-        const userOptionsHtml = document.getElementById('user-options-template')?.innerHTML || '';
         const tr = document.createElement('tr');
         tr.className = 'member-row';
         tr.innerHTML = `
             <td>
-                <select name="memberUserId" class="user-select-box" required>
-                    ` + userOptionsHtml + `
-                </select>
-                <div class="schedule-feedback-box"></div>
+                <input type="email" name="memberEmail" class="member-email-input" placeholder="Nhập email phóng viên (vd: name@newsroom.vn)..." required>
+                <div class="member-schedule-hint" style="font-size: 11.5px; margin-top: 4px;"></div>
             </td>
             <td>
                 <select name="memberRole" required>
-                    <option value="LEAD_REPORTER">Phóng viên chính</option>
                     <option value="PHOTO_REPORTER">Phóng viên ảnh</option>
                     <option value="CAMERAMAN">Quay phim</option>
                     <option value="ASSISTANT" selected>Trợ lý</option>
+                    <option value="LEAD_REPORTER">Phóng viên chính</option>
                 </select>
             </td>
             <td style="text-align: center;">
@@ -467,6 +427,20 @@
             </td>
         `;
         tbody.appendChild(tr);
+        const newInput = tr.querySelector('.member-email-input');
+        if (newInput) {
+            newInput.focus();
+            newInput.addEventListener('blur', function() { checkMemberSchedule(this); });
+            newInput.addEventListener('change', function() { checkMemberSchedule(this); });
+        }
+    });
+
+    document.querySelectorAll('.member-email-input').forEach(function(inp) {
+        inp.addEventListener('blur', function() { checkMemberSchedule(this); });
+        inp.addEventListener('change', function() { checkMemberSchedule(this); });
+        if (inp.value && inp.value.trim()) {
+            checkMemberSchedule(inp);
+        }
     });
 
     document.getElementById('member-table-body')?.addEventListener('click', function(e) {
@@ -474,7 +448,6 @@
             const row = e.target.closest('tr');
             if (row) {
                 row.remove();
-                refreshAllFeedbacks();
             }
         }
     });
@@ -484,29 +457,51 @@
         window.open('${base}/reporter/duplicate-search?keyword=' + titleVal, '_blank');
     });
 
-    document.getElementById('pitch-form')?.addEventListener('submit', function(e) {
-        const allSelects = document.querySelectorAll('.user-select-box');
-        const userIds = new Set();
-        let hasDuplicate = false;
+    // Thiết lập giới hạn ngày hoàn thành dự kiến phải từ ngày mai trở đi
+    const deadlineInput = document.getElementById('deadline');
+    if (deadlineInput) {
+        const tmr = new Date();
+        tmr.setDate(tmr.getDate() + 1);
+        const tmrStr = tmr.toISOString().split('T')[0];
+        if (!deadlineInput.min || deadlineInput.min < tmrStr) {
+            deadlineInput.min = tmrStr;
+        }
+    }
 
-        allSelects.forEach(function(s) {
-            if (s.value) {
-                if (userIds.has(s.value)) {
-                    hasDuplicate = true;
+    document.getElementById('pitch-form')?.addEventListener('submit', function(e) {
+        const dlInput = document.getElementById('deadline');
+        if (dlInput && dlInput.value) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (dlInput.value <= todayStr) {
+                e.preventDefault();
+                alert('Thời hạn hoàn thành dự kiến (Deadline) phải là một ngày trong tương lai (từ ngày mai trở đi)!');
+                dlInput.focus();
+                return false;
+            }
+        }
+
+        const emailInputs = document.querySelectorAll('.member-email-input');
+        const seen = new Set();
+        let dup = '';
+
+        emailInputs.forEach(function(input) {
+            const val = (input.value || '').trim().toLowerCase();
+            if (val) {
+                if (seen.has(val)) {
+                    dup = val;
                 }
-                userIds.add(s.value);
+                seen.add(val);
             }
         });
 
-        if (hasDuplicate) {
+        if (dup) {
             e.preventDefault();
-            alert('Có nhân sự bị thêm trùng lặp nhiều lần trong danh sách tổ tác nghiệp. Vui lòng kiểm tra lại!');
+            alert('Email "' + dup + '" bị nhập trùng lặp nhiều lần trong danh sách tổ tác nghiệp. Vui lòng kiểm tra lại!');
             return false;
         }
     });
 
     calculateEstimateTotal();
-    refreshAllFeedbacks();
 })();
 </script>
 </body>

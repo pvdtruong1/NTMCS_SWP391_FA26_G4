@@ -1757,6 +1757,10 @@ public class TopicDAO extends DBContext {
         return t;
     }
 
+    /**
+     * Lấy danh sách đề tài của phóng viên kèm theo bộ lọc trạng thái và từ khóa tìm kiếm.
+     * Sắp xếp giảm dần theo topic_id (mới nhất lên đầu).
+     */
     public List<Topic> getTopicsByReporter(int userId, String statusFilter, String searchKeyword) {
         List<Topic> list = new ArrayList<>();
         StringBuilder sql = new StringBuilder(baseReporterSelect());
@@ -1823,6 +1827,11 @@ public class TopicDAO extends DBContext {
         return list;
     }
 
+    /**
+     * Lấy chi tiết đề tài cho phóng viên, có kiểm tra quyền truy cập:
+     * Người dùng phải là tác giả (author), thành viên ekip (Topic_Member),
+     * người được phân công nhiệm vụ (Fieldwork_Task), hoặc các vai trò quản lý/biên tập.
+     */
     public Topic getTopicDetailForReporter(int topicId, int userId) {
         String sql = baseReporterSelect()
                    + "WHERE t.topic_id = ? AND ( "
@@ -1855,6 +1864,13 @@ public class TopicDAO extends DBContext {
         return null;
     }
 
+    /**
+     * Lưu đề xuất đề tài (Tạo mới hoặc Cập nhật) kèm bảng dự toán kinh phí và thành viên tổ tác nghiệp.
+     * Sử dụng Transaction để đảm bảo tính toàn vẹn dữ liệu:
+     * - Nếu topicId == 0: INSERT đề tài mới, sau đó INSERT dự toán và thành viên.
+     * - Nếu topicId > 0: UPDATE đề tài (chỉ cho phép khi ở trạng thái DRAFT hoặc REVISION_REQUESTED/REVISION_REQUIRED),
+     *   sau đó làm mới danh sách Topic_Estimate và Topic_Member.
+     */
     public Topic saveTopicPitch(Topic topic, List<TopicEstimate> estimates, List<TopicMember> members) throws SQLException {
         if (topic == null) {
             throw new IllegalArgumentException("Topic khﾃｴng ﾄ柁ｰ盻｣c null.");
@@ -2080,6 +2096,10 @@ public class TopicDAO extends DBContext {
         }
     }
 
+    /**
+     * Xóa bản nháp đề tài của phóng viên. Chỉ xóa thành công nếu đề tài đang ở trạng thái 'DRAFT'
+     * và đúng tác giả (author_user_id == userId).
+     */
     public boolean deleteReporterDraft(int topicId, int userId) {
         String sql = "DELETE FROM Topic WHERE topic_id = ? AND author_user_id = ? AND status = 'DRAFT'";
         try {
@@ -2090,13 +2110,17 @@ public class TopicDAO extends DBContext {
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 xﾃｳa b蘯｣n nhﾃ｡p #" + topicId + " c盻ｧa user #" + userId, ex);
+            LOGGER.log(Level.SEVERE, "Lỗi xóa bản nháp #" + topicId + " của user #" + userId, ex);
             return false;
         } finally {
             close();
         }
     }
 
+    /**
+     * Tìm kiếm các đề tài tương tự dựa trên từ khóa trong tiêu đề, tóm tắt, góc tiếp cận
+     * hoặc tên chuyên mục nhằm hỗ trợ phóng viên phát hiện trùng lặp ý tưởng.
+     */
     public List<Topic> searchSimilarTopics(String query) {
         List<Topic> list = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
@@ -2123,13 +2147,16 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 tra c盻ｩu ﾄ黛ｻ・tﾃi tﾆｰﾆ｡ng t盻ｱ", ex);
+            LOGGER.log(Level.SEVERE, "Lỗi tra cứu đề tài tương tự", ex);
         } finally {
             close();
         }
         return list;
     }
 
+    /**
+     * Lấy danh sách các khoản mục dự toán kinh phí tác nghiệp của đề tài từ bảng Topic_Estimate.
+     */
     public List<TopicEstimate> findEstimatesByTopicId(int topicId) {
         List<TopicEstimate> list = new ArrayList<>();
         if (topicId <= 0) return list;
@@ -2151,13 +2178,16 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y chi phﾃｭ cho topic " + topicId, ex);
+            LOGGER.log(Level.SEVERE, "Lỗi lấy chi phí cho topic " + topicId, ex);
         } finally {
             close();
         }
         return list;
     }
 
+    /**
+     * Lấy danh sách các thành viên tổ tác nghiệp của đề tài từ bảng Topic_Member kèm thông tin người dùng.
+     */
     public List<TopicMember> findMembersByTopicId(int topicId) {
         List<TopicMember> list = new ArrayList<>();
         if (topicId <= 0) return list;
@@ -2189,13 +2219,17 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y thﾃnh viﾃｪn cho topic " + topicId, ex);
+            LOGGER.log(Level.SEVERE, "Lỗi lấy thành viên cho topic " + topicId, ex);
         } finally {
             close();
         }
         return list;
     }
 
+    /**
+     * Lấy danh sách tất cả phóng viên đang hoạt động (active_status = 1 và role = 'REPORTER')
+     * trong tòa soạn để phục vụ phân công nhân sự.
+     */
     public List<User> findAllActiveUsersForTeam() {
         List<User> list = new ArrayList<>();
         String sql = "SELECT u.user_id, u.full_name, u.email, u.role_id, r.role_name, u.active_status, u.desk_id, d.desk_name "
@@ -2227,13 +2261,21 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y danh sﾃ｡ch nhﾃ｢n s盻ｱ tﾃ｡c nghi盻㎝", ex);
+            LOGGER.log(Level.SEVERE, "Lỗi lấy danh sách nhân sự tác nghiệp", ex);
         } finally {
             close();
         }
         return list;
     }
 
+    /**
+     * Truy vấn bản đồ lịch bận của toàn bộ nhân sự tòa soạn (Map: userId -> danh sách mã và tên đề tài đang bận).
+     * Một nhân sự bị tính là đang bận nếu:
+     * - Là tác giả chủ trì đề tài khác đang hoạt động.
+     * - Là thành viên trong Topic_Member của đề tài khác đang hoạt động.
+     * - Đang được giao nhiệm vụ thực địa (Fieldwork_Task) ở trạng thái TODO hoặc IN_PROGRESS.
+     * @param excludeTopicId Bỏ qua đề tài hiện tại khi kiểm tra lịch bận.
+     */
     public Map<Integer, List<String>> getUsersBusySchedule(int excludeTopicId) {
         Map<Integer, List<String>> map = new HashMap<>();
         String sql = "SELECT DISTINCT tm_all.user_id, t.topic_id, t.topic_code, t.title, t.status "
@@ -2268,13 +2310,18 @@ public class TopicDAO extends DBContext {
                 }
             }
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "L盻擁 l蘯･y l盻議h b蘯ｭn nhﾃ｢n s盻ｱ", ex);
+            LOGGER.log(Level.SEVERE, "Lỗi lấy lịch bận nhân sự", ex);
         } finally {
             close();
         }
         return map;
     }
 
+    /**
+     * Lấy danh sách các đề tài mà một phóng viên cụ thể đang bận tham gia.
+     * @param userId ID phóng viên cần kiểm tra
+     * @param excludeTopicId ID đề tài hiện tại cần loại trừ
+     */
     public List<String> getUserBusyTopics(int userId, int excludeTopicId) {
         if (userId <= 0) return Collections.emptyList();
         Map<Integer, List<String>> map = getUsersBusySchedule(excludeTopicId);

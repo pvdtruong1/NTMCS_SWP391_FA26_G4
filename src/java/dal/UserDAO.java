@@ -127,6 +127,34 @@ public class UserDAO extends DBContext {
         return null;
     }
 
+    /**
+     * Tìm kiếm user theo email với điều kiện:
+     * - Email khớp chính xác (không phân biệt chữ hoa/thường)
+     * - Role = 'REPORTER'
+     * - active_status = 1 (ACTIVE)
+     */
+    public User getActiveReporterByEmail(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return null;
+        }
+        String sql = BASE_SELECT
+                + "WHERE LOWER(u.email) = LOWER(?) "
+                + "AND u.active_status = 1 "
+                + "AND r.role_name = 'REPORTER'";
+        try (Connection con = getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, email.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapUser(rs);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public boolean emailExists(String email) {
         return getByEmail(email) != null;
     }

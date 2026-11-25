@@ -197,6 +197,14 @@ public class ReporterServlet extends HttpServlet {
         }
 
         try (TopicDAO topicDAO = new TopicDAO()) {
+            // Chống duplicate submit do bấm nút nhiều lần trong khoảng thời gian ngắn (5 giây)
+            if (topic.getTopicId() == 0 && topicDAO.hasRecentDuplicateTopic(loggedUser.getUserId(), title, 5)) {
+                LOGGER.log(Level.WARNING, "Phát hiện duplicate submit đề tài ''{0}'' từ user #{1}. Bỏ qua request trùng lặp.",
+                        new Object[]{title, loggedUser.getUserId()});
+                String message = "submit".equals(action) ? "submitted" : "draftSaved";
+                response.sendRedirect(request.getContextPath() + "/reporter/topics?message=" + message);
+                return;
+            }
             topicDAO.saveTopicPitch(topic, estimates, validMembers);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Lỗi khi lưu đề xuất đề tài", e);

@@ -2097,6 +2097,34 @@ public class TopicDAO extends DBContext {
     }
 
     /**
+     * Kiểm tra xem phóng viên có vừa tạo một đề tài giống hệt trong vòng secondsThres giây gần nhất không
+     * để chống duplicate submit do click chuột nhiều lần hoặc mạng chập chờn.
+     */
+    public boolean hasRecentDuplicateTopic(int authorUserId, String title, int secondsThres) {
+        if (title == null || title.trim().isEmpty() || authorUserId <= 0) {
+            return false;
+        }
+        String sql = "SELECT COUNT(*) FROM Topic "
+                   + "WHERE author_user_id = ? "
+                   + "  AND LTRIM(RTRIM(LOWER(title))) = LTRIM(RTRIM(LOWER(?))) "
+                   + "  AND created_date >= DATEADD(second, -?, SYSDATETIME())";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, authorUserId);
+            ps.setString(2, title.trim());
+            ps.setInt(3, secondsThres);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.WARNING, "Failed to check recent duplicate topic", e);
+        }
+        return false;
+    }
+
+    /**
      * Xóa bản nháp đề tài của phóng viên. Chỉ xóa thành công nếu đề tài đang ở trạng thái 'DRAFT'
      * và đúng tác giả (author_user_id == userId).
      */

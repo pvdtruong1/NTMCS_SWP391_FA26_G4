@@ -254,10 +254,11 @@
                             <a class="btn" href="${base}/reporter/topics">
                                 Hủy bỏ
                             </a>
-                            <button class="btn action-btn-draft" type="submit" name="action" value="saveDraft">
+                            <input type="hidden" name="action" id="formActionField" value="submit">
+                            <button class="btn action-btn-draft" type="submit" id="btnSaveDraft" onclick="document.getElementById('formActionField').value='saveDraft';">
                                 💾 Lưu bản thảo (DRAFT)
                             </button>
-                            <button class="btn primary" type="submit" name="action" value="submit">
+                            <button class="btn primary" type="submit" id="btnSubmitTopic" onclick="document.getElementById('formActionField').value='submit';">
                                 🚀 Gửi duyệt đề xuất (SUBMITTED)
                             </button>
                         </div>
@@ -468,7 +469,14 @@
         }
     }
 
+    let isSubmitting = false;
+
     document.getElementById('pitch-form')?.addEventListener('submit', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            return false;
+        }
+
         const dlInput = document.getElementById('deadline');
         if (dlInput && dlInput.value) {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -499,6 +507,28 @@
             alert('Email "' + dup + '" bị nhập trùng lặp nhiều lần trong danh sách tổ tác nghiệp. Vui lòng kiểm tra lại!');
             return false;
         }
+
+        // Đã qua toàn bộ validation -> Khóa submit để chống bấm nhiều lần gây duplicate
+        isSubmitting = true;
+        const btnSubmit = document.getElementById('btnSubmitTopic');
+        const btnDraft = document.getElementById('btnSaveDraft');
+        const actionVal = document.getElementById('formActionField')?.value;
+
+        if (actionVal === 'saveDraft') {
+            if (btnDraft) {
+                btnDraft.innerText = '⏳ Đang lưu nháp...';
+                btnDraft.style.opacity = '0.7';
+                btnDraft.style.pointerEvents = 'none';
+            }
+        } else {
+            if (btnSubmit) {
+                btnSubmit.innerText = '⏳ Đang gửi duyệt...';
+                btnSubmit.style.opacity = '0.7';
+                btnSubmit.style.pointerEvents = 'none';
+            }
+        }
+        if (btnDraft) btnDraft.style.pointerEvents = 'none';
+        if (btnSubmit) btnSubmit.style.pointerEvents = 'none';
     });
 
     calculateEstimateTotal();
